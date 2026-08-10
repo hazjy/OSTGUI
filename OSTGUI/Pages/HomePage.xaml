@@ -1,0 +1,68 @@
+<Page
+    x:Class="OSTGUI.Pages.HomePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+
+    <ScrollViewer>
+        <StackPanel Margin="40,32,40,40" Spacing="24">
+
+            <StackPanel Spacing="4">
+                <TextBlock Text="OSTGUI" FontSize="32" FontWeight="Bold" />
+                <TextBlock Text="OpenSteamTool 可视化管理工具"
+                           FontSize="14"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </StackPanel>
+
+            <Grid ColumnSpacing="16" RowSpacing="16">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Padding="16"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Steam 路径" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Text="{Binding SteamPathDisplay}" FontSize="20" FontWeight="Bold" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1" Padding="16"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="关键DLL" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Text="{Binding OstStatusText}" FontSize="20" FontWeight="Bold" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2" Padding="16"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Steam 状态" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Text="{Binding SteamRunningText}" FontSize="20" FontWeight="Bold" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <StackPanel Spacing="12">
+                <TextBlock Text="快捷操作" FontSize="16" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <Button Click="GoToSearch_Click"><TextBlock Text="搜索入库" /></Button>
+                    <Button Click="GoToLibrary_Click"><TextBlock Text="管理库" /></Button>
+                    <Button Click="RestartSteam_Click"><TextBlock Text="重启 Steam" /></Button>
+                    <Button Click="FreeVip_Click"><TextBlock Text="免费领B站大会员" /></Button>
+                </StackPanel>
+            </StackPanel>
+
+            <Border Padding="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="6">
+                <TextBlock Text="{Binding StatusMessage}" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</Page>

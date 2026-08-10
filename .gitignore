@@ -1,0 +1,17 @@
+# 构建产物
+bin/
+obj/
+*.user
+*.suo
+
+# 日志与用户数据
+crash.log
+WindowStateSaveData.json
+build_log.txt
+deepseek_usage.html
+
+# 打包文件
+*.zip
+
+# 调试符号
+*.pdb
