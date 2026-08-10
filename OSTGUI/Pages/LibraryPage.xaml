@@ -4,7 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:OSTGUI.Models"
     xmlns:helpers="using:OSTGUI.Helpers"
-    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    Background="{ThemeResource LayerFillColorDefaultBrush}">
 
     <Page.Resources>
         <helpers:BoolToVisibilityConverter x:Key="BoolToVis" />

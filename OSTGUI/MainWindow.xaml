@@ -24,10 +24,10 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <Grid x:Name="AppTitleBar" Grid.Row="0" Height="32"
-              Background="{ThemeResource LayerFillColorDefaultBrush}" VerticalAlignment="Top">
-            <TextBlock x:Name="AppTitleBarText" Text="OSTGUI" VerticalAlignment="Center" Margin="12,0,0,0"
-                       FontSize="12" FontWeight="SemiBold"
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Height="48"
+              Background="{ThemeResource ApplicationPageBackgroundThemeBrush}" VerticalAlignment="Top">
+            <TextBlock x:Name="AppTitleBarText" Text="OSTGUI" VerticalAlignment="Center" Margin="16,0,0,0"
+                       FontSize="14" FontWeight="SemiBold"
                        Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
         </Grid>
 
@@ -38,9 +38,10 @@
             IsSettingsVisible="False"
             PaneDisplayMode="Left"
             IsPaneToggleButtonVisible="True"
-            OpenPaneLength="300"
-            Background="{ThemeResource LayerFillColorDefaultBrush}"
+            OpenPaneLength="360"
+            Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"
             SelectionChanged="NavView_SelectionChanged"
+            ItemInvoked="MainNavView_ItemInvoked"
             PaneOpening="MainNavView_PaneOpening"
             PaneClosing="MainNavView_PaneClosing">
 
@@ -57,15 +58,19 @@
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE8F1;" /></NavigationViewItem.Icon>
                     <NavigationViewItem.Content>入库管理</NavigationViewItem.Content>
                 </NavigationViewItem>
+                <NavigationViewItem x:Name="NavDenuvo" Tag="denuvo">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xEA18;" /></NavigationViewItem.Icon>
+                    <NavigationViewItem.Content>D加密授权</NavigationViewItem.Content>
+                </NavigationViewItem>
             </NavigationView.MenuItems>
 
             <NavigationView.FooterMenuItems>
                 <NavigationViewItem x:Name="NavRestartSteam" SelectsOnInvoked="False" Tapped="NavRestartSteam_Tapped">
-                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE72C;" /></NavigationViewItem.Icon>
+                    <NavigationViewItem.Icon><FontIcon x:Name="RestartGlyphIcon" Glyph="&#xE72C;" /></NavigationViewItem.Icon>
                     <NavigationViewItem.Content>重启 Steam</NavigationViewItem.Content>
                 </NavigationViewItem>
                 <NavigationViewItem x:Name="NavSettings" Tag="settings">
-                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE713;" /></NavigationViewItem.Icon>
+                    <NavigationViewItem.Icon><FontIcon x:Name="SettingsGlyphIcon" Glyph="&#xE713;" /></NavigationViewItem.Icon>
                     <NavigationViewItem.Content>设置</NavigationViewItem.Content>
                 </NavigationViewItem>
             </NavigationView.FooterMenuItems>

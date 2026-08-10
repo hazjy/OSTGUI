@@ -4,7 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:helpers="using:OSTGUI.Helpers"
     xmlns:models="using:OSTGUI.Models"
-    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    Background="{ThemeResource LayerFillColorDefaultBrush}">
 
     <Page.Resources>
         <helpers:BoolToVisibilityConverter x:Key="BoolToVis" />
@@ -110,11 +110,6 @@
                             </ItemsControl>
                         </ScrollViewer>
                     </StackPanel>
-                </Border>
-
-                <Border Padding="12" CornerRadius="6" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-                    <TextBlock Text="{Binding StatusMessage}" FontSize="13"
-                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </Border>
 
                 <!-- 日志区域 -->

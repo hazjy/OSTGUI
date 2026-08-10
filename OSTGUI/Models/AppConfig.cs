@@ -41,7 +41,7 @@ public class AppConfig
     public string LibraryViewMode { get; set; } = "list"; // list, grid
     public string DefaultPage { get; set; } = "home";
     public bool IsNavigationPaneOpen { get; set; } = true;
-    public double NavigationPaneWidth { get; set; } = 300;
+    public double NavigationPaneWidth { get; set; } = 360;
 
     // === 应用程序设置 ===
     public bool DebugMode { get; set; }
@@ -89,7 +89,7 @@ public class AppConfig
         LibraryViewMode = "list",
         DefaultPage = "home",
         IsNavigationPaneOpen = true,
-        NavigationPaneWidth = 300,
+        NavigationPaneWidth = 360,
         DebugMode = false,
         SaveLogFiles = true,
         CheckUpdateOnStart = true,

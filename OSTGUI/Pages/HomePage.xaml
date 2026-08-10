@@ -2,7 +2,7 @@
     x:Class="OSTGUI.Pages.HomePage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
+    Background="{ThemeResource LayerFillColorDefaultBrush}">
 
     <ScrollViewer>
         <StackPanel Margin="40,32,40,40" Spacing="24">
@@ -54,7 +54,6 @@
                 <StackPanel Orientation="Horizontal" Spacing="12">
                     <Button Click="GoToSearch_Click"><TextBlock Text="搜索入库" /></Button>
                     <Button Click="GoToLibrary_Click"><TextBlock Text="管理库" /></Button>
-                    <Button Click="RestartSteam_Click"><TextBlock Text="重启 Steam" /></Button>
                     <Button Click="FreeVip_Click"><TextBlock Text="免费领B站大会员" /></Button>
                 </StackPanel>
             </StackPanel>

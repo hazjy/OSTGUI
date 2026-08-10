@@ -33,14 +33,6 @@ public sealed partial class HomePage : Page
         NavigateMain("library");
     }
 
-    private async void RestartSteam_Click(object sender, RoutedEventArgs e)
-    {
-        var steamService = App.Services.GetRequiredService<SteamService>();
-        var (success, message) = await steamService.RestartSteamAsync();
-        VM.StatusMessage = message;
-        VM.RefreshOstStatus();
-    }
-
     private void FreeVip_Click(object sender, RoutedEventArgs e)
     {
         // 你被骗了 🎵 Never gonna give you up 🎵

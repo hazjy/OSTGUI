@@ -181,12 +181,44 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
         }
     }
 
+    private void MainNavView_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
+    {
+        // 每次点击设置项（含重复点击当前项）都触发齿轮旋转
+        if (args.InvokedItemContainer == NavSettings)
+            RotateIcon(SettingsGlyphIcon);
+    }
+
     private void NavRestartSteam_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
     {
         if (sender is not NavigationViewItem item) return;
+        RotateIcon(RestartGlyphIcon);
 
         var menu = (MenuFlyout)RootGrid.Resources["RestartSteamMenu"];
-        menu.ShowAt(item, new Windows.Foundation.Point(0, item.ActualHeight));
+        // 弹窗右移，避免遮挡左侧图标的旋转动效
+        menu.ShowAt(item, new Windows.Foundation.Point(40, item.ActualHeight));
+    }
+
+    /// <summary>
+    /// 图标点击旋转动效（Composition 动画，0 → 360 度）
+    /// </summary>
+    private void RotateIcon(Microsoft.UI.Xaml.Controls.FontIcon icon)
+    {
+        try
+        {
+            var visual = Microsoft.UI.Xaml.Hosting.ElementCompositionPreview.GetElementVisual(icon);
+            var compositor = visual.Compositor;
+            var animation = compositor.CreateScalarKeyFrameAnimation();
+            animation.InsertKeyFrame(0f, 0f);
+            animation.InsertKeyFrame(1f, 360f);
+            animation.Duration = TimeSpan.FromMilliseconds(450);
+            animation.Target = "RotationAngleInDegrees";
+
+            var width = icon.ActualWidth > 0 ? icon.ActualWidth : 16;
+            var height = icon.ActualHeight > 0 ? icon.ActualHeight : 16;
+            visual.CenterPoint = new System.Numerics.Vector3((float)width / 2, (float)height / 2, 0f);
+            visual.StartAnimation("RotationAngleInDegrees", animation);
+        }
+        catch { }
     }
 
     private async void RestartSteam_Click(object sender, RoutedEventArgs e)
@@ -291,6 +323,7 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
                 "home" => new HomePage(_mainVM),
                 "search" => new SearchPage(_mainVM.SearchVM),
                 "library" => new LibraryPage(_mainVM.LibraryVM),
+                "denuvo" => new DenuvoPage(_mainVM.DenuvoVM),
                 "settings" => new SettingsPage(_mainVM.SettingsVM),
                 _ => new HomePage(_mainVM),
             };
