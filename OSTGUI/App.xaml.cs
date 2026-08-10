@@ -38,6 +38,11 @@ public partial class App : Application
         services.AddSingleton<SteamService>();
         services.AddSingleton<GameSearchService>();
         services.AddSingleton<LuaConfigService>();
+        services.AddSingleton<SudamaKeyCache>();
+        services.AddSingleton<SteamGameInfoService>();
+        services.AddSingleton<LuaBuilder>();
+        services.AddSingleton<ManifestDownloadService>();
+        services.AddSingleton<ManifestRepairService>();
         services.AddSingleton<ManifestService>();
         services.AddSingleton<TicketService>();
         services.AddSingleton<MainViewModel>();
