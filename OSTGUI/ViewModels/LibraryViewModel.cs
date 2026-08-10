@@ -14,6 +14,7 @@ public partial class LibraryViewModel : ObservableObject
 {
     private readonly LuaConfigService _luaService;
     private readonly GameSearchService _searchService;
+    private readonly GameInfoService _gameInfoService;
     private readonly SteamService _steamService;
     private readonly ManifestService _manifestService;
     private readonly ConfigService _configService;
@@ -44,12 +45,14 @@ public partial class LibraryViewModel : ObservableObject
     public LibraryViewModel(
         LuaConfigService luaService,
         GameSearchService searchService,
+        GameInfoService gameInfoService,
         SteamService steamService,
         ManifestService manifestService,
         ConfigService configService)
     {
         _luaService = luaService;
         _searchService = searchService;
+        _gameInfoService = gameInfoService;
         _steamService = steamService;
         _manifestService = manifestService;
         _configService = configService;
@@ -104,7 +107,7 @@ public partial class LibraryViewModel : ObservableObject
             {
                 try
                 {
-                    var dlcInfo = await _searchService.GetDlcInfoAsync(item.AppId);
+                    var dlcInfo = await _gameInfoService.GetDlcInfoAsync(item.AppId);
                     foreach (var dlc in dlcInfo)
                         dlc.Status = item.InstalledAppIds.Contains(dlc.AppId) ? "installed" : "";
                     item.DlcList = dlcInfo;
