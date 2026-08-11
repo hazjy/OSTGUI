@@ -2,8 +2,7 @@
     x:Class="OSTGUI.Pages.HomePage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Background="{ThemeResource LayerFillColorDefaultBrush}">
-
+    >
     <ScrollViewer>
         <StackPanel Margin="40,32,40,40" Spacing="24">
 
@@ -57,6 +56,21 @@
                     <Button Click="FreeVip_Click"><TextBlock Text="免费领B站大会员" /></Button>
                 </StackPanel>
             </StackPanel>
+
+            <Border Padding="16"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="入库失败 / 时间过长？" FontSize="16" FontWeight="Bold" />
+                    <TextBlock TextWrapping="Wrap" FontSize="14">
+                        <Run Text="下载开源工具 " />
+                        <Hyperlink Click="SteamPP_Click" Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}">
+                            <Run Text="瓦特工具箱" />
+                        </Hyperlink>
+                        <Run Text=" 并加速 Steam。" />
+                    </TextBlock>
+                </StackPanel>
+            </Border>
 
             <Border Padding="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="6">
                 <TextBlock Text="{Binding StatusMessage}" FontSize="13" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />

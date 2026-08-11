@@ -3,8 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:CommunityToolkit.WinUI.Controls"
-    Background="{ThemeResource LayerFillColorDefaultBrush}">
-
+    >
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -58,7 +57,7 @@
                                         <TextBlock Text="买或租/借，购买价格不应超过 5 元，低价优先"
                                                    FontSize="13" TextWrapping="Wrap"
                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                        <TextBlock Text="提醒：注意辨别是不是假入库的所谓“激活码”"
+                                        <TextBlock Text="--注意辨别是不是假入库的所谓“激活码”"
                                                    FontSize="12" TextWrapping="Wrap"
                                                    Foreground="{ThemeResource SystemFillColorCautionBrush}" />
                                     </StackPanel>
@@ -76,9 +75,12 @@
                                     </Border>
                                     <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
                                         <TextBlock Text="用正版账号启动一次游戏，看到窗口后退出" FontSize="16" FontWeight="SemiBold" />
-                                        <TextBlock Text="（看到窗口）然后退出"
-                                                   FontSize="13" TextWrapping="Wrap"
-                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock FontSize="13" TextWrapping="Wrap"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                            <Run Text="--" />
+                                            <Underline><Run Text="看到窗口" /></Underline>
+                                            <Run Text=" 然后退出" />
+                                        </TextBlock>
                                     </StackPanel>
                                 </Grid>
 
@@ -94,7 +96,7 @@
                                     </Border>
                                     <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
                                         <TextBlock Text="用自己的账号启动游戏，即可开玩" FontSize="16" FontWeight="SemiBold" />
-                                        <TextBlock Text="提醒：想省心就锁定游戏版本，否则更新后要重新授权"
+                                        <TextBlock Text="--想省心就锁定游戏版本，否则更新后要重新授权"
                                                    FontSize="13" TextWrapping="Wrap"
                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     </StackPanel>
@@ -117,7 +119,7 @@
                                 </StackPanel>
 
                                 <StackPanel Spacing="6">
-                                    <TextBlock Text="Q：红信号影响授权吗？" FontSize="15" FontWeight="SemiBold"
+                                    <TextBlock Text="Q：红信账号影响授权吗？" FontSize="15" FontWeight="SemiBold"
                                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
                                     <TextBlock Text="不影响"
                                                FontSize="13" TextWrapping="Wrap"
@@ -135,7 +137,7 @@
                                 <StackPanel Spacing="6">
                                     <TextBlock Text="Q：锁定版本要开吗？" FontSize="15" FontWeight="SemiBold"
                                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
-                                    <TextBlock Text="在乎新内容就开，想省心就锁定"
+                                    <TextBlock Text="在乎新内容就关，想省心就锁定"
                                                FontSize="13" TextWrapping="Wrap"
                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                 </StackPanel>

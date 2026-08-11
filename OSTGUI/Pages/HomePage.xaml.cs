@@ -49,6 +49,21 @@ public sealed partial class HomePage : Page
         catch { }
     }
 
+    private void SteamPP_Click(Microsoft.UI.Xaml.Documents.Hyperlink sender,
+                               Microsoft.UI.Xaml.Documents.HyperlinkClickEventArgs args)
+    {
+        try
+        {
+            var psi = new System.Diagnostics.ProcessStartInfo
+            {
+                FileName = "https://steampp.net/",
+                UseShellExecute = true
+            };
+            System.Diagnostics.Process.Start(psi);
+        }
+        catch { }
+    }
+
     private void NavigateMain(string tag)
     {
         Page page = tag switch

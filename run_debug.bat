@@ -19,7 +19,7 @@ echo [BUILD OK]
 echo.
 
 echo [2/3] Starting app...
-set "APP=OSTGUI\bin\Debug\net8.0-windows10.0.19041.0\win-x64\OSTGUI.exe"
+set "APP=OSTGUI\bin\Debug\net10.0-windows10.0.19041.0\win-x64\OSTGUI.exe"
 "%APP%"
 set "EXIT_CODE=%ERRORLEVEL%"
 
