@@ -461,6 +461,7 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
                 "home" => new HomePage(_mainVM),
                 "search" => new SearchPage(_mainVM.SearchVM),
                 "library" => new LibraryPage(_mainVM.LibraryVM),
+                "online" => new OnlinePage(),
                 "denuvo" => new DenuvoPage(_mainVM.DenuvoVM),
                 "settings" => new SettingsPage(_mainVM.SettingsVM),
                 _ => new HomePage(_mainVM),

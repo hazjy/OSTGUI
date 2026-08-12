@@ -36,6 +36,18 @@ public sealed partial class DenuvoPage : Page
             return;
         }
 
+        var confirmDialog = new ContentDialog
+        {
+            XamlRoot = this.XamlRoot,
+            Title = "使用正版账号导出",
+            Content = "请务必使用拥有该游戏的正版账号进行导出。\n\n如果使用非正版账号，可能提取到本地缓存的过时授权，导入后无法生效。",
+            PrimaryButtonText = "继续导出",
+            CloseButtonText = "取消"
+        };
+        var confirmResult = await confirmDialog.ShowAsync();
+        if (confirmResult != ContentDialogResult.Primary)
+            return;
+
         var picker = new FileSavePicker
         {
             SuggestedFileName = $"{appId}.ost"

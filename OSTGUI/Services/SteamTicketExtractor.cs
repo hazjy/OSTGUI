@@ -161,14 +161,16 @@ public class SteamTicketExtractor
                     if (user == 0)
                         return Fail("ConnectToGlobalUser 失败，请确认已登录 Steam 账号");
 
-                    var appTicketHex = ExtractAppOwnershipTicket(client, user, pipe, getGeneric, appId);
-                    if (appTicketHex == null)
-                        return Fail("获取所有权票据失败（请确认该账号拥有此游戏且已缓存）");
-
+                    // ETicket 仅由 Steam 服务器为正版拥有的账号签发，
+                    // 拿不到即说明当前账号无所有权或未在线
                     var eTicketHex = ExtractEncryptedAppTicket(
                         client, user, pipe, getUtils, getUser, appId);
                     if (eTicketHex == null)
-                        return Fail("获取加密票据失败（可能未拥有该游戏或请求超时）");
+                        return Fail("获取加密票据失败（请确认已登录正版账号且在线，该账号需拥有此游戏）");
+
+                    var appTicketHex = ExtractAppOwnershipTicket(client, user, pipe, getGeneric, appId);
+                    if (appTicketHex == null)
+                        return Fail("获取所有权票据失败（在线验证已通过，但本地未缓存所有权票据）");
 
                     return new ExtractResult
                     {

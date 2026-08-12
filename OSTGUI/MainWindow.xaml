@@ -57,6 +57,10 @@
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE8F1;" /></NavigationViewItem.Icon>
                     <NavigationViewItem.Content>入库管理</NavigationViewItem.Content>
                 </NavigationViewItem>
+                <NavigationViewItem x:Name="NavOnline" Tag="online">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE774;" /></NavigationViewItem.Icon>
+                    <NavigationViewItem.Content>联机</NavigationViewItem.Content>
+                </NavigationViewItem>
                 <NavigationViewItem x:Name="NavDenuvo" Tag="denuvo">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xEA18;" /></NavigationViewItem.Icon>
                     <NavigationViewItem.Content>D加密授权</NavigationViewItem.Content>
