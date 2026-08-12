@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using OSTGUI.ViewModels;
 using OSTGUI.Services;
 using System.Net.Http;
+using System.Text.Json;
 
 namespace OSTGUI;
 
@@ -36,6 +37,9 @@ public partial class App : Application
         services.AddSingleton(httpClient);
         services.AddSingleton<ConfigService>();
         services.AddSingleton<SteamService>();
+        services.AddSingleton<SteamDllService>();
+        services.AddSingleton<GameNameCacheService>();
+        services.AddSingleton<SteamSearchProvider>();
         services.AddSingleton<GameSearchService>();
         services.AddSingleton<GameInfoService>();
         services.AddSingleton<LibraryScanner>();
@@ -43,10 +47,14 @@ public partial class App : Application
         services.AddSingleton<SudamaKeyCache>();
         services.AddSingleton<SteamGameInfoService>();
         services.AddSingleton<LuaBuilder>();
+        services.AddSingleton<ManifestFileService>();
         services.AddSingleton<ManifestDownloadService>();
+        services.AddSingleton<LuaRepairService>();
         services.AddSingleton<ManifestRepairService>();
         services.AddSingleton<ManifestService>();
         services.AddSingleton<TicketService>();
+        services.AddSingleton<OstFileService>();
+        services.AddSingleton<SteamTicketExtractor>();
         services.AddSingleton<MainViewModel>();
         services.AddTransient<SearchViewModel>();
         services.AddTransient<LibraryViewModel>();
@@ -62,6 +70,15 @@ public partial class App : Application
     {
         Log("OnLaunched start");
 
+        // 提取模式：作为子进程运行时只执行提取并退出，不创建窗口
+        var cmdArgs = Environment.GetCommandLineArgs();
+        if (cmdArgs.Length >= 3 &&
+            cmdArgs[1].Equals("--extract-ticket", StringComparison.OrdinalIgnoreCase))
+        {
+            RunExtractTicketMode(cmdArgs);
+            return;
+        }
+
         // 先完整读取配置文件，再创建窗口，
         // 避免窗口先以默认状态显示、随后又被配置恢复导致闪烁
         var configService = Services.GetRequiredService<ConfigService>();
@@ -72,6 +89,34 @@ public partial class App : Application
         Log("MainWindow created");
         _window.Activate();
         Log("MainWindow activated");
+    }
+
+    /// <summary>
+    /// 子进程提取模式：--extract-ticket &lt;appid&gt; "&lt;输出文件&gt;"
+    /// 提取完成后立即退出，避免主进程被 Steam 识别为游戏进程
+    /// </summary>
+    private static void RunExtractTicketMode(string[] cmdArgs)
+    {
+        try
+        {
+            var appId = cmdArgs[2];
+            var outFile = cmdArgs.Length >= 4 ? cmdArgs[3] : "";
+            var extractor = new SteamTicketExtractor();
+            var result = extractor.Extract(appId);
+
+            if (!string.IsNullOrEmpty(outFile))
+                File.WriteAllText(outFile, JsonSerializer.Serialize(result));
+
+            Log($"extract mode done: success={result.Success} {result.Message}");
+        }
+        catch (Exception ex)
+        {
+            Log($"extract mode error: {ex}");
+        }
+        finally
+        {
+            Environment.Exit(0);
+        }
     }
 
     private static void Log(string msg)

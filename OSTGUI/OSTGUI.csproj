@@ -8,9 +8,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <Version>1.0.0</Version>
-    <AssemblyVersion>1.0.0.0</AssemblyVersion>
-    <FileVersion>1.0.0.0</FileVersion>
+    <Version>1.1.0</Version>
+    <AssemblyVersion>1.1.0.0</AssemblyVersion>
+    <FileVersion>1.1.0.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
@@ -23,5 +23,9 @@
     <PackageReference Include="System.Drawing.Common" Version="10.0.10" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
     <PackageReference Include="WindowStateSaver.WinUi3" Version="0.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Assets\important.html" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

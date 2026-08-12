@@ -13,22 +13,20 @@ public class ManifestRepairService
     private readonly ConfigService _configService;
     private readonly SteamGameInfoService _gameInfoService;
     private readonly LuaBuilder _luaBuilder;
-
-    private static readonly Regex RepairAddAppIdRegex = new(
-        @"addappid\s*\(\s*(\d+)",
-        RegexOptions.IgnoreCase | RegexOptions.Compiled);
+    private readonly LuaRepairService _luaRepair;
 
     private static readonly Regex RepairSetManifestIdRegex = new(
         @"^\s*setManifestid\s*\(\s*(\d+)\s*,\s*""(\d+)""",
         RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled);
 
     public ManifestRepairService(SteamService steamService, ConfigService configService,
-        SteamGameInfoService gameInfoService, LuaBuilder luaBuilder)
+        SteamGameInfoService gameInfoService, LuaBuilder luaBuilder, LuaRepairService luaRepair)
     {
         _steamService = steamService;
         _configService = configService;
         _gameInfoService = gameInfoService;
         _luaBuilder = luaBuilder;
+        _luaRepair = luaRepair;
     }
 
     private void Log(string message)
@@ -127,7 +125,7 @@ public class ManifestRepairService
             }
 
             // 1. Lua 损坏（缺失/无 addappid/残缺）→ 重建为固定版本配置
-            if (await EnsureLuaValidAsync(appId, true))
+            if (await _luaRepair.EnsureLuaValidAsync(appId, true))
                 notes.Add("已修复 Lua 配置");
 
             // 2. Lua 有效但缺少 setManifestid 配置（含注释形式）→ 重建补充
@@ -144,7 +142,7 @@ public class ManifestRepairService
 
             if (!hasConfig)
             {
-                if (await RebuildLuaAsync(appId, true))
+                if (await _luaRepair.RebuildLuaAsync(appId, true))
                     notes.Add("已补充固定版本配置");
                 else
                     return (false, "无法生成固定版本配置（未获取到 Depot 信息）");
@@ -189,7 +187,7 @@ public class ManifestRepairService
     private async Task<(bool ok, string message)> DownloadMissingManifestsAsync(string appId)
     {
         // 1. 收集该游戏 Lua 中出现的所有 AppID（主游戏 + depot/DLC 条目）
-        var luaIds = await GetAppIdsFromLuaAsync(appId);
+        var luaIds = await _luaRepair.GetAppIdsFromLuaAsync(appId);
         Log($"自动修复: 在 Lua 中发现 {luaIds.Count} 个条目");
 
         // 2. 为每个条目获取 depot + manifest gid（SteamCMD 优先）
@@ -244,109 +242,6 @@ public class ManifestRepairService
         if (errors.Count == 0)
             return (true, $"已补齐 {okCount} 个缺失清单");
         return (false, $"修复未完全成功: 成功 {okCount} 个，失败 {errors.Count} 个（{string.Join("; ", errors)}）");
-    }
-
-    /// <summary>
-    /// 检查 Lua 配置有效性：文件缺失 / 无 addappid / 内容残缺时重建（按原固定意图补 setManifestid 配置）
-    /// </summary>
-
-    private async Task<bool> EnsureLuaValidAsync(string appId, bool preferFixed)
-    {
-        var luaDir = _steamService.GetLuaConfigDir();
-        if (string.IsNullOrEmpty(luaDir)) return false;
-
-        var luaPath = Path.Combine(luaDir, $"{appId}.lua");
-        if (!File.Exists(luaPath))
-            return await RebuildLuaAsync(appId, preferFixed);
-
-        var content = await File.ReadAllTextAsync(luaPath);
-        if (!RepairAddAppIdRegex.IsMatch(content) || !IsLuaContentBalanced(content))
-        {
-            var hadManifestConfig = content.Contains("setManifestid", StringComparison.OrdinalIgnoreCase);
-            return await RebuildLuaAsync(appId, preferFixed || hadManifestConfig);
-        }
-
-        return false;
-    }
-
-    /// <summary>
-    /// 重建 Lua 配置（含 depot key / token / DLC / 固定版本配置）
-    /// </summary>
-
-    private async Task<bool> RebuildLuaAsync(string appId, bool fixedVersion)
-    {
-        try
-        {
-            Log($"重建 Lua 配置: AppID {appId}");
-            var gameDetails = await _gameInfoService.GetGameDetailsFromSteamAsync(appId);
-            if (gameDetails == null || gameDetails.Depots.Count == 0)
-                return false;
-
-            var depots = gameDetails.Depots.Values
-                .Select(d => (d.DepotId, d.Manifests.Count > 0 ? d.Manifests[0] : "", 0L))
-                .ToList();
-
-            var lua = await _luaBuilder.BuildLuaAsync(appId, "自动修复", depots, fixedVersion, true, true);
-            var ok = await _luaBuilder.WriteLuaAsync(appId, lua);
-            if (ok) Log("已重建 Lua 配置");
-            return ok;
-        }
-        catch (Exception ex)
-        {
-            Log($"重建 Lua 失败: {ex.Message}");
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// 检查 Lua 内容括号/引号是否配对（发现截断残留）
-    /// </summary>
-
-    private static bool IsLuaContentBalanced(string content)
-    {
-        var parenBalance = 0;
-        var quoteCount = 0;
-        foreach (var rawLine in content.Split('\n'))
-        {
-            var line = rawLine;
-            var commentIdx = line.IndexOf("--", StringComparison.Ordinal);
-            if (commentIdx >= 0)
-                line = line.Substring(0, commentIdx);
-
-            parenBalance += line.Count(c => c == '(');
-            parenBalance -= line.Count(c => c == ')');
-            quoteCount += line.Count(c => c == '"');
-        }
-        return parenBalance == 0 && quoteCount % 2 == 0;
-    }
-
-    /// <summary>
-    /// 读取该游戏 Lua 中出现的所有 addappid（主游戏 + depot/DLC 条目），文件不存在时仅返回主 AppID
-    /// </summary>
-
-    private async Task<List<string>> GetAppIdsFromLuaAsync(string appId)
-    {
-        var luaDir = _steamService.GetLuaConfigDir();
-        var ids = new List<string>();
-
-        if (!string.IsNullOrEmpty(luaDir))
-        {
-            var luaPath = Path.Combine(luaDir, $"{appId}.lua");
-            if (File.Exists(luaPath))
-            {
-                var content = await File.ReadAllTextAsync(luaPath);
-                foreach (Match m in RepairAddAppIdRegex.Matches(content))
-                {
-                    var id = m.Groups[1].Value;
-                    if (!ids.Contains(id))
-                        ids.Add(id);
-                }
-            }
-        }
-
-        if (ids.Count == 0)
-            ids.Add(appId);
-        return ids;
     }
 
     /// <summary>

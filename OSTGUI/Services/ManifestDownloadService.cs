@@ -15,13 +15,15 @@ public class ManifestDownloadService
     private readonly SteamGameInfoService _gameInfoService;
     private readonly LuaBuilder _luaBuilder;
     private readonly SudamaKeyCache _sudamaCache;
+    private readonly ManifestFileService _manifestFile;
 
     private const string GithubRepo = "SteamAutoCracks/ManifestHub";
     private const string GithubApiBase = "https://api.github.com/repos/" + GithubRepo;
     private const string GithubRawBase = "https://raw.githubusercontent.com/" + GithubRepo;
 
     public ManifestDownloadService(HttpClient http, SteamService steamService, ConfigService configService,
-        SteamGameInfoService gameInfoService, LuaBuilder luaBuilder, SudamaKeyCache sudamaCache)
+        SteamGameInfoService gameInfoService, LuaBuilder luaBuilder, SudamaKeyCache sudamaCache,
+        ManifestFileService manifestFile)
     {
         _http = http;
         _steamService = steamService;
@@ -29,6 +31,7 @@ public class ManifestDownloadService
         _gameInfoService = gameInfoService;
         _luaBuilder = luaBuilder;
         _sudamaCache = sudamaCache;
+        _manifestFile = manifestFile;
     }
 
     private void Log(string message)
@@ -129,10 +132,10 @@ public class ManifestDownloadService
                 return (false, "未能下载任何 manifest 文件");
 
             var manifestFiles = Directory.GetFiles(extractPath, "*.manifest", SearchOption.AllDirectories).ToList();
-            var manifestCount = CopyManifestsToDepotCache(manifestFiles);
+            var manifestCount = _manifestFile.CopyToDepotCache(manifestFiles);
 
             // 4. 从文件名解析 depot 信息
-            var depots = ParseDepotsFromManifestFiles(manifestFiles);
+            var depots = ManifestFileService.ParseDepotsFromFiles(manifestFiles);
             Log($"解析到 {depots.Count} 个 depot");
 
             // 5. 生成完整 Lua（自动补 depot key / access token / DLC）
@@ -148,7 +151,7 @@ public class ManifestDownloadService
         }
         finally
         {
-            TryDeleteDir(tempDir);
+            ManifestFileService.TryDeleteDir(tempDir);
         }
     }
 
@@ -232,7 +235,7 @@ public class ManifestDownloadService
             if (downloaded.Count == 0)
                 return (false, "未能下载任何清单文件");
 
-            var manifestCount = CopyManifestsToDepotCache(
+            var manifestCount = _manifestFile.CopyToDepotCache(
                 downloaded.Select(d => Path.Combine(tempDir, $"{d.depotId}_{d.manifestGid}.manifest")).ToList());
 
             // 3. 生成完整 Lua（自动补 depot key / access token）
@@ -251,7 +254,7 @@ public class ManifestDownloadService
         }
         finally
         {
-            TryDeleteDir(tempDir);
+            ManifestFileService.TryDeleteDir(tempDir);
         }
     }
 
@@ -280,8 +283,8 @@ public class ManifestDownloadService
 
             // 2. 下载 manifest（GitHub 分支 zip，直连失败自动走镜像）
             var extractPath = Path.Combine(tempDir, "extract");
-            var manifests = await DownloadManifestsFromGithubZipAsync(appId, extractPath);
-            var manifestCount = CopyManifestsToDepotCache(manifests);
+            var manifests = await _manifestFile.DownloadFromGithubZipAsync(appId, extractPath);
+            var manifestCount = _manifestFile.CopyToDepotCache(manifests);
 
             // 3. 组装 depot 列表（优先用 Steam API 的 manifest gid）
             var depots = depotList
@@ -291,7 +294,7 @@ public class ManifestDownloadService
             if (depots.Count == 0 && manifestCount > 0)
             {
                 // zip 下载到了 manifest 但 Steam API 没有 gid，从文件名解析
-                depots = ParseDepotsFromManifestFiles(manifests);
+                depots = ManifestFileService.ParseDepotsFromFiles(manifests);
             }
 
             // 4. 生成完整 Lua（自动补 depot key / access token）
@@ -308,127 +311,13 @@ public class ManifestDownloadService
         }
         finally
         {
-            TryDeleteDir(tempDir);
+            ManifestFileService.TryDeleteDir(tempDir);
         }
     }
 
     /// <summary>
     /// 从 Sudama API 获取全量 depot 密钥（24h 缓存）
     /// </summary>
-
-    private async Task<List<string>> DownloadManifestsFromGithubZipAsync(string appId, string extractPath)
-    {
-        var urls = new List<string>
-        {
-            $"https://codeload.github.com/{GithubRepo}/zip/refs/heads/{appId}",
-            $"https://gh-proxy.org/https://codeload.github.com/{GithubRepo}/zip/refs/heads/{appId}",
-            $"https://cdn.gh-proxy.org/https://codeload.github.com/{GithubRepo}/zip/refs/heads/{appId}",
-            $"https://edgeone.gh-proxy.org/https://codeload.github.com/{GithubRepo}/zip/refs/heads/{appId}",
-        };
-
-        var zipPath = Path.Combine(Path.GetTempPath(), $"ostgui_zip_{appId}.zip");
-        try
-        {
-            // zip 可能较大，用独立 HttpClient 避免受全局 30 秒超时限制
-            using var dlClient = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
-
-            foreach (var url in urls)
-            {
-                try
-                {
-                    Log($"尝试下载分支 zip: {url}");
-                    var response = await dlClient.GetAsync(url);
-                    if (!response.IsSuccessStatusCode)
-                        continue;
-
-                    var bytes = await response.Content.ReadAsByteArrayAsync();
-                    await File.WriteAllBytesAsync(zipPath, bytes);
-
-                    if (Directory.Exists(extractPath))
-                        Directory.Delete(extractPath, true);
-                    Directory.CreateDirectory(extractPath);
-                    ZipFile.ExtractToDirectory(zipPath, extractPath);
-
-                    var manifests = Directory.GetFiles(extractPath, "*.manifest", SearchOption.AllDirectories).ToList();
-                    Log($"分支 zip 解压出 {manifests.Count} 个清单");
-                    return manifests;
-                }
-                catch (Exception ex)
-                {
-                    Log($"zip 下载/解压失败: {ex.Message}");
-                }
-            }
-        }
-        finally
-        {
-            try { if (File.Exists(zipPath)) File.Delete(zipPath); } catch { }
-        }
-
-        return new();
-    }
-
-    /// <summary>
-    /// 删除临时目录（失败忽略，不影响入库结果）
-    /// </summary>
-
-    private int CopyManifestsToDepotCache(List<string> manifestFiles)
-    {
-        var depotcachePaths = new[]
-        {
-            _steamService.GetConfigDepotCacheDir(),
-            _steamService.GetDepotCacheDir()
-        };
-        foreach (var p in depotcachePaths)
-        {
-            if (!string.IsNullOrEmpty(p))
-                Directory.CreateDirectory(p);
-        }
-
-        var count = 0;
-        foreach (var manifestFile in manifestFiles)
-        {
-            var fileName = Path.GetFileName(manifestFile);
-            foreach (var depotcache in depotcachePaths)
-            {
-                if (!string.IsNullOrEmpty(depotcache))
-                    File.Copy(manifestFile, Path.Combine(depotcache, fileName), true);
-            }
-            count++;
-        }
-        return count;
-    }
-
-    /// <summary>
-    /// 从 manifest 文件名解析 depot 信息（格式: {depotId}_{manifestGid}.manifest）
-    /// </summary>
-
-    private static List<(string depotId, string manifestGid, long manifestSize)> ParseDepotsFromManifestFiles(List<string> manifestFiles)
-    {
-        var depots = new List<(string, string, long)>();
-        foreach (var manifestFile in manifestFiles)
-        {
-            var fileName = Path.GetFileName(manifestFile);
-            var stem = Path.GetFileNameWithoutExtension(fileName);
-            var parts = stem.Split('_');
-            if (parts.Length >= 2 && parts[0].All(char.IsDigit) && parts[1].All(char.IsDigit))
-                depots.Add((parts[0], parts[1], new FileInfo(manifestFile).Length));
-        }
-        return depots;
-    }
-
-    /// <summary>
-    /// 从 GitHub 分支 zip 下载 manifest（直连失败自动走镜像），返回 manifest 文件路径列表
-    /// </summary>
-
-    private static void TryDeleteDir(string path)
-    {
-        try
-        {
-            if (Directory.Exists(path))
-                Directory.Delete(path, true);
-        }
-        catch { }
-    }
 
     /// <summary>
     /// 获取游戏详情（含 depot 和 manifest gid）

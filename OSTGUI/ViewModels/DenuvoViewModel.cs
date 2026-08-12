@@ -1,6 +1,9 @@
 using System.Collections.ObjectModel;
+using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using OSTGUI.Models;
 using OSTGUI.Services;
 
@@ -14,6 +17,10 @@ public partial class DenuvoViewModel : ObservableObject
     private readonly TicketService _ticketService;
     private readonly LuaConfigService _luaService;
     private readonly GameSearchService _searchService;
+    private readonly OstFileService _ostFileService;
+    private readonly SteamGameInfoService _gameInfoService;
+    private readonly SteamService _steamService;
+    private readonly SteamTicketExtractor _ticketExtractor;
 
     [ObservableProperty] private ObservableCollection<TicketProfile> _profiles = new();
     [ObservableProperty] private TicketProfile? _selectedProfile;
@@ -35,14 +42,249 @@ public partial class DenuvoViewModel : ObservableObject
     [ObservableProperty] private string _importText = "";
     [ObservableProperty] private string _importAccountName = "";
 
+    // OST 授权文件导入/导出
+    [ObservableProperty] private string _exportAppId = "";
+    [ObservableProperty] private bool _isExporting;
+    [ObservableProperty] private string _selectedOstPath = "";
+    [ObservableProperty] private OstFile? _selectedOst;
+    [ObservableProperty] private bool _hasValidOst;
+    [ObservableProperty] private string _ostStatusText = "";
+    [ObservableProperty] private string _ostStatusType = "ok";
+    [ObservableProperty] private string _ostCreatedText = "";
+    [ObservableProperty] private string _ostExpiresText = "";
+
     public DenuvoViewModel(
         TicketService ticketService,
         LuaConfigService luaService,
-        GameSearchService searchService)
+        GameSearchService searchService,
+        OstFileService ostFileService,
+        SteamGameInfoService gameInfoService,
+        SteamService steamService,
+        SteamTicketExtractor ticketExtractor)
     {
         _ticketService = ticketService;
         _luaService = luaService;
         _searchService = searchService;
+        _ostFileService = ostFileService;
+        _gameInfoService = gameInfoService;
+        _steamService = steamService;
+        _ticketExtractor = ticketExtractor;
+    }
+
+    /// <summary>
+    /// 导出 .ost 授权文件：优先在线提取，失败回退本机注册表缓存
+    /// </summary>
+    public async Task<(bool success, string message)> ExportAsync(string outputPath)
+    {
+        var appId = ExportAppId.Trim();
+        if (string.IsNullOrEmpty(appId))
+        {
+            ToastService.ShowWarning("导出授权", "请先输入 AppID");
+            return (false, "AppID 为空");
+        }
+
+        IsExporting = true;
+        try
+        {
+            ToastService.ShowInfo("导出授权", $"正在从 Steam 提取 AppID {appId} 的授权，请稍候...");
+            var extract = await SteamTicketExtractor.ExtractInSubprocessAsync(appId);
+
+            if (!extract.Success)
+            {
+                ToastService.ShowError("导出授权", $"AppID {appId} 提取失败：{extract.Message}");
+                return (false, extract.Message);
+            }
+
+            var account = _steamService.GetCurrentSteamAccount();
+            var sourceName = !string.IsNullOrEmpty(account?.PersonaName)
+                ? account.Value.PersonaName
+                : !string.IsNullOrEmpty(account?.AccountName)
+                    ? account.Value.AccountName
+                    : "本地账号";
+
+            var (ok, msg, filePath) = await _ostFileService.ExportAsync(
+                appId, sourceName, extract.AppTicketHex, extract.ETicketHex, outputPath);
+
+            if (ok)
+                ToastService.ShowSuccess("导出成功", $"{filePath}\n授权有效期至 {DateTime.Now.Add(OstFileService.DefaultValidity):HH:mm}，请尽快使用");
+            else
+                ToastService.ShowError("导出失败", msg);
+            return (ok, msg);
+        }
+        finally
+        {
+            IsExporting = false;
+        }
+    }
+
+    /// <summary>
+    /// 导入 .ost 授权文件：校验 → 过期警告 → 入库检查（可选补全）→ 写注册表
+    /// </summary>
+    public async Task<(bool success, string message)> ImportOstAsync(string filePath, XamlRoot xamlRoot)
+    {
+        // 1. 解析与校验
+        var (ok, msg, ost) = await _ostFileService.ParseAsync(filePath);
+        if (!ok || ost == null)
+        {
+            ToastService.ShowError("导入授权失败", msg);
+            return (false, msg);
+        }
+
+        // 2. 过期警告（不强制拦截）
+        if (ost.IsExpired)
+        {
+            var expiredDialog = new ContentDialog
+            {
+                XamlRoot = xamlRoot,
+                Title = "授权已过期",
+                Content = $"该授权已于 {ost.ExpiresAt:yyyy-MM-dd HH:mm} 过期，导入后可能无法通过 D 加密验证。\n是否仍要导入？",
+                PrimaryButtonText = "仍要导入",
+                CloseButtonText = "取消"
+            };
+            var expiredResult = await expiredDialog.ShowAsync();
+            if (expiredResult != ContentDialogResult.Primary)
+                return (false, "已取消导入");
+        }
+
+        // 3. 检查游戏是否已入库
+        var isInLibrary = await IsInLibraryAsync(ost.AppId);
+        var shouldComplete = false;
+        if (!isInLibrary)
+        {
+            var libDialog = new ContentDialog
+            {
+                XamlRoot = xamlRoot,
+                Title = "游戏尚未入库",
+                Content = $"AppID {ost.AppId} 尚未入库。OST 内核仅对已入库（addappid）的游戏读取授权，建议先补全入库配置。\n\n补全将添加主游戏与全部 DLC 的入库条目（仅 addappid，不含清单与密钥）。",
+                PrimaryButtonText = "补全入库",
+                SecondaryButtonText = "仅导入授权",
+                CloseButtonText = "取消"
+            };
+            var libResult = await libDialog.ShowAsync();
+            if (libResult == ContentDialogResult.None)
+                return (false, "已取消导入");
+            shouldComplete = libResult == ContentDialogResult.Primary;
+        }
+
+        // 4. 可选：补全入库（主游戏 + 全部 DLC）
+        if (shouldComplete)
+        {
+            var (luaOk, luaMsg) = await CompleteLibraryAsync(ost.AppId);
+            if (!luaOk)
+            {
+                ToastService.ShowError("补全入库失败", luaMsg);
+                return (false, luaMsg);
+            }
+        }
+
+        // 5. 写入注册表凭证
+        var ticket = new TicketEntry
+        {
+            AppId = ost.AppId,
+            AppTicket = ost.AppTicket,
+            ETicket = ost.ETicket,
+            AccountName = ost.Source,
+        };
+        var (regOk, regMsg) = _ticketService.WriteTicketToRegistry(ticket);
+        if (!regOk)
+        {
+            ToastService.ShowError("写入授权失败", regMsg);
+            return (false, regMsg);
+        }
+
+        // 5.5 消费一次使用次数并写回文件（记录用，不做强制限制）
+        ost.UseCount++;
+        await _ostFileService.UpdateUseCountAsync(filePath, ost);
+
+        // 6. 成功提示（系统通知）
+        var hint = isInLibrary ? "" : (shouldComplete ? "，已补全入库配置" : "（游戏未入库，授权可能不生效）");
+        ToastService.ShowSuccess("授权导入成功", $"AppID {ost.AppId} 已写入授权{hint}（该授权已使用 {ost.UseCount} 次）");
+        return (true, "导入成功");
+    }
+
+    /// <summary>
+    /// 选择 .ost 文件后解析并展示元数据（仅合法文件才置为可用）
+    /// </summary>
+    public async Task LoadOstPreviewAsync(string filePath)
+    {
+        var (ok, msg, ost) = await _ostFileService.ParseAsync(filePath);
+        if (!ok || ost == null)
+        {
+            ClearOstSelection();
+            ToastService.ShowError("授权文件无效", msg);
+            return;
+        }
+
+        SelectedOst = ost;
+        SelectedOstPath = filePath;
+        HasValidOst = true;
+        OstStatusText = ost.IsExpired ? "已过期" : "有效";
+        OstStatusType = ost.IsExpired ? "error" : "ok";
+        OstCreatedText = ost.CreatedAt.ToString("yyyy-MM-dd HH:mm");
+        OstExpiresText = ost.ExpiresAt.ToString("yyyy-MM-dd HH:mm");
+    }
+
+    /// <summary>
+    /// 清空当前 .ost 选择
+    /// </summary>
+    public void ClearOstSelection()
+    {
+        SelectedOst = null;
+        SelectedOstPath = "";
+        HasValidOst = false;
+        OstStatusText = "";
+        OstStatusType = "ok";
+        OstCreatedText = "";
+        OstExpiresText = "";
+    }
+
+    /// <summary>
+    /// 判断游戏是否已入库（Lua 中存在 addappid）
+    /// </summary>
+    private async Task<bool> IsInLibraryAsync(string appId)
+    {
+        try
+        {
+            var lua = await _luaService.ReadLuaContentAsync(appId);
+            return lua != null && Regex.IsMatch(
+                lua,
+                $@"addappid\s*\(\s*{Regex.Escape(appId)}\b",
+                RegexOptions.IgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// 补全入库配置：addappid 主游戏 + 全部 DLC（仅入库条目，不含清单/密钥）
+    /// </summary>
+    private async Task<(bool success, string message)> CompleteLibraryAsync(string appId)
+    {
+        try
+        {
+            var lines = new List<string>
+            {
+                $"-- OSTGUI 授权导入补全 - AppID {appId}",
+                $"addappid({appId})",
+            };
+
+            var dlcIds = await _gameInfoService.GetDlcIdsAsync(appId);
+            if (dlcIds.Count > 0)
+            {
+                lines.Add("-- 所有 DLC");
+                lines.AddRange(dlcIds.Select(dlcId => $"addappid({dlcId})"));
+            }
+
+            var (ok, msg, _) = await _luaService.WriteLuaFileAsync(
+                appId, string.Join("\n", lines) + "\n");
+            return (ok, msg);
+        }
+        catch (Exception ex)
+        {
+            return (false, $"补全入库失败: {ex.Message}");
+        }
     }
 
     [RelayCommand]

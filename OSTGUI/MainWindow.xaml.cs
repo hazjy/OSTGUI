@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using OSTGUI.Pages;
 using OSTGUI.Services;
 using OSTGUI.ViewModels;
+using System.Runtime.InteropServices;
 
 namespace OSTGUI;
 
@@ -65,14 +66,88 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
             var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
             if (appWindow == null) return;
 
+            // 全局窗口最小尺寸（系统级锁定，WM_GETMINMAXINFO）
+            if (_hwnd == IntPtr.Zero)
+                SetupMinTrackSize(hwnd);
+
             if (config.WindowWidth > 400 && config.WindowHeight > 300)
             {
                 appWindow.Resize(new Windows.Graphics.SizeInt32(
-                    (int)config.WindowWidth, (int)config.WindowHeight));
+                    Math.Max((int)config.WindowWidth, MinWindowWidth),
+                    Math.Max((int)config.WindowHeight, MinWindowHeight)));
             }
         }
         catch { }
     }
+
+    private const int MinWindowWidth = 800;
+    private const int MinWindowHeight = 560;
+    private const int GwlWndProc = -4;
+    private const uint WmGetMinMaxInfo = 0x0024;
+
+    private IntPtr _hwnd;
+    private IntPtr _oldWndProc;
+    private WndProcDelegate? _wndProcHook;
+
+    private delegate IntPtr WndProcDelegate(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct NativePoint { public int X; public int Y; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MinMaxInfo
+    {
+        public NativePoint PtReserved;
+        public NativePoint PtMaxSize;
+        public NativePoint PtMaxPosition;
+        public NativePoint PtMinTrackSize;
+        public NativePoint PtMaxTrackSize;
+    }
+
+    /// <summary>
+    /// 通过替换窗口过程设置系统级最小尺寸，拖动窗口到边界即锁定，无拉回动画
+    /// </summary>
+    private void SetupMinTrackSize(IntPtr hwnd)
+    {
+        try
+        {
+            _hwnd = hwnd;
+            _wndProcHook = WndProcHook;
+            _oldWndProc = SetWindowLongPtr(
+                hwnd, GwlWndProc, Marshal.GetFunctionPointerForDelegate(_wndProcHook));
+        }
+        catch { }
+    }
+
+    private IntPtr WndProcHook(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
+    {
+        try
+        {
+            if (msg == WmGetMinMaxInfo)
+            {
+                var mmi = Marshal.PtrToStructure<MinMaxInfo>(lParam);
+                var dpi = GetDpiForWindow(hWnd);
+                mmi.PtMinTrackSize.X = ScaleLogical(MinWindowWidth, dpi);
+                mmi.PtMinTrackSize.Y = ScaleLogical(MinWindowHeight, dpi);
+                Marshal.StructureToPtr(mmi, lParam, false);
+            }
+        }
+        catch { }
+
+        return CallWindowProc(_oldWndProc, hWnd, msg, wParam, lParam);
+    }
+
+    private static int ScaleLogical(int logical, uint dpi)
+        => (int)Math.Round(logical * dpi / 96.0);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SetWindowLongPtr(IntPtr hWnd, int nIndex, IntPtr dwNewLong);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr CallWindowProc(IntPtr lpPrevWndFunc, IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam);
+
+    [DllImport("user32.dll")]
+    private static extern uint GetDpiForWindow(IntPtr hwnd);
 
     private void EnsureWindowIsVisible()
     {
@@ -148,7 +223,7 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
             var config = _mainVM.ConfigService.Config;
             NavigateTo(config.DefaultPage == "search" ? "search" : "home");
 
-            _mainVM.SettingsVM.ApplyTheme(RootGrid);
+            ApplyThemeAndChrome();
 
             // 配置加载完成后重新读取入库选项，
             // 避免启动瞬间 ViewModel 用默认值初始化后覆盖真实配置
@@ -156,6 +231,69 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
 
             // 刷新库统计并更新标题
             await _mainVM.RefreshLibraryStatsAsync();
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// 应用主题并同步窗口级外观：
+    /// XAML 主题、标题栏按钮颜色、转换器深色标志、刷新库列表（触发绑定重算）
+    /// </summary>
+    public void ApplyThemeAndChrome()
+    {
+        try
+        {
+            var theme = _mainVM.SettingsVM.ThemeMode switch
+            {
+                "dark" => ElementTheme.Dark,
+                "light" => ElementTheme.Light,
+                _ => ElementTheme.Default
+            };
+            RootGrid.RequestedTheme = theme;
+
+            var isDark = theme switch
+            {
+                ElementTheme.Light => false,
+                ElementTheme.Dark => true,
+                _ => Application.Current.RequestedTheme == ApplicationTheme.Dark
+            };
+
+            Helpers.ThemeColorHelper.IsDarkTheme = isDark;
+            UpdateTitleBarButtonColor(isDark);
+            RefreshLibraryIfLoaded();
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// 同步标题栏控制按钮颜色（应用内主题切换不影响系统默认按钮，需显式设置）
+    /// </summary>
+    private void UpdateTitleBarButtonColor(bool isDark)
+    {
+        try
+        {
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
+            var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
+
+            appWindow.TitleBar.ButtonForegroundColor = isDark
+                ? Windows.UI.Color.FromArgb(255, 0xFF, 0xFF, 0xFF)
+                : Windows.UI.Color.FromArgb(255, 0x1B, 0x1B, 0x1B);
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// 库页面已加载时强制刷新列表，使前景色转换器按新主题重新求值
+    /// </summary>
+    private void RefreshLibraryIfLoaded()
+    {
+        try
+        {
+            if (_pageCache.TryGetValue("library", out var page) && page is Pages.LibraryPage libPage)
+            {
+                _ = libPage.VM.LoadLibraryCommand.ExecuteAsync(null);
+            }
         }
         catch { }
     }

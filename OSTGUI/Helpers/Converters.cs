@@ -4,6 +4,19 @@ using Microsoft.UI.Xaml.Data;
 namespace OSTGUI.Helpers;
 
 /// <summary>
+/// 主题相关颜色辅助（深色/浅色由窗口切换主题时同步）
+/// </summary>
+internal static class ThemeColorHelper
+{
+    public static bool IsDarkTheme { get; set; } = true;
+
+    public static Microsoft.UI.Xaml.Media.SolidColorBrush DefaultTextBrush()
+        => new(IsDarkTheme
+            ? Windows.UI.Color.FromArgb(255, 255, 255, 255)
+            : Windows.UI.Color.FromArgb(255, 0x1B, 0x1B, 0x1B));
+}
+
+/// <summary>
 /// Bool 取反转换器
 /// </summary>
 public class BoolNegateConverter : IValueConverter
@@ -51,10 +64,10 @@ public class VersionModeToBrushConverter : IValueConverter
             return mode switch
             {
                 "fixed" => new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 120, 212)), // 蓝色
-                _ => new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255)) // 白色
+                _ => ThemeColorHelper.DefaultTextBrush()
             };
         }
-        return new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255));
+        return ThemeColorHelper.DefaultTextBrush();
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, string language)
@@ -75,8 +88,7 @@ public class StatusToBrushConverter : IValueConverter
             return new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 196, 43, 28));
         }
 
-        return Application.Current.Resources["TextFillColorPrimaryBrush"]
-            ?? new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 255, 255, 255));
+        return ThemeColorHelper.DefaultTextBrush();
     }
 
     public object ConvertBack(object value, Type targetType, object parameter, string language)

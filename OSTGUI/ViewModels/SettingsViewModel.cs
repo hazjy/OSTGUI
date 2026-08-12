@@ -14,6 +14,7 @@ public partial class SettingsViewModel : ObservableObject
 {
     private readonly ConfigService _configService;
     private readonly SteamService _steamService;
+    private readonly SteamDllService _steamDllService;
     private bool _isLoading;
 
     // === 基本设置 ===
@@ -99,10 +100,11 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _statusMessage = "";
     [ObservableProperty] private string _statusType = "Info";
 
-    public SettingsViewModel(ConfigService configService, SteamService steamService)
+    public SettingsViewModel(ConfigService configService, SteamService steamService, SteamDllService steamDllService)
     {
         _configService = configService;
         _steamService = steamService;
+        _steamDllService = steamDllService;
 
         // 设置变化即自动保存（实时生效）；加载期间由 _isLoading 抑制
         PropertyChanged += (s, e) => SaveAllToConfig();
@@ -331,7 +333,7 @@ public partial class SettingsViewModel : ObservableObject
     private void RefreshOstStatus()
     {
         IsSteamRunning = _steamService.IsSteamRunning();
-        IsOstInjected = _steamService.IsOSTDllInjected();
+        IsOstInjected = _steamDllService.IsOSTDllInjected();
         OstStatusText = IsOstInjected ? "已注入" : "未注入";
         OstStatusType = IsOstInjected ? "Success" : "Warning";
     }
@@ -368,7 +370,7 @@ public partial class SettingsViewModel : ObservableObject
                 return;
             }
 
-            var (success, message) = await _steamService.InjectOstDllAsync(OstSourceDir);
+            var (success, message) = await _steamDllService.InjectOstDllAsync(OstSourceDir);
             RefreshOstStatus();
             SetStatus(message, success ? "Success" : "Error");
         }
@@ -399,7 +401,7 @@ public partial class SettingsViewModel : ObservableObject
                 return;
             }
 
-            var (success, message) = await _steamService.UnloadOstDllAsync();
+            var (success, message) = await _steamDllService.UnloadOstDllAsync();
             RefreshOstStatus();
             SetStatus(message, success ? "Success" : "Error");
         }

@@ -27,7 +27,7 @@ public sealed partial class SettingsPage : Page
     {
         if (App.MainWindow is MainWindow mw)
         {
-            VM.ApplyTheme(mw.Root);
+            mw.ApplyThemeAndChrome();
         }
     }
 

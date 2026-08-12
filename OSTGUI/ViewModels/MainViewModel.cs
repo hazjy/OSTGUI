@@ -13,6 +13,7 @@ public partial class MainViewModel : ObservableObject
 {
     public ConfigService ConfigService { get; }
     public SteamService SteamService { get; }
+    private readonly SteamDllService _steamDllService;
     public GameSearchService SearchService { get; }
     public LuaConfigService LuaService { get; }
     public ManifestService ManifestService { get; }
@@ -80,7 +81,11 @@ public partial class MainViewModel : ObservableObject
         GameInfoService gameInfoService,
         LuaConfigService luaService,
         ManifestService manifestService,
-        TicketService ticketService)
+        TicketService ticketService,
+        OstFileService ostFileService,
+        SteamGameInfoService steamGameInfoService,
+        SteamTicketExtractor ticketExtractor,
+        SteamDllService steamDllService)
     {
         ConfigService = configService;
         SteamService = steamService;
@@ -88,12 +93,15 @@ public partial class MainViewModel : ObservableObject
         LuaService = luaService;
         ManifestService = manifestService;
         TicketService = ticketService;
+        _steamDllService = steamDllService;
 
         // 初始化子 ViewModel
         SearchVM = new SearchViewModel(searchService, manifestService, steamService, configService);
         LibraryVM = new LibraryViewModel(luaService, searchService, gameInfoService, steamService, manifestService, configService);
-        DenuvoVM = new DenuvoViewModel(ticketService, luaService, searchService);
-        SettingsVM = new SettingsViewModel(configService, steamService);
+        DenuvoVM = new DenuvoViewModel(
+            ticketService, luaService, searchService, ostFileService,
+            steamGameInfoService, steamService, ticketExtractor);
+        SettingsVM = new SettingsViewModel(configService, steamService, _steamDllService);
     }
 
     /// <summary>
@@ -121,7 +129,7 @@ public partial class MainViewModel : ObservableObject
         }
 
         // 检查状态
-        IsOstInjected = SteamService.IsOSTDllInjected();
+        IsOstInjected = _steamDllService.IsOSTDllInjected();
         IsSteamRunning = SteamService.IsSteamRunning();
 
         StatusMessage = "就绪";
@@ -215,7 +223,7 @@ public partial class MainViewModel : ObservableObject
     /// </summary>
     public void RefreshOstStatus()
     {
-        IsOstInjected = SteamService.IsOSTDllInjected();
+        IsOstInjected = _steamDllService.IsOSTDllInjected();
         IsSteamRunning = SteamService.IsSteamRunning();
     }
 }

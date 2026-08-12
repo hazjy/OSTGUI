@@ -3,7 +3,13 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:helpers="using:OSTGUI.Helpers"
     >
+    <Page.Resources>
+        <helpers:BoolNegateConverter x:Key="BoolNegateConverter" />
+        <helpers:BoolToVisibilityConverter x:Key="BoolToVis" />
+        <helpers:StatusToBrushConverter x:Key="StatusToBrush" />
+    </Page.Resources>
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -151,22 +157,109 @@
                                 </StackPanel>
                             </StackPanel>
                         </Border>
+
                     </StackPanel>
                 </ScrollViewer>
                 </Grid>
 
                 <Grid x:Name="TransferPanel" Visibility="Collapsed">
-                <Grid Padding="0,16,0,40">
-                    <Border Padding="24" CornerRadius="12"
-                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                        <TextBlock Text="导入/导出授权 - 内容待定" FontSize="14"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                   HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Border>
-                </Grid>
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <StackPanel Spacing="16" MaxWidth="920" HorizontalAlignment="Center" Padding="0,16,0,40">
+
+                            <Border Padding="24" CornerRadius="12"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Text="导出授权" FontSize="20" FontWeight="SemiBold" />
+                                    <TextBlock Text="提取当前 Steam 账号的授权数据，导出为可分享的授权文件"
+                                               FontSize="13" TextWrapping="Wrap"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBox Header="AppID" PlaceholderText="输入要导出的游戏 AppID"
+                                             Text="{Binding ExportAppId, Mode=TwoWay}" />
+                                    <Button HorizontalAlignment="Left" Click="ExportOst_Click"
+                                            IsEnabled="{Binding IsExporting, Converter={StaticResource BoolNegateConverter}}">
+                                        <TextBlock Text="导出授权" />
+                                    </Button>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Padding="24" CornerRadius="12"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Text="导入授权" FontSize="20" FontWeight="SemiBold" />
+                                    <TextBlock Text="选择授权文件导入，写入本机凭证存储"
+                                               FontSize="13" TextWrapping="Wrap"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <Button Click="ImportOst_Click">
+                                            <TextBlock Text="选择文件" />
+                                        </Button>
+                                        <Button Click="GoOst_Click" Style="{StaticResource AccentButtonStyle}"
+                                                IsEnabled="{Binding HasValidOst}">
+                                            <TextBlock Text="Go" />
+                                        </Button>
+                                    </StackPanel>
+
+                                    <Border Padding="16" CornerRadius="8"
+                                            Background="{ThemeResource SubtleFillColorSecondaryBrush}"
+                                            Visibility="{Binding HasValidOst, Converter={StaticResource BoolToVis}}">
+                                        <StackPanel Spacing="6">
+                                            <TextBlock Text="授权文件信息" FontSize="13" FontWeight="SemiBold" />
+                                            <TextBlock FontSize="12">
+                                                <Run Text="AppID：" /><Run Text="{Binding SelectedOst.AppId}" />
+                                            </TextBlock>
+                                            <TextBlock FontSize="12">
+                                                <Run Text="来源：" /><Run Text="{Binding SelectedOst.Source}" />
+                                            </TextBlock>
+                                            <TextBlock FontSize="12">
+                                                <Run Text="生成：" /><Run Text="{Binding OstCreatedText}" />
+                                            </TextBlock>
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock FontSize="12">
+                                                    <Run Text="失效：" /><Run Text="{Binding OstExpiresText}" />
+                                                </TextBlock>
+                                                <TextBlock FontSize="12" FontWeight="SemiBold"
+                                                           Text="{Binding OstStatusText}"
+                                                           Foreground="{Binding OstStatusType, Converter={StaticResource StatusToBrush}}" />
+                                            </StackPanel>
+                                            <TextBlock FontSize="12">
+                                                <Run Text="使用次数：" /><Run Text="{Binding SelectedOst.UseCount}" />
+                                            </TextBlock>
+                                            <TextBlock FontSize="12">
+                                                <Run Text="导出版本：" /><Run Text="{Binding SelectedOst.ExporterVersion}" />
+                                            </TextBlock>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <TextBlock Text="注意：部分游戏的 DLC 也受 D 加密保护，授权文件中没有对应 DLC 授权时，这些 DLC 将无法解锁或启动失败。"
+                                               FontSize="12" TextWrapping="Wrap"
+                                               Foreground="{ThemeResource SystemFillColorCautionBrush}" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Padding="24" CornerRadius="12"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="重要说明" FontSize="16" FontWeight="Bold"
+                                               VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" Style="{StaticResource AccentButtonStyle}"
+                                            Click="ImportantLink_Click">
+                                        <TextBlock Text="跳转" />
+                                    </Button>
+                                </Grid>
+                            </Border>
+
+                        </StackPanel>
+                    </ScrollViewer>
                 </Grid>
             </Grid>
         </Grid>
+
     </Grid>
 </Page>

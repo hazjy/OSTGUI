@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>重要说明 - OSTGUI</title>
+    <style>
+        :root {
+            color-scheme: light dark;
+            --text: #1b1b1b;
+            --text-secondary: #5c5c5c;
+            --bg: #ffffff;
+            --accent: #0078d4;
+            --border: #e5e5e5;
+        }
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --text: #e5e5e5;
+                --text-secondary: #9d9d9d;
+                --bg: #1c1c1c;
+                --accent: #60cdfe;
+                --border: #3b3b3b;
+            }
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            padding: 28px 32px 40px;
+            font-family: "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", sans-serif;
+            font-size: 14px;
+            line-height: 1.7;
+            color: var(--text);
+            background: var(--bg);
+        }
+        h1 {
+            font-size: 22px;
+            margin: 0 0 6px;
+        }
+        .subtitle {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin: 0 0 24px;
+        }
+        h2 {
+            font-size: 16px;
+            margin: 26px 0 10px;
+            padding-bottom: 6px;
+            border-bottom: 1px solid var(--border);
+        }
+        p { margin: 8px 0; }
+        ul { margin: 8px 0; padding-left: 22px; }
+        li { margin: 4px 0; }
+        strong { font-weight: 600; }
+        code {
+            font-family: Consolas, "Cascadia Mono", monospace;
+            font-size: 12.5px;
+            background: var(--border);
+            padding: 1px 5px;
+            border-radius: 4px;
+        }
+        .highlight {
+            background: color-mix(in srgb, var(--accent) 10%, transparent);
+            border-left: 3px solid var(--accent);
+            padding: 8px 12px;
+            border-radius: 4px;
+            margin: 10px 0;
+        }
+        .muted { color: var(--text-secondary); }
+    </style>
+</head>
+<body>
+    <h1>重要说明</h1>
+    <p class="subtitle">关于 OSTGUI 授权格式与导入导出授权的说明</p>
+
+    <h2>为什么 OSTGUI 不兼容 .cw / .shiki？</h2>
+    <p>它们是闭源的私有格式。.cw 是私有的授权文件格式，内部用 AES 加密，格式规范从未公开，核心提取模块也从未开源。.shiki 及类似的加密授权文件同理——格式定义权在作者手里。</p>
+    <p>闭源格式有三个实际问题：</p>
+    <ul>
+        <li><strong>无法审计</strong>：文件不透明，你没法自己验证、校验、排查问题。</li>
+        <li><strong>随时可能作废</strong>：作者改一版封装，旧文件可能全部失效。</li>
+        <li><strong>生态越用越依赖</strong>：格式用的人越多，作者定价权越大。</li>
+    </ul>
+    <p>所以 OSTGUI 自己定义了一套<strong>开放格式</strong>。</p>
+
+    <h2>.ost 到底是什么？</h2>
+    <p>.ost 是 OSTGUI 的授权文件格式，<strong>明文 JSON，无加密</strong>，无黑盒，里面装什么一眼就能看到：</p>
+    <ul>
+        <li><code>AppTicket / ETicket</code>：授权数据本身（hex 文本）</li>
+        <li><code>Source</code>：来源（提取者的 Steam 用户名，方便追溯分享者）</li>
+        <li><code>CreatedAt / ExpiresAt</code>：生成时间和失效时间</li>
+        <li><code>UseCount</code>：已使用次数</li>
+        <li><code>ExporterVersion</code>：导出者用的 OSTGUI 版本</li>
+    </ul>
+    <p>格式开放、结构透明，任何人拿到文件都能读懂、校验，也都能实现兼容。</p>
+
+    <h2>为什么授权文件有 30 分钟有效期？</h2>
+    <p>因为里面的 <strong>ETicket 是 Steam 服务器实时签发的动态口令，Steam 规定 30 分钟过期</strong>——这不是 .ost 或 OSTGUI 的规定，是 Steam/Denuvo 的机制。</p>
+    <ul>
+        <li>到期后 Denuvo 验票失败（报错 <code>88500005</code>），重新提取一张新票就行。</li>
+        <li>所以导出的 .ost 要"趁热用"：提取后 30 分钟内导入。</li>
+    </ul>
+    <div class="highlight">
+        顺带说明：Denuvo 还有"每个账号每天最多 5 台新机器激活"的额度，已激活过的机器不消耗；这两条是所有授权方式都绕不开的规则。
+    </div>
+
+    <h2>到底怎么用导入导出授权？</h2>
+    <p><strong>导出（正版机）：</strong></p>
+    <ol>
+        <li>Steam 运行中，登录<strong>拥有该游戏的正版账号</strong></li>
+        <li>输入 AppID → 点导出授权</li>
+        <li>生成 <code>{AppID}.ost</code>，30 分钟内发给目标机器</li>
+    </ol>
+    <p><strong>导入（目标机）：</strong></p>
+    <ol>
+        <li>选 .ost 文件，下方会显示元数据（来源、有效期、使用次数）</li>
+        <li>点 Go 导入</li>
+        <li>已过期会警告，但允许强制导入；游戏未入库会询问是否补全（含全部 DLC）</li>
+        <li>写入成功后，这台机器上<strong>任意 Steam 账号</strong>都能玩（OST 内核会自动匹配票据身份），无需重启 Steam</li>
+    </ol>
+    <p><strong>两个提醒：</strong></p>
+    <ul>
+        <li>部分游戏的 DLC 也受 D 加密保护，.ost 只带主游戏授权时，这些 DLC 可能无法解锁。</li>
+        <li>授权数据写在本机注册表，属于本机所有 Steam 账号；分享 .ost 等于分享一次动态口令，注意控制范围。</li>
+    </ul>
+
+    <p class="muted" style="margin-top:28px; font-size:12px;">— OSTGUI 开源授权格式说明</p>
+</body>
+</html>
