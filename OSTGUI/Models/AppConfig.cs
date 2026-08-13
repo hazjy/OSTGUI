@@ -45,7 +45,7 @@ public class AppConfig
 
     // === 应用程序设置 ===
     public bool DebugMode { get; set; }
-    public bool SaveLogFiles { get; set; } = true;
+    public int LogMaxLines { get; set; } = 1000;
     public bool CheckUpdateOnStart { get; set; } = true;
 
     // === 自定义清单源 ===
@@ -91,7 +91,7 @@ public class AppConfig
         IsNavigationPaneOpen = true,
         NavigationPaneWidth = 360,
         DebugMode = false,
-        SaveLogFiles = true,
+        LogMaxLines = 1000,
         CheckUpdateOnStart = true,
         ManifestSourceEnabled = ManifestSource.GetPresetSources()
             .ToDictionary(s => s.Id, s => s.IsEnabled),

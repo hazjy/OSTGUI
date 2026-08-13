@@ -39,12 +39,12 @@ public class ManifestDownloadService
         LogService.AddLog(message);
         System.Diagnostics.Debug.WriteLine($"[ManifestDownload] {message}");
     }
-    public async Task<(bool success, string message)> DownloadFromGithubAsync(
+    public async Task<(bool success, string message, List<string> missingKeys)> DownloadFromGithubAsync(
         string appId,
         bool fixedVersion,
         bool addAllDlc,
         bool patchDepotKey,
-        IProgress<string>? progress = null)
+        IProgress<string>? progress)
     {
         var tempDir = Path.Combine(Path.GetTempPath(), "ostgui_" + appId);
         var extractPath = Path.Combine(tempDir, "extract");
@@ -70,9 +70,9 @@ public class ManifestDownloadService
             Log($"分支检查响应: {(int)branchResponse.StatusCode}");
 
             if (branchResponse.StatusCode == System.Net.HttpStatusCode.NotFound)
-                return (false, "未在 GitHub 仓库中找到该游戏的清单 (404)");
+                return (false, "未在 GitHub 仓库中找到该游戏的清单 (404)", new List<string>());
             if (!branchResponse.IsSuccessStatusCode)
-                return (false, $"GitHub API 错误: {(int)branchResponse.StatusCode}");
+                return (false, $"GitHub API 错误: {(int)branchResponse.StatusCode}", new List<string>());
 
             var branchData = await branchResponse.Content.ReadAsStringJsonAsync();
             var commitSha = branchData.GetProperty("commit").GetProperty("sha").GetString()!;
@@ -85,7 +85,7 @@ public class ManifestDownloadService
                 treeRequest.Headers.TryAddWithoutValidation(h.Key, h.Value);
             var treeResponse = await _http.SendAsync(treeRequest);
             if (!treeResponse.IsSuccessStatusCode)
-                return (false, "无法获取文件树");
+                return (false, "无法获取文件树", new List<string>());
 
             var treeData = await treeResponse.Content.ReadAsStringJsonAsync();
             var files = treeData.GetProperty("tree").EnumerateArray()
@@ -93,7 +93,7 @@ public class ManifestDownloadService
                 .ToList();
 
             if (files.Count == 0)
-                return (false, "仓库中没有文件");
+                return (false, "仓库中没有文件", new List<string>());
 
             Log($"找到 {files.Count} 个文件，开始下载...");
 
@@ -129,7 +129,7 @@ public class ManifestDownloadService
             }
 
             if (downloaded == 0)
-                return (false, "未能下载任何 manifest 文件");
+                return (false, "未能下载任何 manifest 文件", new List<string>());
 
             var manifestFiles = Directory.GetFiles(extractPath, "*.manifest", SearchOption.AllDirectories).ToList();
             var manifestCount = _manifestFile.CopyToDepotCache(manifestFiles);
@@ -139,15 +139,15 @@ public class ManifestDownloadService
             Log($"解析到 {depots.Count} 个 depot");
 
             // 5. 生成完整 Lua（自动补 depot key / access token / DLC）
-            var lua = await _luaBuilder.BuildLuaAsync(appId, "GitHub", depots, fixedVersion, patchDepotKey, addAllDlc);
+            var (lua, missingKeys) = await _luaBuilder.BuildLuaAsync(appId, "GitHub", depots, fixedVersion, patchDepotKey, addAllDlc);
             var luaOk = await _luaBuilder.WriteLuaAsync(appId, lua);
 
             Log("入库完成!");
-            return (true, $"成功入库 AppID {appId}，复制了 {manifestCount} 个清单，Lua {(luaOk ? "已生成" : "生成失败")}");
+            return (true, $"成功入库 AppID {appId}，复制了 {manifestCount} 个清单，Lua {(luaOk ? "已生成" : "生成失败")}", missingKeys);
         }
         catch (Exception ex)
         {
-            return (false, $"GitHub 入库失败: {ex.Message}");
+            return (false, $"GitHub 入库失败: {ex.Message}", new List<string>());
         }
         finally
         {
@@ -159,11 +159,11 @@ public class ManifestDownloadService
     /// 从 ManifestHub API 下载清单
     /// </summary>
 
-    public async Task<(bool success, string message)> DownloadFromManifestHubAsync(
+    public async Task<(bool success, string message, List<string> missingKeys)> DownloadFromManifestHubAsync(
         string appId,
         bool fixedVersion,
-        bool addAllDlc = false,
-        IProgress<string>? progress = null)
+        bool addAllDlc,
+        IProgress<string>? progress)
     {
         var tempDir = Path.Combine(Path.GetTempPath(), "ostgui_mhub_" + appId);
 
@@ -171,13 +171,13 @@ public class ManifestDownloadService
         {
             var apiKey = GetSourceApiKey("mhub", _configService.Config.ManifestHubApiKey);
             if (string.IsNullOrEmpty(apiKey))
-                return (false, "未配置 ManifestHub API Key");
+                return (false, "未配置 ManifestHub API Key", new List<string>());
 
             // 1. 从 Steam 官方 API 获取 depot + manifest gid（不依赖 GitHub）
             Log("正在从 Steam API 获取 depot/manifest 信息...");
             var gameDetails = await _gameInfoService.GetGameDetailsFromSteamAsync(appId);
             if (gameDetails == null || gameDetails.Depots.Count == 0)
-                return (false, "无法获取游戏 Depot 信息");
+                return (false, "无法获取游戏 Depot 信息", new List<string>());
 
             var manifestFiles = new List<(string depotId, string manifestGid)>();
             foreach (var depot in gameDetails.Depots.Values)
@@ -187,7 +187,7 @@ public class ManifestDownloadService
             }
 
             if (manifestFiles.Count == 0)
-                return (false, "Steam API 未返回任何 manifest 信息，无法下载清单");
+                return (false, "Steam API 未返回任何 manifest 信息，无法下载清单", new List<string>());
 
             Log($"找到 {manifestFiles.Count} 个清单文件, 开始下载...");
 
@@ -233,7 +233,7 @@ public class ManifestDownloadService
             }
 
             if (downloaded.Count == 0)
-                return (false, "未能下载任何清单文件");
+                return (false, "未能下载任何清单文件", new List<string>());
 
             var manifestCount = _manifestFile.CopyToDepotCache(
                 downloaded.Select(d => Path.Combine(tempDir, $"{d.depotId}_{d.manifestGid}.manifest")).ToList());
@@ -242,15 +242,15 @@ public class ManifestDownloadService
             var depots = downloaded
                 .Select(d => (depotId: d.depotId, manifestGid: d.manifestGid, manifestSize: d.size))
                 .ToList();
-            var lua = await _luaBuilder.BuildLuaAsync(appId, "ManifestHub", depots, fixedVersion, true, addAllDlc);
+            var (lua, missingKeys) = await _luaBuilder.BuildLuaAsync(appId, "ManifestHub", depots, fixedVersion, true, addAllDlc);
             var luaOk = await _luaBuilder.WriteLuaAsync(appId, lua);
 
             Log("入库完成!");
-            return (true, $"成功入库 AppID {appId}，下载了 {manifestCount} 个清单，Lua {(luaOk ? "已生成" : "生成失败")}");
+            return (true, $"成功入库 AppID {appId}，下载了 {manifestCount} 个清单，Lua {(luaOk ? "已生成" : "生成失败")}", missingKeys);
         }
         catch (Exception ex)
         {
-            return (false, $"ManifestHub 入库失败: {ex.Message}");
+            return (false, $"ManifestHub 入库失败: {ex.Message}", new List<string>());
         }
         finally
         {
@@ -262,11 +262,11 @@ public class ManifestDownloadService
     /// 从 Sudama 获取 depot key / access token，并补全 manifest（GitHub 分支 zip + 镜像）
     /// </summary>
 
-    public async Task<(bool success, string message)> DownloadFromSudamaAsync(
+    public async Task<(bool success, string message, List<string> missingKeys)> DownloadFromSudamaAsync(
         string appId,
         bool fixedVersion,
-        bool addAllDlc = false,
-        IProgress<string>? progress = null)
+        bool addAllDlc,
+        IProgress<string>? progress)
     {
         var tempDir = Path.Combine(Path.GetTempPath(), "ostgui_sudama_" + appId);
 
@@ -276,7 +276,7 @@ public class ManifestDownloadService
             Log("正在获取 Depot 信息...");
             var gameDetails = await _gameInfoService.GetGameDetailsFromSteamAsync(appId);
             if (gameDetails == null || gameDetails.Depots.Count == 0)
-                return (false, "无法获取游戏 Depot 信息");
+                return (false, "无法获取游戏 Depot 信息", new List<string>());
 
             var depotList = gameDetails.Depots.Values.ToList();
             Log($"找到 {depotList.Count} 个 Depot");
@@ -298,16 +298,16 @@ public class ManifestDownloadService
             }
 
             // 4. 生成完整 Lua（自动补 depot key / access token）
-            var lua = await _luaBuilder.BuildLuaAsync(appId, "Sudama", depots, fixedVersion, true, addAllDlc);
+            var (lua, missingKeys) = await _luaBuilder.BuildLuaAsync(appId, "Sudama", depots, fixedVersion, true, addAllDlc);
             var luaOk = await _luaBuilder.WriteLuaAsync(appId, lua);
 
             Log("入库完成!");
             var manifestInfo = manifestCount > 0 ? $"，复制了 {manifestCount} 个清单" : "（未下载到清单文件）";
-            return (true, $"成功入库 AppID {appId} (Sudama 模式){manifestInfo}，Lua {(luaOk ? "已生成" : "生成失败")}");
+            return (true, $"成功入库 AppID {appId} (Sudama 模式){manifestInfo}，Lua {(luaOk ? "已生成" : "生成失败")}", missingKeys);
         }
         catch (Exception ex)
         {
-            return (false, $"Sudama 入库失败: {ex.Message}");
+            return (false, $"Sudama 入库失败: {ex.Message}", new List<string>());
         }
         finally
         {

@@ -6,6 +6,7 @@ using OSTGUI.Services;
 using OSTGUI.ViewModels;
 using Windows.Storage.Pickers;
 using Windows.ApplicationModel.DataTransfer;
+using System.Diagnostics;
 
 namespace OSTGUI.Pages;
 
@@ -80,6 +81,23 @@ public sealed partial class SettingsPage : Page
         Clipboard.SetContent(dataPackage);
 
         LogService.AddLog($"已复制 {LogService.Logs.Count} 条日志到剪贴板");
+    }
+
+    private void OpenLogFile_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var path = LogService.LogFilePath;
+            if (string.IsNullOrEmpty(path)) return;
+            if (!File.Exists(path))
+                File.WriteAllText(path, "");
+
+            Process.Start(new ProcessStartInfo("explorer.exe", $"/select,\"{path}\"")
+            {
+                UseShellExecute = true
+            });
+        }
+        catch { }
     }
 
     private void OpenTokenPage_Click(object sender, RoutedEventArgs e)

@@ -85,7 +85,7 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     [ObservableProperty] private bool _debugMode;
-    [ObservableProperty] private bool _saveLogFiles = true;
+    [ObservableProperty] private double _logMaxLines = 1000;
     [ObservableProperty] private bool _checkUpdateOnStart = true;
 
     // === OST DLL 状态 ===
@@ -136,7 +136,7 @@ public partial class SettingsViewModel : ObservableObject
             ShowSystemNotifications = c.ShowSystemNotifications;
             ShowVersionChangeNotifications = c.ShowVersionChangeNotifications;
             DebugMode = c.DebugMode;
-            SaveLogFiles = c.SaveLogFiles;
+            LogMaxLines = c.LogMaxLines;
             CheckUpdateOnStart = c.CheckUpdateOnStart;
 
             LoadSourcesFromConfig(c);
@@ -277,8 +277,9 @@ public partial class SettingsViewModel : ObservableObject
                 c.ShowSystemNotifications = ShowSystemNotifications;
                 c.ShowVersionChangeNotifications = ShowVersionChangeNotifications;
                 c.DebugMode = DebugMode;
-                c.SaveLogFiles = SaveLogFiles;
+                c.LogMaxLines = (int)LogMaxLines;
                 c.CheckUpdateOnStart = CheckUpdateOnStart;
+                LogService.SetMaxLines((int)LogMaxLines);
 
                 // 保存完整源配置（内置 + 自定义，含 URL 模板与每源 Key）
                 c.ManifestSources = Sources.ToList();

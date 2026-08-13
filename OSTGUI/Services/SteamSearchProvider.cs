@@ -48,7 +48,8 @@ public class SteamSearchProvider
         HttpResponseMessage response;
         try
         {
-            response = await _http.GetAsync($"{SteamStoreApi}?appids={appId}&l=schinese");
+            // cc=us：显式指定地区，避免按 IP 落入 cn 区导致成人游戏被过滤（success=false）
+            response = await _http.GetAsync($"{SteamStoreApi}?appids={appId}&l=schinese&cc=us");
         }
         catch (Exception ex)
         {

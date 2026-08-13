@@ -27,22 +27,22 @@ public class ManifestService
     /// <summary>
     /// 从 GitHub 下载清单并生成 Lua 配置
     /// </summary>
-    public Task<(bool success, string message)> DownloadFromGithubAsync(
-        string appId, bool fixedVersion, bool addAllDlc, bool patchDepotKey, IProgress<string>? progress = null)
+    public Task<(bool success, string message, List<string> missingKeys)> DownloadFromGithubAsync(
+        string appId, bool fixedVersion, bool addAllDlc, bool patchDepotKey, IProgress<string>? progress)
         => _downloadService.DownloadFromGithubAsync(appId, fixedVersion, addAllDlc, patchDepotKey, progress);
 
     /// <summary>
     /// 从 ManifestHub 下载清单并生成 Lua 配置
     /// </summary>
-    public Task<(bool success, string message)> DownloadFromManifestHubAsync(
-        string appId, bool fixedVersion, bool addAllDlc = false, IProgress<string>? progress = null)
+    public Task<(bool success, string message, List<string> missingKeys)> DownloadFromManifestHubAsync(
+        string appId, bool fixedVersion, bool addAllDlc, IProgress<string>? progress)
         => _downloadService.DownloadFromManifestHubAsync(appId, fixedVersion, addAllDlc, progress);
 
     /// <summary>
     /// 从 Sudama 获取密钥并兜底下载清单、生成 Lua
     /// </summary>
-    public Task<(bool success, string message)> DownloadFromSudamaAsync(
-        string appId, bool fixedVersion, bool addAllDlc = false, IProgress<string>? progress = null)
+    public Task<(bool success, string message, List<string> missingKeys)> DownloadFromSudamaAsync(
+        string appId, bool fixedVersion, bool addAllDlc, IProgress<string>? progress)
         => _downloadService.DownloadFromSudamaAsync(appId, fixedVersion, addAllDlc, progress);
 
     /// <summary>

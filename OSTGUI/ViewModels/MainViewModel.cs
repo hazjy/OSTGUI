@@ -73,12 +73,15 @@ public partial class MainViewModel : ObservableObject
     public LibraryViewModel LibraryVM { get; }
     public DenuvoViewModel DenuvoVM { get; }
     public SettingsViewModel SettingsVM { get; }
+    public OnlineViewModel OnlineVM { get; }
 
     public MainViewModel(
         ConfigService configService,
         SteamService steamService,
         GameSearchService searchService,
         GameInfoService gameInfoService,
+        GameNameCacheService gameNameCacheService,
+        OnlineFixService onlineFixService,
         LuaConfigService luaService,
         ManifestService manifestService,
         TicketService ticketService,
@@ -102,6 +105,7 @@ public partial class MainViewModel : ObservableObject
             ticketService, luaService, searchService, ostFileService,
             steamGameInfoService, steamService, ticketExtractor);
         SettingsVM = new SettingsViewModel(configService, steamService, _steamDllService);
+        OnlineVM = new OnlineViewModel(onlineFixService, gameInfoService, gameNameCacheService);
     }
 
     /// <summary>

@@ -29,9 +29,40 @@
                 <Grid x:Name="OnlineFixPanel">
                     <ScrollViewer VerticalScrollBarVisibility="Auto">
                         <StackPanel Spacing="24" MaxWidth="920" HorizontalAlignment="Center" Padding="0,16,0,40">
-                            <TextBlock Text="功能开发中"
-                                       FontSize="14"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <Border Padding="24" CornerRadius="12"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                                <StackPanel Spacing="12">
+                                    <TextBlock Text="480 联机启动" FontSize="20" FontWeight="SemiBold" />
+                                    <TextBlock Text="以 Spacewar(480) 身份启动已入库游戏，启用 Steamworks 联机功能（需 Steam 在线）"
+                                               FontSize="13" TextWrapping="Wrap"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <TextBox Header="AppID" Width="180"
+                                                 Text="{Binding OnlineAppId, Mode=TwoWay}" />
+                                        <Button Content="查询" Click="QueryName_Click"
+                                                VerticalAlignment="Bottom" />
+                                    </StackPanel>
+
+                                    <TextBlock Text="{Binding GameName}" FontSize="16" FontWeight="SemiBold" />
+
+                                    <StackPanel Orientation="Horizontal" Spacing="12">
+                                        <Button Click="StartOnlineFix_Click"
+                                                Style="{StaticResource AccentButtonStyle}"
+                                                IsEnabled="{Binding CanStart}">
+                                            <TextBlock Text="启动 480 联机" />
+                                        </Button>
+                                        <Button Click="StopOnlineFix_Click"
+                                                IsEnabled="{Binding IsRunning}">
+                                            <TextBlock Text="停止游戏" />
+                                        </Button>
+                                    </StackPanel>
+
+                                    <TextBlock Text="{Binding StatusText}" FontSize="13"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                </StackPanel>
+                            </Border>
                         </StackPanel>
                     </ScrollViewer>
                 </Grid>

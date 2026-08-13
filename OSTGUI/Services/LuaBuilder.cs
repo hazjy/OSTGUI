@@ -25,17 +25,21 @@ public class LuaBuilder
         LogService.AddLog(message);
         System.Diagnostics.Debug.WriteLine($"[LuaBuilder] {message}");
     }
-    public async Task<string> BuildLuaAsync(
+    public async Task<(string lua, List<string> missingKeyDepots)> BuildLuaAsync(
         string appId,
         string sourceName,
         List<(string depotId, string manifestGid, long manifestSize)> depots,
         bool fixedVersion,
         bool patchDepotKey,
-        bool addAllDlc = false)
+        bool addAllDlc)
     {
         // 密钥与令牌获取失败不阻断，尽力而为
         var keys = patchDepotKey ? await _sudamaCache.GetSudamaKeysAsync() : new Dictionary<string, string>();
         var tokens = await _sudamaCache.GetAccessTokensAsync();
+        var missingKeyDepots = new List<string>();
+
+        // 补全全部 depot（SteamCMD 列表），避免缺失 depot 下载时无密钥报"内容加密"
+        var allDepots = await MergeAllDepotsAsync(appId, depots);
 
         var lines = new List<string>
         {
@@ -47,18 +51,25 @@ public class LuaBuilder
         lines.Add($"addappid({appId})");
         lines.Add("");
 
-        foreach (var (depotId, _, _) in depots)
+        foreach (var (depotId, _, _) in allDepots)
         {
             // OpenSteamTool 只接受恰好 64 字符的 depot key
             var hasKey = keys.TryGetValue(depotId, out var key) && key.Length == 64;
+            if (patchDepotKey && !hasKey)
+                missingKeyDepots.Add(depotId);
             lines.Add(hasKey ? $"addappid({depotId}, 1, \"{key}\")" : $"addappid({depotId})");
+        }
+        if (patchDepotKey && missingKeyDepots.Count > 0)
+        {
+            Log($"警告: 以下 depot 未找到解密密钥: {string.Join(", ", missingKeyDepots)}" +
+                "（Steam depot 内容均为 AES-256 加密，缺少密钥将无法解密下载）");
         }
 
         // 添加所有 DLC（可选）：获取 DLC 列表，跳过已在 depots 中的，逐个 addappid
         if (addAllDlc)
         {
             var existingIds = new HashSet<string> { appId };
-            foreach (var (depotId, _, _) in depots)
+            foreach (var (depotId, _, _) in allDepots)
                 existingIds.Add(depotId);
 
             var dlcIds = await _gameInfoService.GetDlcIdsAsync(appId);
@@ -75,7 +86,7 @@ public class LuaBuilder
 
         if (fixedVersion)
         {
-            var fixedLines = depots
+            var fixedLines = allDepots
                 .Where(d => !string.IsNullOrEmpty(d.manifestGid))
                 .Select(d => d.manifestSize > 0
                     ? $"setManifestid({d.depotId}, \"{d.manifestGid}\", {d.manifestSize})"
@@ -96,7 +107,44 @@ public class LuaBuilder
             lines.Add($"addtoken({appId}, \"{token}\")");
         }
 
-        return string.Join("\n", lines) + "\n";
+        return (string.Join("\n", lines) + "\n", missingKeyDepots);
+    }
+
+    /// <summary>
+    /// 合并 SteamCMD 返回的全部 depot，补全缺失项。
+    /// 没有清单 GID 的 depot 不固定版本，下载时由 OST 内核自动获取 manifest 请求码。
+    /// </summary>
+    private async Task<List<(string depotId, string manifestGid, long manifestSize)>> MergeAllDepotsAsync(
+        string appId,
+        List<(string depotId, string manifestGid, long manifestSize)> known)
+    {
+        var merged = new Dictionary<string, (string gid, long size)>();
+        foreach (var (id, gid, size) in known)
+            merged[id] = (gid, size);
+
+        try
+        {
+            var game = await _gameInfoService.GetGameDetailsFromSteamAsync(appId);
+            if (game != null)
+            {
+                foreach (var depot in game.Depots.Values)
+                {
+                    if (merged.ContainsKey(depot.DepotId)) continue;
+                    var gid = depot.Manifests.Count > 0 ? depot.Manifests[0] : "";
+                    merged[depot.DepotId] = (gid, depot.MaxSize);
+                    Log($"补全缺失 depot: {depot.DepotId}" +
+                        (string.IsNullOrEmpty(gid) ? "（无清单 GID，由内核自动获取）" : ""));
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"补全 depot 失败: {ex.Message}");
+        }
+
+        return merged
+            .Select(kv => (kv.Key, kv.Value.gid, kv.Value.size))
+            .ToList();
     }
 
     /// <summary>

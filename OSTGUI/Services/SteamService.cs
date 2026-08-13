@@ -286,7 +286,7 @@ public class SteamService
         {
             using var http = new System.Net.Http.HttpClient();
             http.Timeout = TimeSpan.FromSeconds(15);
-            var url = $"https://store.steampowered.com/api/appdetails?appids={appId}";
+            var url = $"https://store.steampowered.com/api/appdetails?appids={appId}&cc=us";
             var response = await http.GetAsync(url);
             if (!response.IsSuccessStatusCode)
                 return new();

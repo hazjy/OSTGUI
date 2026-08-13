@@ -120,8 +120,8 @@ public class SteamGameInfoService
     {
         try
         {
-            Log($"请求 Steam API: https://store.steampowered.com/api/appdetails?appids={appId}");
-            var response = await _http.GetAsync($"https://store.steampowered.com/api/appdetails?appids={appId}");
+            Log($"请求 Steam API: https://store.steampowered.com/api/appdetails?appids={appId}&cc=us");
+            var response = await _http.GetAsync($"https://store.steampowered.com/api/appdetails?appids={appId}&cc=us");
             Log($"Steam API 响应: {(int)response.StatusCode}");
 
             if (!response.IsSuccessStatusCode)
@@ -253,7 +253,7 @@ public class SteamGameInfoService
         // 2. Steam 官方 API：dlc 数组
         try
         {
-            var response = await _http.GetAsync($"https://store.steampowered.com/api/appdetails?appids={appId}&l=schinese");
+            var response = await _http.GetAsync($"https://store.steampowered.com/api/appdetails?appids={appId}&l=schinese&cc=us");
             if (response.IsSuccessStatusCode)
             {
                 var json = await response.Content.ReadAsStringAsync();

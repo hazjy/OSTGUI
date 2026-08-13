@@ -66,7 +66,7 @@ public class LuaRepairService
                 .Select(d => (d.DepotId, d.Manifests.Count > 0 ? d.Manifests[0] : "", 0L))
                 .ToList();
 
-            var lua = await _luaBuilder.BuildLuaAsync(appId, "自动修复", depots, fixedVersion, true, true);
+            var (lua, _) = await _luaBuilder.BuildLuaAsync(appId, "自动修复", depots, fixedVersion, true, true);
             var ok = await _luaBuilder.WriteLuaAsync(appId, lua);
             if (ok) Log("已重建 Lua 配置");
             return ok;

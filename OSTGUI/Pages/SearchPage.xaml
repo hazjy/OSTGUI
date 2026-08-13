@@ -46,6 +46,10 @@
                 </Button>
             </Grid>
 
+            <!-- 成人内容提示 -->
+            <TextBlock Text="限制级作品请用 AppID 搜索" FontSize="12" Margin="4,-10,0,0"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
             <ProgressBar x:Name="SearchProgress" IsIndeterminate="True" Visibility="{Binding IsSearching, Converter={StaticResource BoolToVis}}" />
 
             <!-- 入库流程加载条（搜索框下方，入库结束自动消失） -->

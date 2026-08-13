@@ -22,7 +22,8 @@ public class GameInfoService
     {
         try
         {
-            var response = await _http.GetAsync($"{SteamStoreApi}?appids={appId}&l=schinese");
+            // cc=us：显式指定地区，避免按 IP 落入 cn 区导致成人游戏被过滤（success=false）
+            var response = await _http.GetAsync($"{SteamStoreApi}?appids={appId}&l=schinese&cc=us");
             if (!response.IsSuccessStatusCode) return null;
 
             var json = await response.Content.ReadAsStringAsync();

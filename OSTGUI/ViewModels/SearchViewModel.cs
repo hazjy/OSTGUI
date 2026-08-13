@@ -227,6 +227,7 @@ public partial class SearchViewModel : ObservableObject
 
             var progress = new Progress<string>(msg => LogService.AddLog(msg));
             var (success, message) = (false, "");
+            var missingKeys = new List<string>();
 
             // 多源级联：MHub（配了 key 时）→ GitHub → Sudama，任一成功即完成
             var mhubKey = _configService.Config.ManifestSources?
@@ -236,14 +237,14 @@ public partial class SearchViewModel : ObservableObject
             if (!string.IsNullOrEmpty(mhubKey))
             {
                 LogService.AddLog("使用 ManifestHub 下载清单...");
-                (success, message) = await _manifestService.DownloadFromManifestHubAsync(
+                (success, message, missingKeys) = await _manifestService.DownloadFromManifestHubAsync(
                     appId, FixedVersion, AddAllDlc, progress);
             }
 
             if (!success)
             {
                 LogService.AddLog("使用 GitHub 下载清单...");
-                (success, message) = await _manifestService.DownloadFromGithubAsync(
+                (success, message, missingKeys) = await _manifestService.DownloadFromGithubAsync(
                     appId, FixedVersion, AddAllDlc, PatchDepotKey, progress);
             }
 
@@ -251,7 +252,7 @@ public partial class SearchViewModel : ObservableObject
             if (!success)
             {
                 LogService.AddLog("尝试 Sudama 兜底...");
-                (success, message) = await _manifestService.DownloadFromSudamaAsync(
+                (success, message, missingKeys) = await _manifestService.DownloadFromSudamaAsync(
                     appId, FixedVersion, AddAllDlc, progress);
             }
 
@@ -266,6 +267,14 @@ public partial class SearchViewModel : ObservableObject
                     var abnormalMsg = $"入库异常: {message}";
                     LogService.AddLog(abnormalMsg);
                     Services.ToastService.ShowWarning("入库异常", $"{target.Name} (AppID {appId}) 未能获取到清单文件，可能无法正常解锁");
+                    SetStatus(abnormalMsg, "Warning");
+                }
+                else if (missingKeys.Count > 0)
+                {
+                    var abnormalMsg = $"入库异常: 缺少解密密钥: {string.Join(", ", missingKeys)}";
+                    LogService.AddLog(abnormalMsg);
+                    Services.ToastService.ShowWarning("入库异常",
+                        $"{target.Name} (AppID {appId}) 缺少解密密钥: {string.Join(", ", missingKeys)}，Steam 内容均为 AES-256 加密，缺少密钥将无法正常下载");
                     SetStatus(abnormalMsg, "Warning");
                 }
                 else

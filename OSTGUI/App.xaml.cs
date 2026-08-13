@@ -14,13 +14,12 @@ public partial class App : Application
     public static Window? MainWindow => ((App)Current)._window;
 
     private Window? _window;
-    private static string LogPath => Path.Combine(AppContext.BaseDirectory, "crash.log");
 
     public App()
     {
         this.InitializeComponent();
 
-        // 全局异常日志（写入 crash.log）
+        // 全局异常日志（写入应用日志文件）
         UnhandledException += (s, e) =>
         {
             Log($"UnhandledException: {e.Exception}");
@@ -55,6 +54,7 @@ public partial class App : Application
         services.AddSingleton<TicketService>();
         services.AddSingleton<OstFileService>();
         services.AddSingleton<SteamTicketExtractor>();
+        services.AddSingleton<OnlineFixService>();
         services.AddSingleton<MainViewModel>();
         services.AddTransient<SearchViewModel>();
         services.AddTransient<LibraryViewModel>();
@@ -64,6 +64,11 @@ public partial class App : Application
 
         // 初始化 Toast 服务
         ToastService.Initialize(Services.GetRequiredService<ConfigService>());
+
+        // 初始化日志文件（本地数据目录）
+        LogService.Initialize(Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "OSTGUI", "logs", "ostgui.log"));
     }
 
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
@@ -84,6 +89,7 @@ public partial class App : Application
         var configService = Services.GetRequiredService<ConfigService>();
         await configService.LoadAsync();
         Log("Config loaded");
+        LogService.SetMaxLines(configService.Config.LogMaxLines);
 
         _window = new MainWindow();
         Log("MainWindow created");
@@ -120,11 +126,5 @@ public partial class App : Application
     }
 
     private static void Log(string msg)
-    {
-        try
-        {
-            File.AppendAllText(LogPath, $"[{DateTime.Now:HH:mm:ss}] {msg}{Environment.NewLine}");
-        }
-        catch { }
-    }
+        => LogService.AddAppLog(msg);
 }
