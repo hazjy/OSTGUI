@@ -5,7 +5,7 @@ using OSTGUI.Models;
 
 namespace OSTGUI.Services;
 /// <summary>
-/// 清单下载服务 - 从 GitHub / ManifestHub / Sudama 下载 manifest 并生成 Lua 配置
+/// 清单下载服务 - 从 GitHub / ManifestHub 下载 manifest，Sudama 仅作密钥源，统一生成 Lua 配置
 /// </summary>
 public class ManifestDownloadService
 {

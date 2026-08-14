@@ -19,12 +19,12 @@
 
 1. **MHub**（配置了 API Key 时优先）：SteamCMD/Steam 官方 API 获取 depot+gid → manifesthub API 下载 manifest
 2. **GitHub**：SteamAutoCracks/ManifestHub 仓库按 AppID 分支下载 manifest
-3. **Sudama 兜底**：SteamCMD API 获取 depot+gid → GitHub 分支 zip（直连+镜像）下载 manifest → 补 depot key / access token
+3. **Sudama 兜底**：SteamCMD API 获取 depot+gid → 生成完整 Lua（补 depot key / access token）；不下载清单文件，清单由清单源（MHub / GitHub）负责，Sudama 仅作密钥源
 
-所有路径最终统一生成完整 Lua（`addappid` + depot key + `setManifestid` + `addtoken`），原子写入 `Steam/config/lua/`。
+所有路径最终统一生成完整 Lua（`addappid` + depot key + `addtoken`，勾选"写入固定版本配置"时另预写注释形式 `--setManifestid`），原子写入 `Steam/config/lua/`。MHub / GitHub 路径还会把 manifest 下载到 Steam 的 depotcache；Sudama 路径不下载清单。
 
 ## 注意事项
 
 - 未接入的源不会在实际入库中被调用，保留条目仅作后续实现占位。
 - MHub 域名默认 `api.manifesthub2.filegear-sg.me`（原文档域名 `manifesthub1` 已不可用）。
-- GitHub 相关接口在当前网络环境下可能不可用，入库主链路设计为不依赖 GitHub。
+- GitHub 接口在部分网络环境下可能不可用，失败时由 Sudama 密钥源兜底生成 Lua（不含清单文件）。

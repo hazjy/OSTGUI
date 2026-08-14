@@ -36,7 +36,7 @@ public class ManifestService
         => _downloadService.DownloadFromManifestHubAsync(appId, fixedVersion, addAllDlc, progress);
 
     /// <summary>
-    /// 从 Sudama 获取密钥并兜底下载清单、生成 Lua
+    /// 从 Sudama 获取密钥并生成 Lua（不下载清单文件，仅作密钥源兜底）
     /// </summary>
     public Task<(bool success, string message, List<string> missingKeys)> DownloadFromSudamaAsync(
         string appId, bool fixedVersion, bool addAllDlc, IProgress<string>? progress)
