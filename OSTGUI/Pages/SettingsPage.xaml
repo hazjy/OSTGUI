@@ -84,9 +84,21 @@
                                                 Background="{ThemeResource LayerFillColorDefaultBrush}"
                                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                                             <StackPanel Spacing="8">
-                                                <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" />
-                                                <TextBlock Text="{Binding Description}" FontSize="11"
-                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <Grid ColumnSpacing="8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <StackPanel Grid.Column="0" Spacing="4">
+                                                        <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" />
+                                                        <TextBlock Text="{Binding Description}" FontSize="11"
+                                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                    </StackPanel>
+                                                    <Button Grid.Column="1" Content="刷新缓存" Click="RefreshSudamaCache_Click"
+                                                            Tag="{Binding}"
+                                                            Visibility="{Binding ShowRefreshCacheButton, Converter={StaticResource BoolToVis}}"
+                                                            VerticalAlignment="Center" />
+                                                </Grid>
                                                 <StackPanel Spacing="4"
                                                             Visibility="{Binding RequiresToken, Converter={StaticResource BoolToVis}}">
                                                     <TextBlock Text="API Key / Token" FontSize="12" />

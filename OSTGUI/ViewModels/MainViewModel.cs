@@ -88,7 +88,8 @@ public partial class MainViewModel : ObservableObject
         OstFileService ostFileService,
         SteamGameInfoService steamGameInfoService,
         SteamTicketExtractor ticketExtractor,
-        SteamDllService steamDllService)
+        SteamDllService steamDllService,
+        SudamaKeyCache sudamaCache)
     {
         ConfigService = configService;
         SteamService = steamService;
@@ -104,7 +105,7 @@ public partial class MainViewModel : ObservableObject
         DenuvoVM = new DenuvoViewModel(
             ticketService, luaService, searchService, ostFileService,
             steamGameInfoService, steamService, ticketExtractor);
-        SettingsVM = new SettingsViewModel(configService, steamService, _steamDllService);
+        SettingsVM = new SettingsViewModel(configService, steamService, _steamDllService, sudamaCache);
         OnlineVM = new OnlineViewModel(onlineFixService, gameInfoService, gameNameCacheService);
     }
 

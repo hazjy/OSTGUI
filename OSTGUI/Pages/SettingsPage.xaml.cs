@@ -122,4 +122,9 @@ public sealed partial class SettingsPage : Page
             System.Diagnostics.Debug.WriteLine("OpenTokenPage error: " + ex.Message);
         }
     }
+
+    private void RefreshSudamaCache_Click(object sender, RoutedEventArgs e)
+    {
+        VM.RefreshSudamaCacheCommand.Execute(null);
+    }
 }

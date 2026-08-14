@@ -19,7 +19,6 @@ public class AppConfig
     public bool DefaultAddAllDlc { get; set; } = true;
     public bool DefaultPatchDepotKey { get; set; } = true;
     public bool DefaultPatchManifest { get; set; } = true;
-    public int DlcTimeout { get; set; } = 60;
     public int DownloadTimeout { get; set; } = 120;
     public bool StFixedVersionDefault { get; set; } = true;
     public string StFixedManifestMode { get; set; } = "ask"; // always, never, ask
@@ -72,7 +71,6 @@ public class AppConfig
         DefaultAddAllDlc = true,
         DefaultPatchDepotKey = true,
         DefaultPatchManifest = true,
-        DlcTimeout = 60,
         DownloadTimeout = 120,
         StFixedVersionDefault = true,
         StFixedManifestMode = "ask",

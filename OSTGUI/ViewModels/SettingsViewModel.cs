@@ -15,6 +15,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly ConfigService _configService;
     private readonly SteamService _steamService;
     private readonly SteamDllService _steamDllService;
+    private readonly SudamaKeyCache _sudamaCache;
     private bool _isLoading;
 
     // === 基本设置 ===
@@ -28,8 +29,6 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _defaultAddAllDlc = true;
     [ObservableProperty] private bool _defaultPatchDepotKey = true;
     [ObservableProperty] private bool _defaultPatchManifest = true;
-    [ObservableProperty] private int _dlcTimeout = 60;
-    [ObservableProperty] private int _downloadTimeout = 120;
     [ObservableProperty] private bool _stFixedVersionDefault = true;
     [ObservableProperty] private string _stFixedManifestMode = "ask";
 
@@ -99,15 +98,49 @@ public partial class SettingsViewModel : ObservableObject
     // === 状态 ===
     [ObservableProperty] private string _statusMessage = "";
     [ObservableProperty] private string _statusType = "Info";
+    [ObservableProperty] private bool _isRefreshingSudama;
 
-    public SettingsViewModel(ConfigService configService, SteamService steamService, SteamDllService steamDllService)
+    public SettingsViewModel(ConfigService configService, SteamService steamService,
+        SteamDllService steamDllService, SudamaKeyCache sudamaCache)
     {
         _configService = configService;
         _steamService = steamService;
         _steamDllService = steamDllService;
+        _sudamaCache = sudamaCache;
 
         // 设置变化即自动保存（实时生效）；加载期间由 _isLoading 抑制
         PropertyChanged += (s, e) => SaveAllToConfig();
+    }
+
+    /// <summary>
+    /// 手动刷新 Sudama 缓存（密钥 + 令牌）
+    /// </summary>
+    [RelayCommand]
+    private async Task RefreshSudamaCache()
+    {
+        if (IsRefreshingSudama) return;
+        IsRefreshingSudama = true;
+        try
+        {
+            var (ok, message) = await _sudamaCache.RefreshAsync();
+            LogService.AddLog(message);
+            SetStatus(message, ok ? "Success" : "Error");
+            if (ok)
+                Services.ToastService.ShowSuccess("Sudama 缓存已更新", message);
+            else
+                Services.ToastService.ShowError("Sudama 缓存刷新失败", message);
+        }
+        catch (Exception ex)
+        {
+            var msg = $"Sudama 缓存刷新异常: {ex.Message}";
+            LogService.AddLog(msg);
+            SetStatus(msg, "Error");
+            Services.ToastService.ShowError("Sudama 缓存刷新失败", msg);
+        }
+        finally
+        {
+            IsRefreshingSudama = false;
+        }
     }
 
     /// <summary>
@@ -125,8 +158,6 @@ public partial class SettingsViewModel : ObservableObject
             DefaultAddAllDlc = c.DefaultAddAllDlc;
             DefaultPatchDepotKey = c.DefaultPatchDepotKey;
             DefaultPatchManifest = c.DefaultPatchManifest;
-            DlcTimeout = c.DlcTimeout;
-            DownloadTimeout = c.DownloadTimeout;
             StFixedVersionDefault = c.StFixedVersionDefault;
             StFixedManifestMode = c.StFixedManifestMode;
             ThemeMode = c.ThemeMode;
@@ -266,8 +297,6 @@ public partial class SettingsViewModel : ObservableObject
                 c.DefaultAddAllDlc = DefaultAddAllDlc;
                 c.DefaultPatchDepotKey = DefaultPatchDepotKey;
                 c.DefaultPatchManifest = DefaultPatchManifest;
-                c.DlcTimeout = DlcTimeout;
-                c.DownloadTimeout = DownloadTimeout;
                 c.StFixedVersionDefault = StFixedVersionDefault;
                 c.StFixedManifestMode = StFixedManifestMode;
                 c.ThemeMode = ThemeMode;

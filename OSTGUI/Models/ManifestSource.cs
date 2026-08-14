@@ -38,6 +38,11 @@ public class ManifestSource
     public bool IsCustom => Type == ManifestSourceType.Custom;
 
     /// <summary>
+    /// 该源是否需要手动刷新缓存的按钮（当前仅 Sudama 密钥库）
+    /// </summary>
+    public bool ShowRefreshCacheButton => Id == "sudama";
+
+    /// <summary>
     /// 获取该源 API Key / Token 的页面地址（无则返回 null）
     /// </summary>
     public static string? GetTokenPageUrl(string sourceId) => sourceId switch
