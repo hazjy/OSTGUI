@@ -17,7 +17,6 @@ public class AppConfig
 
     // === 入库设置 ===
     public bool DefaultAddAllDlc { get; set; } = true;
-    public bool DefaultPatchDepotKey { get; set; } = true;
     public bool DefaultPatchManifest { get; set; } = true;
     public int DownloadTimeout { get; set; } = 120;
     public bool StFixedVersionDefault { get; set; } = true;
@@ -69,7 +68,6 @@ public class AppConfig
         DefaultManifestSource = "auto",
         UnlockerType = "ost",
         DefaultAddAllDlc = true,
-        DefaultPatchDepotKey = true,
         DefaultPatchManifest = true,
         DownloadTimeout = 120,
         StFixedVersionDefault = true,

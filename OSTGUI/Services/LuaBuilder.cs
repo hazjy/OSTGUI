@@ -5,7 +5,7 @@ using OSTGUI.Models;
 
 namespace OSTGUI.Services;
 /// <summary>
-/// Lua 配置生成服务 - 生成完整解锁 Lua（depot key / token / DLC / 固定版本）并原子写入
+/// Lua 配置生成服务 - 生成完整解锁 Lua（depot key / token / DLC / 可选预写固定版本配置）并原子写入
 /// </summary>
 public class LuaBuilder
 {
@@ -30,11 +30,10 @@ public class LuaBuilder
         string sourceName,
         List<(string depotId, string manifestGid, long manifestSize)> depots,
         bool fixedVersion,
-        bool patchDepotKey,
         bool addAllDlc)
     {
         // 密钥与令牌获取失败不阻断，尽力而为
-        var keys = patchDepotKey ? await _sudamaCache.GetSudamaKeysAsync() : new Dictionary<string, string>();
+        var keys = await _sudamaCache.GetSudamaKeysAsync();
         var tokens = await _sudamaCache.GetAccessTokensAsync();
         var missingKeyDepots = new List<string>();
 
@@ -55,11 +54,11 @@ public class LuaBuilder
         {
             // OpenSteamTool 只接受恰好 64 字符的 depot key
             var hasKey = keys.TryGetValue(depotId, out var key) && key.Length == 64;
-            if (patchDepotKey && !hasKey)
+            if (!hasKey)
                 missingKeyDepots.Add(depotId);
             lines.Add(hasKey ? $"addappid({depotId}, 1, \"{key}\")" : $"addappid({depotId})");
         }
-        if (patchDepotKey && missingKeyDepots.Count > 0)
+        if (missingKeyDepots.Count > 0)
         {
             Log($"警告: 以下 depot 未找到解密密钥: {string.Join(", ", missingKeyDepots)}" +
                 "（Steam depot 内容均为 AES-256 加密，缺少密钥将无法解密下载）");
@@ -80,23 +79,38 @@ public class LuaBuilder
                 lines.Add("-- 所有 DLC");
                 foreach (var dlcId in newDlcs)
                     lines.Add($"addappid({dlcId})");
+
+                // 为缓存中有 token 的 DLC 补充 addtoken（受限 DLC 获取 appinfo 需要）
+                var dlcTokenLines = newDlcs
+                    .Where(d => tokens.TryGetValue(d, out var t) && !string.IsNullOrEmpty(t))
+                    .Select(d => $"addtoken({d}, \"{tokens[d]}\")")
+                    .ToList();
+                if (dlcTokenLines.Count > 0)
+                {
+                    lines.Add("");
+                    lines.Add("-- DLC access token");
+                    lines.AddRange(dlcTokenLines);
+                }
+
                 Log($"已添加 {newDlcs.Count} 个 DLC");
             }
         }
 
+        // fixedVersion 仅决定是否预写固定版本配置（注释形式，备用不启用），
+        // 不决定版本模式：写入后仍是自动更新，切换固定版本时由用户手动取消注释
         if (fixedVersion)
         {
             var fixedLines = allDepots
                 .Where(d => !string.IsNullOrEmpty(d.manifestGid))
                 .Select(d => d.manifestSize > 0
-                    ? $"setManifestid({d.depotId}, \"{d.manifestGid}\", {d.manifestSize})"
-                    : $"setManifestid({d.depotId}, \"{d.manifestGid}\")")
+                    ? $"--setManifestid({d.depotId}, \"{d.manifestGid}\", {d.manifestSize})"
+                    : $"--setManifestid({d.depotId}, \"{d.manifestGid}\")")
                 .ToList();
 
             if (fixedLines.Count > 0)
             {
                 lines.Add("");
-                lines.Add("-- 固定版本配置");
+                lines.Add("-- 固定版本配置（预写备用，未启用）");
                 lines.AddRange(fixedLines);
             }
         }
@@ -182,7 +196,8 @@ public class LuaBuilder
 
     private static async Task WriteFileAtomicallyAsync(string path, string content)
     {
-        var tmpPath = path + ".tmp";
+        // 唯一临时文件名：避免多个实例/并发写入同一 tmp 导致文件交错损坏
+        var tmpPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         await File.WriteAllTextAsync(tmpPath, content, new System.Text.UTF8Encoding(false));
         File.Move(tmpPath, path, true);
     }

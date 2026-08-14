@@ -10,26 +10,23 @@ public class ManifestService
     private readonly ConfigService _configService;
     private readonly ManifestDownloadService _downloadService;
     private readonly SteamGameInfoService _gameInfoService;
-    private readonly ManifestRepairService _repairService;
 
     public ManifestService(
         ConfigService configService,
         ManifestDownloadService downloadService,
-        SteamGameInfoService gameInfoService,
-        ManifestRepairService repairService)
+        SteamGameInfoService gameInfoService)
     {
         _configService = configService;
         _downloadService = downloadService;
         _gameInfoService = gameInfoService;
-        _repairService = repairService;
     }
 
     /// <summary>
     /// 从 GitHub 下载清单并生成 Lua 配置
     /// </summary>
     public Task<(bool success, string message, List<string> missingKeys)> DownloadFromGithubAsync(
-        string appId, bool fixedVersion, bool addAllDlc, bool patchDepotKey, IProgress<string>? progress)
-        => _downloadService.DownloadFromGithubAsync(appId, fixedVersion, addAllDlc, patchDepotKey, progress);
+        string appId, bool fixedVersion, bool addAllDlc, IProgress<string>? progress)
+        => _downloadService.DownloadFromGithubAsync(appId, fixedVersion, addAllDlc, progress);
 
     /// <summary>
     /// 从 ManifestHub 下载清单并生成 Lua 配置
@@ -67,22 +64,4 @@ public class ManifestService
 
         return sources;
     }
-
-    /// <summary>
-    /// 自动修复清单（拉取缺失清单）
-    /// </summary>
-    public Task<(bool success, string message)> RepairManifestAsync(string appId)
-        => _repairService.RepairManifestAsync(appId);
-
-    /// <summary>
-    /// 修复 Lua 错误（重新生成 Lua 配置）
-    /// </summary>
-    public Task<(bool success, string message)> RepairLuaAsync(string appId, bool fixedVersion)
-        => _repairService.RepairLuaAsync(appId, fixedVersion);
-
-    /// <summary>
-    /// 补齐版本配置（检测并修复固定版本方面的错误）
-    /// </summary>
-    public Task<(bool success, string message)> RepairVersionConfigAsync(string appId)
-        => _repairService.RepairVersionConfigAsync(appId);
 }

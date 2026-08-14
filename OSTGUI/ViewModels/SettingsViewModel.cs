@@ -27,7 +27,6 @@ public partial class SettingsViewModel : ObservableObject
 
     // === 入库设置 ===
     [ObservableProperty] private bool _defaultAddAllDlc = true;
-    [ObservableProperty] private bool _defaultPatchDepotKey = true;
     [ObservableProperty] private bool _defaultPatchManifest = true;
     [ObservableProperty] private bool _stFixedVersionDefault = true;
     [ObservableProperty] private string _stFixedManifestMode = "ask";
@@ -156,7 +155,6 @@ public partial class SettingsViewModel : ObservableObject
             DefaultSource = c.DefaultManifestSource;
             UnlockerType = c.UnlockerType;
             DefaultAddAllDlc = c.DefaultAddAllDlc;
-            DefaultPatchDepotKey = c.DefaultPatchDepotKey;
             DefaultPatchManifest = c.DefaultPatchManifest;
             StFixedVersionDefault = c.StFixedVersionDefault;
             StFixedManifestMode = c.StFixedManifestMode;
@@ -295,7 +293,6 @@ public partial class SettingsViewModel : ObservableObject
                 c.DefaultManifestSource = DefaultSource;
                 c.UnlockerType = UnlockerType;
                 c.DefaultAddAllDlc = DefaultAddAllDlc;
-                c.DefaultPatchDepotKey = DefaultPatchDepotKey;
                 c.DefaultPatchManifest = DefaultPatchManifest;
                 c.StFixedVersionDefault = StFixedVersionDefault;
                 c.StFixedManifestMode = StFixedManifestMode;

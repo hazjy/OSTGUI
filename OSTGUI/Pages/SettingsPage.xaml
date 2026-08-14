@@ -43,7 +43,7 @@
                                 <Button Grid.Column="2" Content="自动检测" Click="DetectSteam_Click" />
                             </Grid>
                         </StackPanel>
-                        <CheckBox Content="显示系统通知" IsChecked="{Binding ShowSystemNotifications, Mode=TwoWay}"
+                <CheckBox Content="入库结果通知" IsChecked="{Binding ShowSystemNotifications, Mode=TwoWay}"
                                   Checked="OnSettingChanged" Unchecked="OnSettingChanged" />
                         <CheckBox Content="版本状态更改通知" IsChecked="{Binding ShowVersionChangeNotifications, Mode=TwoWay}"
                                   Checked="OnSettingChanged" Unchecked="OnSettingChanged" />

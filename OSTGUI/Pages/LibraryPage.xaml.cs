@@ -64,24 +64,9 @@ public sealed partial class LibraryPage : Page
         }
     }
 
-    private async void Repair_Click(object sender, RoutedEventArgs e)
-    {
-        if (sender is Button btn && btn.Tag is LibraryItem item)
-        {
-            VM.LastRightClickedItem = item;
-            await VM.RepairManifestCommand.ExecuteAsync(item);
-        }
-    }
-
     private void EditLua_Click(object sender, RoutedEventArgs e)
     {
         VM.EditLuaCommand.Execute(null);
-    }
-
-    private async void RepairVersionConfig_Click(object sender, RoutedEventArgs e)
-    {
-        if (VM.LastRightClickedItem != null)
-            await VM.RepairVersionConfigCommand.ExecuteAsync(VM.LastRightClickedItem);
     }
 
     private void CopyAppId_Click(object sender, RoutedEventArgs e)
@@ -100,10 +85,11 @@ public sealed partial class LibraryPage : Page
         }
     }
 
-    private void InstallInfo_Click(object sender, RoutedEventArgs e)
+    private async void InstallInfo_Click(object sender, RoutedEventArgs e)
     {
         if (VM.LastRightClickedItem != null)
         {
+            await VM.LoadDlcInfoAsync(VM.LastRightClickedItem);
             ShowInstallInfoDialog(VM.LastRightClickedItem);
         }
     }
@@ -121,8 +107,7 @@ public sealed partial class LibraryPage : Page
             Content = new StackPanel { Spacing = 8, Children =
             {
                 new TextBlock { Text = $"AppID: {item.AppId}" },
-                new TextBlock { Text = $"版本模式: {item.VersionModeText}" },
-                new TextBlock { Text = $"状态: {item.StatusText}" }
+                new TextBlock { Text = $"版本模式: {item.VersionModeText}" }
             }}
         };
 
@@ -146,7 +131,6 @@ public sealed partial class LibraryPage : Page
         var headerPanel = new StackPanel { Spacing = 8, Padding = new Thickness(0, 0, 0, 12) };
         headerPanel.Children.Add(new TextBlock { Text = $"AppID: {item.AppId}", FontSize = 14, FontWeight = FontWeights.SemiBold });
         headerPanel.Children.Add(new TextBlock { Text = $"游戏名称: {item.GameName}", FontSize = 13 });
-        headerPanel.Children.Add(new TextBlock { Text = $"入库状态: {item.StatusText}", FontSize = 13 });
         headerPanel.Children.Add(new TextBlock { Text = $"版本模式: {item.VersionModeText}", FontSize = 13 });
 
         // DLC 过滤器：全部 / 已入库 / 未入库（单选按钮组）

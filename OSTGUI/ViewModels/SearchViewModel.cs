@@ -37,7 +37,6 @@ public partial class SearchViewModel : ObservableObject
 
     // 入库选项（全局）
     [ObservableProperty] private bool _addAllDlc;
-    [ObservableProperty] private bool _patchDepotKey;
     [ObservableProperty] private bool _fixedVersion;
 
     public ObservableCollection<string> Logs => LogService.Logs;
@@ -73,7 +72,6 @@ public partial class SearchViewModel : ObservableObject
         {
             var c = _configService.Config;
             AddAllDlc = c.DefaultAddAllDlc;
-            PatchDepotKey = c.DefaultPatchDepotKey;
             FixedVersion = c.StFixedVersionDefault;
         }
         finally
@@ -88,7 +86,6 @@ public partial class SearchViewModel : ObservableObject
         _configService.UpdateAndSaveAsync(c =>
         {
             c.DefaultAddAllDlc = AddAllDlc;
-            c.DefaultPatchDepotKey = PatchDepotKey;
             c.StFixedVersionDefault = FixedVersion;
         }).GetAwaiter().GetResult();
     }
@@ -99,13 +96,6 @@ public partial class SearchViewModel : ObservableObject
         if (!_isLoadingOptions && _configService.IsLoaded)
             SaveOptionsToConfig();
     }
-
-    partial void OnPatchDepotKeyChanged(bool value)
-    {
-        if (!_isLoadingOptions && _configService.IsLoaded)
-            SaveOptionsToConfig();
-    }
-
 
     partial void OnFixedVersionChanged(bool value)
     {
@@ -245,7 +235,7 @@ public partial class SearchViewModel : ObservableObject
             {
                 LogService.AddLog("使用 GitHub 下载清单...");
                 (success, message, missingKeys) = await _manifestService.DownloadFromGithubAsync(
-                    appId, FixedVersion, AddAllDlc, PatchDepotKey, progress);
+                    appId, FixedVersion, AddAllDlc, progress);
             }
 
             // GitHub 失败时兜底走 Sudama（Sudama 自身会尽力下载 manifest，失败也给出明确日志）
@@ -266,27 +256,31 @@ public partial class SearchViewModel : ObservableObject
                 {
                     var abnormalMsg = $"入库异常: {message}";
                     LogService.AddLog(abnormalMsg);
-                    Services.ToastService.ShowWarning("入库异常", $"{target.Name} (AppID {appId}) 未能获取到清单文件，可能无法正常解锁");
+                    if (_configService.Config.ShowSystemNotifications)
+                        Services.ToastService.ShowWarning("入库异常", $"{target.Name} (AppID {appId}) 未能获取到清单文件，可能无法正常解锁");
                     SetStatus(abnormalMsg, "Warning");
                 }
                 else if (missingKeys.Count > 0)
                 {
                     var abnormalMsg = $"入库异常: 缺少解密密钥: {string.Join(", ", missingKeys)}";
                     LogService.AddLog(abnormalMsg);
-                    Services.ToastService.ShowWarning("入库异常",
-                        $"{target.Name} (AppID {appId}) 缺少解密密钥: {string.Join(", ", missingKeys)}，Steam 内容均为 AES-256 加密，缺少密钥将无法正常下载");
+                    if (_configService.Config.ShowSystemNotifications)
+                        Services.ToastService.ShowWarning("入库异常",
+                            $"{target.Name} (AppID {appId}) 缺少解密密钥: {string.Join(", ", missingKeys)}，Steam 内容均为 AES-256 加密，缺少密钥将无法正常下载");
                     SetStatus(abnormalMsg, "Warning");
                 }
                 else
                 {
-                    Services.ToastService.ShowSuccess("入库成功", $"{target.Name} (AppID {appId}) 已入库");
+                    if (_configService.Config.ShowSystemNotifications)
+                        Services.ToastService.ShowSuccess("入库成功", $"{target.Name} (AppID {appId}) 已入库");
                     SetStatus(message, "Success");
                 }
                 SaveOptionsToConfig();
             }
             else
             {
-                Services.ToastService.ShowError("入库失败", message);
+                if (_configService.Config.ShowSystemNotifications)
+                    Services.ToastService.ShowError("入库失败", message);
                 SetStatus(message, "Error");
             }
         }

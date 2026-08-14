@@ -11,7 +11,6 @@
         <helpers:StatusToBrushConverter x:Key="StatusToBrushConverter" />
         <MenuFlyout x:Key="MoreMenu">
             <MenuFlyoutItem Text="编辑 Lua" Click="EditLua_Click" />
-            <MenuFlyoutItem Text="补齐版本配置" Click="RepairVersionConfig_Click" />
             <MenuFlyoutItem Text="复制 AppID" Click="CopyAppId_Click" />
             <MenuFlyoutItem Text="复制游戏名称" Click="CopyGameName_Click" />
             <MenuFlyoutSeparator />
@@ -70,18 +69,8 @@
                                         <StackPanel Orientation="Horizontal" Spacing="4">
                                             <TextBlock Text="{Binding GameName}" FontSize="14" FontWeight="SemiBold"
                                                        VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="200"
-                                                       Foreground="{Binding Status, Converter={StaticResource StatusToBrushConverter}}" />
-                                            <Button Click="Repair_Click" Tag="{Binding}"
-                                                    ToolTipService.ToolTip="自动修复"
-                                                    Background="Transparent" BorderThickness="0" Padding="6,2"
-                                                    Visibility="{Binding HasError, Converter={StaticResource BoolToVis}}">
-                                                <FontIcon Glyph="&#xE777;" FontSize="14" />
-                                            </Button>
+                                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                                         </StackPanel>
-                                        <TextBlock Text="{Binding ErrorLabel}" FontSize="11" Margin="0,2,0,0"
-                                                   MaxWidth="420" TextTrimming="CharacterEllipsis"
-                                                   Foreground="{Binding Status, Converter={StaticResource StatusToBrushConverter}}"
-                                                   Visibility="{Binding HasError, Converter={StaticResource BoolToVis}}" />
                                     </StackPanel>
                                     <TextBlock Grid.Column="1" Text="{Binding AppId}" FontSize="12"
                                                VerticalAlignment="Center"

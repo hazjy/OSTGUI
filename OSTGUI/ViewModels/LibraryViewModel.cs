@@ -16,7 +16,6 @@ public partial class LibraryViewModel : ObservableObject
     private readonly GameSearchService _searchService;
     private readonly GameInfoService _gameInfoService;
     private readonly SteamService _steamService;
-    private readonly ManifestService _manifestService;
     private readonly ConfigService _configService;
 
     [ObservableProperty] private ObservableCollection<LibraryItem> _libraryItems = new();
@@ -26,11 +25,7 @@ public partial class LibraryViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(IsBusy))]
     private bool _isLoading;
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsBusy))]
-    private bool _isRepairing;
-
-    public bool IsBusy => IsLoading || IsRepairing;
+    public bool IsBusy => IsLoading;
 
     [ObservableProperty] private string _statusMessage = "准备加载库...";
     [ObservableProperty] private string _statusType = "Info";
@@ -47,14 +42,12 @@ public partial class LibraryViewModel : ObservableObject
         GameSearchService searchService,
         GameInfoService gameInfoService,
         SteamService steamService,
-        ManifestService manifestService,
         ConfigService configService)
     {
         _luaService = luaService;
         _searchService = searchService;
         _gameInfoService = gameInfoService;
         _steamService = steamService;
-        _manifestService = manifestService;
         _configService = configService;
 
         // 恢复上次的视图模式
@@ -81,7 +74,7 @@ public partial class LibraryViewModel : ObservableObject
             var items = await _luaService.ScanLibraryAsync();
             ProgressValue = 30;
 
-            // 获取游戏名称
+            // 批量补游戏名：缓存命中不联网，仅缓存缺失的联网获取（限并发，只慢一次）
             var appIds = items
                 .Where(i => i.AppId != "N/A" && !string.IsNullOrEmpty(i.GameName) && i.GameName.StartsWith("AppID"))
                 .Select(i => i.AppId)
@@ -101,19 +94,7 @@ public partial class LibraryViewModel : ObservableObject
                 }
             }
 
-            // 获取 DLC 信息
-            ProgressValue = 85;
-            foreach (var item in items.Where(i => i.AppId != "N/A"))
-            {
-                try
-                {
-                    var dlcInfo = await _gameInfoService.GetDlcInfoAsync(item.AppId);
-                    foreach (var dlc in dlcInfo)
-                        dlc.Status = item.InstalledAppIds.Contains(dlc.AppId) ? "installed" : "";
-                    item.DlcList = dlcInfo;
-                }
-                catch { }
-            }
+            // DLC 信息不再刷新时预加载，改为点"入库信息"时按需获取
 
             // 应用排序
             items = ApplySort(items);
@@ -139,6 +120,21 @@ public partial class LibraryViewModel : ObservableObject
         {
             IsLoading = false;
         }
+    }
+
+    /// <summary>
+    /// 按需加载单个游戏的 DLC 信息（入库信息对话框打开时调用）
+    /// </summary>
+    public async Task LoadDlcInfoAsync(LibraryItem item)
+    {
+        try
+        {
+            var dlcInfo = await _gameInfoService.GetDlcInfoAsync(item.AppId);
+            foreach (var dlc in dlcInfo)
+                dlc.Status = item.InstalledAppIds.Contains(dlc.AppId) ? "installed" : "";
+            item.DlcList = dlcInfo;
+        }
+        catch { }
     }
 
     /// <summary>
@@ -273,95 +269,6 @@ public partial class LibraryViewModel : ObservableObject
         catch (Exception ex)
         {
             SetStatus($"打开记事本失败: {ex.Message}", "Error");
-        }
-    }
-
-    /// <summary>
-    /// 补齐清单
-    /// </summary>
-    [RelayCommand]
-    private async Task RepairManifestAsync(LibraryItem? item = null)
-    {
-        item ??= LastRightClickedItem;
-        if (item == null) return;
-
-        IsRepairing = true;
-        try
-        {
-            SetStatus($"正在为 AppID {item.AppId} ({item.GameName}) 修复...", "Info");
-
-            // Lua 错误 → 只修复 Lua；其余（清单缺失等）→ 拉取缺失清单
-            var (success, message) = item.Status == "error"
-                ? await _manifestService.RepairLuaAsync(item.AppId, item.VersionMode == "fixed")
-                : await _manifestService.RepairManifestAsync(item.AppId);
-
-            SetStatus(message, success ? "Success" : "Error");
-
-            if (success)
-            {
-                if (item.Status == "error")
-                {
-                    // Lua 修复后重新检测该条目的实际状态
-                    var (st, dt, vm) = _luaService.GetLuaStatus(item.AppId);
-                    item.Status = st;
-                    item.StatusDetail = dt;
-                    item.VersionMode = vm;
-                }
-                else
-                {
-                    // 成功：恢复状态，不写原因
-                    item.Status = "ok";
-                    item.StatusDetail = "";
-                }
-                Services.ToastService.ShowSuccess("自动修复成功", message);
-            }
-            else
-            {
-                // 失败：把失败原因写进该条目的入库状态
-                item.StatusDetail = $"自动修复失败: {message}";
-                if (item.Status == "ok")
-                    item.Status = "error";
-                Services.ToastService.ShowError("自动修复失败", $"{item.GameName} (AppID {item.AppId}) {message}");
-            }
-        }
-        finally
-        {
-            IsRepairing = false;
-        }
-    }
-
-    /// <summary>
-    /// 补齐版本配置：检测固定版本方面的错误（setManifestid 配置缺失 / 清单缺失）并尝试修复
-    /// </summary>
-    [RelayCommand]
-    private async Task RepairVersionConfigAsync(LibraryItem? item = null)
-    {
-        item ??= LastRightClickedItem;
-        if (item == null) return;
-
-        IsRepairing = true;
-        try
-        {
-            var (success, message) = await _manifestService.RepairVersionConfigAsync(item.AppId);
-
-            if (success)
-            {
-                // 修复后重新检测该条目的实际状态
-                var (st, dt, vm) = _luaService.GetLuaStatus(item.AppId);
-                item.Status = st;
-                item.StatusDetail = dt;
-                item.VersionMode = vm;
-                Services.ToastService.ShowSuccess("补齐版本配置成功", message);
-            }
-            else
-            {
-                // 补齐失败不触发 Lua 错误状态，避免自动修复误把已就绪的版本配置清掉
-                Services.ToastService.ShowError("补齐版本配置失败", $"{item.GameName} (AppID {item.AppId}) {message}");
-            }
-        }
-        finally
-        {
-            IsRepairing = false;
         }
     }
 

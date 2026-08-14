@@ -56,12 +56,6 @@ public class LuaConfigService
     public async Task<List<LibraryItem>> ScanLibraryAsync() => await _scanner.ScanLibraryAsync();
 
     /// <summary>
-    /// 检查单个游戏 Lua 的入库状态（委托给 LibraryScanner）
-    /// </summary>
-    public (string status, string detail, string versionMode) GetLuaStatus(string appId)
-        => _scanner.GetLuaStatus(appId);
-
-    /// <summary>
     /// 为游戏生成 Lua 配置内容
     /// 格式: addappid(ID, KeyType, "DepotKey") 或 addappid(ID)
     /// </summary>

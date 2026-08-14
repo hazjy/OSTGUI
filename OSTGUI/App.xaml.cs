@@ -48,8 +48,6 @@ public partial class App : Application
         services.AddSingleton<LuaBuilder>();
         services.AddSingleton<ManifestFileService>();
         services.AddSingleton<ManifestDownloadService>();
-        services.AddSingleton<LuaRepairService>();
-        services.AddSingleton<ManifestRepairService>();
         services.AddSingleton<ManifestService>();
         services.AddSingleton<TicketService>();
         services.AddSingleton<OstFileService>();
@@ -61,9 +59,6 @@ public partial class App : Application
         services.AddTransient<DenuvoViewModel>();
         services.AddTransient<SettingsViewModel>();
         Services = services.BuildServiceProvider();
-
-        // 初始化 Toast 服务
-        ToastService.Initialize(Services.GetRequiredService<ConfigService>());
 
         // 初始化日志文件（本地数据目录）
         LogService.Initialize(Path.Combine(

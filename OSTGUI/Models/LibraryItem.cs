@@ -20,43 +20,6 @@ public class LibraryItem : ObservableObject
     public string GameName { get; set; } = "未知游戏";
     public string FileName { get; set; } = string.Empty;
     public string UnlockerType { get; set; } = "ost"; // ost = OpenSteamTool
-    private string _status = "ok";
-    public string Status // ok, error, manifest
-    {
-        get => _status;
-        set
-        {
-            if (SetProperty(ref _status, value))
-            {
-                OnPropertyChanged(nameof(HasError));
-                OnPropertyChanged(nameof(ErrorLabel));
-                OnPropertyChanged(nameof(StatusText));
-            }
-        }
-    }
-    private string _statusDetail = "";
-    public string StatusDetail // 具体错误信息
-    {
-        get => _statusDetail;
-        set
-        {
-            if (SetProperty(ref _statusDetail, value))
-                OnPropertyChanged(nameof(StatusText));
-        }
-    }
-    public bool HasError => Status != "ok";
-    public string ErrorLabel => Status switch
-    {
-        "error" => "Lua 错误",
-        "manifest" => "Manifest 错误",
-        _ => ""
-    };
-    public string StatusText => Status switch
-    {
-        "error" => $"Lua 错误: {StatusDetail}",
-        "manifest" => $"清单缺失: {StatusDetail}",
-        _ => "入库正常"
-    };
     private string _versionMode = "auto";
     public string VersionMode // auto, fixed
     {
@@ -72,8 +35,6 @@ public class LibraryItem : ObservableObject
     }
     public List<DlcInfo> DlcList { get; set; } = new();
     public List<string> InstalledAppIds { get; set; } = new();
-    public string DepotKeySet { get; set; } = string.Empty; // depot key if present
-    public List<string> ManifestIds { get; set; } = new();
     public bool HasDlc => DlcList.Count > 0;
     public int DlcCount => DlcList.Count;
     public DateTime AddedTime { get; set; }

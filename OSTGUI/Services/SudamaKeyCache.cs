@@ -1,5 +1,6 @@
 ﻿using System.IO.Compression;
 using System.Text.RegularExpressions;
+using System.Net;
 using System.Text.Json;
 using OSTGUI.Models;
 
@@ -55,6 +56,21 @@ public class SudamaKeyCache
         return null;
     }
 
+    /// <summary>
+    /// 创建启用自动解压的下载客户端：
+    /// Sudama 明文传输极慢（实测约 23KB/s），gzip 压缩后约 1.2MB/s。
+    /// 注意不能启用 Brotli：服务器对含 br 的协商返回 brotli，而 br 通道极慢
+    /// （实测 15 秒只传 844KB），只协商 gzip/deflate 才能走快通道
+    /// </summary>
+    private static HttpClient CreateDownloadClient(int timeoutSeconds)
+    {
+        var handler = new HttpClientHandler
+        {
+            AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate
+        };
+        return new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(timeoutSeconds) };
+    }
+
     public async Task<Dictionary<string, string>> GetSudamaKeysAsync()
     {
         return await GetCachedJsonAsync("sudama_cache.json", SudamaApiUrl, "Sudama 密钥");
@@ -97,7 +113,7 @@ public class SudamaKeyCache
         Log($"正在刷新 {label}...");
         try
         {
-            using var dlClient = new HttpClient { Timeout = TimeSpan.FromSeconds(DownloadTimeoutSeconds) };
+            using var dlClient = CreateDownloadClient(DownloadTimeoutSeconds);
             using var response = await TryGetWithRetryAsync(dlClient, url, label);
             if (response == null)
             {
@@ -159,7 +175,7 @@ public class SudamaKeyCache
         Log($"正在下载 {label}...");
         try
         {
-            using var dlClient = new HttpClient { Timeout = TimeSpan.FromSeconds(DownloadTimeoutSeconds) };
+            using var dlClient = CreateDownloadClient(DownloadTimeoutSeconds);
             using var response = await TryGetWithRetryAsync(dlClient, url, label);
             if (response == null)
                 return TryLoadStaleCache(cachePath);

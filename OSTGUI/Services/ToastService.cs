@@ -16,21 +16,11 @@ public enum ToastType
 /// </summary>
 public static class ToastService
 {
-    private static ConfigService? _configService;
     private static readonly ConcurrentQueue<(string title, string content)> _pendingToasts = new();
     private static bool _isShowing;
 
-    public static void Initialize(ConfigService configService)
-    {
-        _configService = configService;
-    }
-
     public static void Show(string title, string content, ToastType type = ToastType.Info)
     {
-        // 检查是否启用系统通知
-        if (_configService?.Config.ShowSystemNotifications == false)
-            return;
-
         _pendingToasts.Enqueue((title, content));
         _ = ProcessQueueAsync();
     }

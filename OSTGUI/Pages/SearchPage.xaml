@@ -22,8 +22,7 @@
                 <TextBlock Grid.Column="0" Text="搜索入库" FontSize="24" FontWeight="Bold" VerticalAlignment="Center" />
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12" VerticalAlignment="Center">
                     <CheckBox Content="添加所有DLC" IsChecked="{Binding AddAllDlc, Mode=TwoWay}" />
-                    <CheckBox Content="修补 Depot Key" IsChecked="{Binding PatchDepotKey, Mode=TwoWay}" />
-                    <CheckBox Content="固定版本" IsChecked="{Binding FixedVersion, Mode=TwoWay}" />
+                <CheckBox Content="写入固定版本配置" IsChecked="{Binding FixedVersion, Mode=TwoWay}" />
                 </StackPanel>
             </Grid>
 

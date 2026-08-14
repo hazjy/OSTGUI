@@ -3,13 +3,11 @@ using System.IO.Compression;
 namespace OSTGUI.Services;
 
 /// <summary>
-/// 清单文件服务 - 分支 zip 下载/解压、复制到 depotcache、从文件名解析 depot 信息
+/// 清单文件服务 - 复制到 depotcache、从文件名解析 depot 信息
 /// </summary>
 public class ManifestFileService
 {
     private readonly SteamService _steamService;
-
-    private const string GithubRepo = "SteamAutoCracks/ManifestHub";
 
     public ManifestFileService(SteamService steamService)
     {
@@ -20,60 +18,6 @@ public class ManifestFileService
     {
         LogService.AddLog(message);
         System.Diagnostics.Debug.WriteLine($"[ManifestFile] {message}");
-    }
-
-    /// <summary>
-    /// 从 GitHub 分支 zip 下载 manifest（直连失败自动走镜像），返回 manifest 文件路径列表
-    /// </summary>
-    public async Task<List<string>> DownloadFromGithubZipAsync(string appId, string extractPath)
-    {
-        var urls = new List<string>
-        {
-            $"https://codeload.github.com/{GithubRepo}/zip/refs/heads/{appId}",
-            $"https://gh-proxy.org/https://codeload.github.com/{GithubRepo}/zip/refs/heads/{appId}",
-            $"https://cdn.gh-proxy.org/https://codeload.github.com/{GithubRepo}/zip/refs/heads/{appId}",
-            $"https://edgeone.gh-proxy.org/https://codeload.github.com/{GithubRepo}/zip/refs/heads/{appId}",
-        };
-
-        var zipPath = Path.Combine(Path.GetTempPath(), $"ostgui_zip_{appId}.zip");
-        try
-        {
-            // zip 可能较大，用独立 HttpClient 避免受全局 30 秒超时限制
-            using var dlClient = new HttpClient { Timeout = TimeSpan.FromSeconds(60) };
-
-            foreach (var url in urls)
-            {
-                try
-                {
-                    Log($"尝试下载分支 zip: {url}");
-                    var response = await dlClient.GetAsync(url);
-                    if (!response.IsSuccessStatusCode)
-                        continue;
-
-                    var bytes = await response.Content.ReadAsByteArrayAsync();
-                    await File.WriteAllBytesAsync(zipPath, bytes);
-
-                    if (Directory.Exists(extractPath))
-                        Directory.Delete(extractPath, true);
-                    Directory.CreateDirectory(extractPath);
-                    ZipFile.ExtractToDirectory(zipPath, extractPath);
-
-                    var manifests = Directory.GetFiles(extractPath, "*.manifest", SearchOption.AllDirectories).ToList();
-                    Log($"分支 zip 解压出 {manifests.Count} 个清单");
-                    return manifests;
-                }
-                catch (Exception ex)
-                {
-                    Log($"zip 下载/解压失败: {ex.Message}");
-                }
-            }
-        }
-        finally
-        {
-            try { if (File.Exists(zipPath)) File.Delete(zipPath); } catch { }
-        }
-
-        return new();
     }
 
     /// <summary>

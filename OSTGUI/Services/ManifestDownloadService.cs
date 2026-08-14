@@ -43,7 +43,6 @@ public class ManifestDownloadService
         string appId,
         bool fixedVersion,
         bool addAllDlc,
-        bool patchDepotKey,
         IProgress<string>? progress)
     {
         var tempDir = Path.Combine(Path.GetTempPath(), "ostgui_" + appId);
@@ -139,7 +138,7 @@ public class ManifestDownloadService
             Log($"解析到 {depots.Count} 个 depot");
 
             // 5. 生成完整 Lua（自动补 depot key / access token / DLC）
-            var (lua, missingKeys) = await _luaBuilder.BuildLuaAsync(appId, "GitHub", depots, fixedVersion, patchDepotKey, addAllDlc);
+            var (lua, missingKeys) = await _luaBuilder.BuildLuaAsync(appId, "GitHub", depots, fixedVersion, addAllDlc);
             var luaOk = await _luaBuilder.WriteLuaAsync(appId, lua);
 
             Log("入库完成!");
@@ -242,7 +241,7 @@ public class ManifestDownloadService
             var depots = downloaded
                 .Select(d => (depotId: d.depotId, manifestGid: d.manifestGid, manifestSize: d.size))
                 .ToList();
-            var (lua, missingKeys) = await _luaBuilder.BuildLuaAsync(appId, "ManifestHub", depots, fixedVersion, true, addAllDlc);
+            var (lua, missingKeys) = await _luaBuilder.BuildLuaAsync(appId, "ManifestHub", depots, fixedVersion, addAllDlc);
             var luaOk = await _luaBuilder.WriteLuaAsync(appId, lua);
 
             Log("入库完成!");
@@ -259,7 +258,8 @@ public class ManifestDownloadService
     }
 
     /// <summary>
-    /// 从 Sudama 获取 depot key / access token，并补全 manifest（GitHub 分支 zip + 镜像）
+    /// Sudama 密钥源入库：获取 depot 信息并生成完整 Lua（补 depot key / access token）。
+    /// 不下载清单文件——清单由清单源（MHub / GitHub）负责，Sudama 只作为密钥源。
     /// </summary>
 
     public async Task<(bool success, string message, List<string> missingKeys)> DownloadFromSudamaAsync(
@@ -268,8 +268,6 @@ public class ManifestDownloadService
         bool addAllDlc,
         IProgress<string>? progress)
     {
-        var tempDir = Path.Combine(Path.GetTempPath(), "ostgui_sudama_" + appId);
-
         try
         {
             // 1. 获取 depot 信息（含 manifest gid）
@@ -281,37 +279,21 @@ public class ManifestDownloadService
             var depotList = gameDetails.Depots.Values.ToList();
             Log($"找到 {depotList.Count} 个 Depot");
 
-            // 2. 下载 manifest（GitHub 分支 zip，直连失败自动走镜像）
-            var extractPath = Path.Combine(tempDir, "extract");
-            var manifests = await _manifestFile.DownloadFromGithubZipAsync(appId, extractPath);
-            var manifestCount = _manifestFile.CopyToDepotCache(manifests);
-
-            // 3. 组装 depot 列表（优先用 Steam API 的 manifest gid）
+            // 2. 组装 depot 列表（gid 来自 Steam API 当前版本）
             var depots = depotList
                 .Select(d => (depotId: d.DepotId, manifestGid: d.Manifests.Count > 0 ? d.Manifests[0] : "", manifestSize: 0L))
                 .ToList();
 
-            if (depots.Count == 0 && manifestCount > 0)
-            {
-                // zip 下载到了 manifest 但 Steam API 没有 gid，从文件名解析
-                depots = ManifestFileService.ParseDepotsFromFiles(manifests);
-            }
-
-            // 4. 生成完整 Lua（自动补 depot key / access token）
-            var (lua, missingKeys) = await _luaBuilder.BuildLuaAsync(appId, "Sudama", depots, fixedVersion, true, addAllDlc);
+            // 3. 生成完整 Lua（自动补 Sudama depot key / access token）
+            var (lua, missingKeys) = await _luaBuilder.BuildLuaAsync(appId, "Sudama", depots, fixedVersion, addAllDlc);
             var luaOk = await _luaBuilder.WriteLuaAsync(appId, lua);
 
             Log("入库完成!");
-            var manifestInfo = manifestCount > 0 ? $"，复制了 {manifestCount} 个清单" : "（未下载到清单文件）";
-            return (true, $"成功入库 AppID {appId} (Sudama 模式){manifestInfo}，Lua {(luaOk ? "已生成" : "生成失败")}", missingKeys);
+            return (true, $"成功入库 AppID {appId} (Sudama 密钥源模式)（未下载到清单文件，清单需由清单源获取）Lua {(luaOk ? "已生成" : "生成失败")}", missingKeys);
         }
         catch (Exception ex)
         {
             return (false, $"Sudama 入库失败: {ex.Message}", new List<string>());
-        }
-        finally
-        {
-            ManifestFileService.TryDeleteDir(tempDir);
         }
     }
 
