@@ -21,7 +21,7 @@ public class GameSearchService
     }
 
     /// <summary>
-    /// 通过 AppID 搜索游戏信息（Steam 官方 API 优先，CaiGames 备用）
+    /// 通过 AppID 搜索游戏信息（Steam 官方 API）
     /// </summary>
     public async Task<SearchResult> SearchByAppIdAsync(string appId)
     {
@@ -48,17 +48,12 @@ public class GameSearchService
         if (steamResult.ErrorMessage == SteamSearchProvider.SteamNotFoundMessage)
             return steamResult;
 
-        // 2. 备用：CaiGames API
-        var caiResult = await _search.SearchByCaiApiAsync(appId);
-        if (caiResult.Success)
-            return caiResult;
-
         // 所有来源均失败
         return new SearchResult
         {
             AppId = appId,
             Success = false,
-            ErrorMessage = $"{steamResult.ErrorMessage}; {caiResult.ErrorMessage}"
+            ErrorMessage = steamResult.ErrorMessage
         };
     }
 
@@ -78,11 +73,7 @@ public class GameSearchService
         if (results.Count == 0)
             results = await _search.SearchKeywordApiAsync(query);
 
-        // 4. 备用：CaiGames 搜索
-        if (results.Count == 0)
-            results = await _search.SearchByCaiApiByNameAsync(query);
-
-        // 5. 兜底：如果查询本身就是数字，尝试按 AppID 精确搜索
+        // 4. 兜底：如果查询本身就是数字，尝试按 AppID 精确搜索
         if (results.Count == 0 && int.TryParse(query.Trim(), out _))
         {
             var detail = await SearchByAppIdAsync(query.Trim());

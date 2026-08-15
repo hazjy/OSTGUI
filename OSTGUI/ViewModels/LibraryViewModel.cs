@@ -211,6 +211,46 @@ public partial class LibraryViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 补齐版本配置：从 CDN 获取 depot / GID，写入注释形式的 setManifestid 对应关系（不下载清单）
+    /// </summary>
+    [RelayCommand]
+    private async Task RepairVersionConfigAsync(LibraryItem? item = null)
+    {
+        item ??= LastRightClickedItem;
+        if (item == null || item.AppId == "N/A") return;
+
+        SetStatus($"正在获取 AppID {item.AppId} 的 depot / GID...", "Info");
+
+        var gameDetails = await _gameInfoService.GetGameDetailsAsync(item.AppId);
+        if (gameDetails == null || gameDetails.Depots.Count == 0)
+        {
+            SetStatus("获取 depot 信息失败", "Error");
+            return;
+        }
+
+        var depots = gameDetails.Depots.Values
+            .Where(d => d.Manifests.Count > 0)
+            .Select(d => (depotId: d.DepotId, manifestGid: d.Manifests[0]))
+            .ToList();
+        if (depots.Count == 0)
+        {
+            SetStatus("Steam 未返回任何 manifest GID", "Error");
+            return;
+        }
+
+        var (success, message) = await _luaService.RepairVersionConfigAsync(item.AppId, depots);
+        if (success)
+        {
+            SetStatus(message, "Success");
+            await LoadLibraryAsync();
+        }
+        else
+        {
+            SetStatus(message, "Error");
+        }
+    }
+
+    /// <summary>
     /// 复制 AppID 到剪贴板
     /// </summary>
     [RelayCommand]

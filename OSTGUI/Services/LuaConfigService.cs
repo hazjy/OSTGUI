@@ -56,6 +56,53 @@ public class LuaConfigService
     public async Task<List<LibraryItem>> ScanLibraryAsync() => await _scanner.ScanLibraryAsync();
 
     /// <summary>
+    /// 补齐版本配置：根据 CDN 返回的 depot / GID 写入（或更新）注释形式的 setManifestid 对应关系。
+    /// 只写配置，不下载清单。
+    /// </summary>
+    public async Task<(bool success, string message)> RepairVersionConfigAsync(
+        string appId,
+        List<(string depotId, string manifestGid)> depots)
+    {
+        var luaDir = _steamService.GetLuaConfigDir();
+        if (string.IsNullOrEmpty(luaDir))
+            return (false, "未找到 Lua 配置目录。");
+
+        var filePath = Path.Combine(luaDir, $"{appId}.lua");
+        if (!File.Exists(filePath))
+            return (false, "Lua 配置文件不存在。");
+
+        var content = await File.ReadAllTextAsync(filePath);
+
+        // 生成新的固定版本配置块（注释形式，预写备用）
+        var lines = depots
+            .Where(d => !string.IsNullOrEmpty(d.depotId) && !string.IsNullOrEmpty(d.manifestGid))
+            .Select(d => $"--setManifestid({d.depotId}, \"{d.manifestGid}\")")
+            .ToList();
+        if (lines.Count == 0)
+            return (false, "未获取到有效的 depot / GID 对应关系");
+
+        var newBlock = "-- 固定版本配置（预写备用，未启用）\n" + string.Join("\n", lines);
+
+        // 已有旧配置块则整体替换，否则追加到文件末尾
+        var blockRegex = new Regex(
+            @"^\s*--\s*固定版本配置[^\n]*\n(?:--+\s*setManifestid[^\n]*\n?)+",
+            RegexOptions.IgnoreCase | RegexOptions.Multiline);
+
+        string newContent;
+        if (blockRegex.IsMatch(content))
+        {
+            newContent = blockRegex.Replace(content, newBlock);
+        }
+        else
+        {
+            newContent = content.TrimEnd('\r', '\n') + "\n\n" + newBlock + "\n";
+        }
+
+        await WriteFileAtomicallyAsync(filePath, newContent);
+        return (true, $"已补齐 {lines.Count} 个 depot 的版本配置");
+    }
+
+    /// <summary>
     /// 为游戏生成 Lua 配置内容
     /// 格式: addappid(ID, KeyType, "DepotKey") 或 addappid(ID)
     /// </summary>
@@ -233,6 +280,34 @@ public class LuaConfigService
                 if (!hasCommentedConfig)
                     return (false, "切换失败：Lua 缺少对应清单配置", "auto");
 
+                // 保险检查：固定版本配置必须覆盖全部 depot，防止个别 depot 无版本锚点导致内容不完整
+                var addAppIdMatches = AddAppIdRegex.Matches(content).Cast<Match>().ToList();
+                if (addAppIdMatches.Count > 0)
+                {
+                    var mainAppId = addAppIdMatches[0].Groups[1].Value;
+                    var dlcCommentIndex = content.IndexOf("-- 所有 DLC", StringComparison.OrdinalIgnoreCase);
+
+                    // 除主 AppID 外，"-- 所有 DLC" 注释之前的 addappid 均视为 depot
+                    var depotIds = addAppIdMatches
+                        .Where(m =>
+                            m.Groups[1].Value != mainAppId &&
+                            (dlcCommentIndex < 0 || m.Index < dlcCommentIndex))
+                        .Select(m => m.Groups[1].Value)
+                        .Distinct()
+                        .ToHashSet();
+
+                    // 已激活 + 注释形式的 setManifestid 都算已覆盖
+                    var manifestDepotIds = new HashSet<string>();
+                    foreach (Match m in SetManifestIdRegex.Matches(content))
+                        manifestDepotIds.Add(m.Groups[1].Value);
+                    foreach (Match m in CommentedManifestIdRegex.Matches(content))
+                        manifestDepotIds.Add(m.Groups[1].Value);
+
+                    var missingDepots = depotIds.Except(manifestDepotIds).ToList();
+                    if (missingDepots.Count > 0)
+                        return (false, $"切换失败：固定版本配置缺少以下 depot 的 setManifestid：{string.Join(", ", missingDepots)}", "auto");
+                }
+
                 // 自动更新 → 固定版本（取消注释 setManifestid）
                 newContent = Regex.Replace(
                     content,
@@ -240,15 +315,6 @@ public class LuaConfigService
                     "$1$2",
                     RegexOptions.IgnoreCase | RegexOptions.Multiline);
                 newMode = "fixed";
-
-                // 检查 setManifestid 对应的清单文件是否齐全
-                var missing = SetManifestIdRegex.Matches(newContent)
-                    .Select(m => (depotId: m.Groups[1].Value, gid: m.Groups[2].Value))
-                    .Where(p => !_scanner.ManifestFileExists(p.depotId, p.gid))
-                    .Select(p => $"{p.depotId}_{p.gid}.manifest")
-                    .ToList();
-                if (missing.Count > 0)
-                    return (false, $"切换失败：Lua 缺少对应清单配置（缺少 {string.Join(", ", missing)}）", "auto");
             }
 
             await WriteFileAtomicallyAsync(filePath, newContent);

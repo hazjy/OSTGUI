@@ -14,6 +14,7 @@
             <MenuFlyoutItem Text="复制 AppID" Click="CopyAppId_Click" />
             <MenuFlyoutItem Text="复制游戏名称" Click="CopyGameName_Click" />
             <MenuFlyoutSeparator />
+            <MenuFlyoutItem Text="补齐版本配置" Click="RepairVersionConfig_Click" />
             <MenuFlyoutItem Text="入库信息" Click="InstallInfo_Click" />
         </MenuFlyout>
     </Page.Resources>

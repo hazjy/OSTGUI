@@ -76,6 +76,10 @@
                     <NavigationViewItem.Icon><FontIcon x:Name="SettingsGlyphIcon" Glyph="&#xE713;" /></NavigationViewItem.Icon>
                     <NavigationViewItem.Content>设置</NavigationViewItem.Content>
                 </NavigationViewItem>
+                <NavigationViewItem x:Name="NavInfo" SelectsOnInvoked="False" Tapped="NavInfo_Tapped">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE946;" /></NavigationViewItem.Icon>
+                    <NavigationViewItem.Content>信息</NavigationViewItem.Content>
+                </NavigationViewItem>
             </NavigationView.FooterMenuItems>
 
             <Frame x:Name="ContentFrame" />

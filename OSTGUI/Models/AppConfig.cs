@@ -21,6 +21,7 @@ public class AppConfig
     public int DownloadTimeout { get; set; } = 120;
     public bool StFixedVersionDefault { get; set; } = true;
     public string StFixedManifestMode { get; set; } = "ask"; // always, never, ask
+    public bool StDownloadManifestDefault { get; set; } = true;
 
     // === 外观设置 ===
     public string ThemeMode { get; set; } = "auto"; // light, dark, auto
@@ -72,6 +73,7 @@ public class AppConfig
         DownloadTimeout = 120,
         StFixedVersionDefault = true,
         StFixedManifestMode = "ask",
+        StDownloadManifestDefault = true,
         ThemeMode = "auto",
         ThemeColor = "#0078d4",
         WindowEffect = "mica",

@@ -22,7 +22,8 @@
                 <TextBlock Grid.Column="0" Text="搜索入库" FontSize="24" FontWeight="Bold" VerticalAlignment="Center" />
                 <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12" VerticalAlignment="Center">
                     <CheckBox Content="添加所有DLC" IsChecked="{Binding AddAllDlc, Mode=TwoWay}" />
-                <CheckBox Content="写入固定版本配置" IsChecked="{Binding FixedVersion, Mode=TwoWay}" />
+                    <CheckBox Content="写入固定版本配置" IsChecked="{Binding FixedVersion, Mode=TwoWay}" />
+                    <CheckBox Content="下载 Manifest" IsChecked="{Binding DownloadManifest, Mode=TwoWay}" />
                 </StackPanel>
             </Grid>
 
@@ -82,7 +83,7 @@
                                 <Button Grid.Column="1" Click="ListAddGame_Click" Tag="{Binding}"
                                         Content="入库" FontSize="12" Padding="14,8" VerticalAlignment="Center" />
                                 <Button Grid.Column="2" Click="ListShareButton_Click" Tag="{Binding}"
-                                        ToolTipService.ToolTip="分享" VerticalAlignment="Center"
+                                        ToolTipService.ToolTip="跳转" VerticalAlignment="Center"
                                         Background="Transparent" BorderThickness="0" Padding="8,4">
                                     <FontIcon Glyph="&#xE72D;" FontSize="14" />
                                 </Button>

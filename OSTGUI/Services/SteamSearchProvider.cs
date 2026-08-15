@@ -1,19 +1,17 @@
 using System.Text.Json;
-using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using OSTGUI.Models;
 
 namespace OSTGUI.Services;
 
 /// <summary>
-/// 搜索源实现 - Steam 官方 API 与 CaiGames 备用源
+/// 搜索源实现 - Steam 官方 API
 /// </summary>
 public class SteamSearchProvider
 {
     private readonly HttpClient _http;
     private readonly GameNameCacheService _nameCache;
 
-    private const string CaiApiBase = "https://api.9178666.xyz";
     private const string SteamStoreApi = "https://store.steampowered.com/api/appdetails";
     private const string SteamStoreSearchApi = "https://store.steampowered.com/api/storesearch";
     private const string SteamSearchWeb = "https://store.steampowered.com/search/";
@@ -85,40 +83,6 @@ public class SteamSearchProvider
         catch (Exception ex)
         {
             return new SearchResult { AppId = appId, Success = false, ErrorMessage = $"Steam API 响应解析失败: {ex.Message}" };
-        }
-    }
-
-    /// <summary>
-    /// 通过 CaiGames API 按 AppID 搜索（备用源）
-    /// </summary>
-    public async Task<SearchResult> SearchByCaiApiAsync(string appId)
-    {
-        try
-        {
-            var request = new HttpRequestMessage(HttpMethod.Get, $"{CaiApiBase}/cmd/{appId}");
-            request.Headers.TryAddWithoutValidation("X-Client-Auth", "CaiGames-pvzcxw");
-            request.Headers.TryAddWithoutValidation("Accept", "application/json");
-
-            var response = await _http.SendAsync(request);
-            if (!response.IsSuccessStatusCode)
-                return new SearchResult { AppId = appId, Success = false, ErrorMessage = $"备用源返回 HTTP {(int)response.StatusCode}" };
-
-            var raw = await response.Content.ReadAsStringAsync();
-            var data = JsonSerializer.Deserialize<CaiApiResponse>(raw);
-            if (data?.Success == true &&
-                data.Data.TryGetProperty("name", out var nameElem) &&
-                !string.IsNullOrEmpty(nameElem.GetString()))
-            {
-                var name = nameElem.GetString()!;
-                _nameCache.Set(appId, name);
-                return new SearchResult { AppId = appId, Name = name, Success = true };
-            }
-
-            return new SearchResult { AppId = appId, Success = false, ErrorMessage = "备用源未返回游戏名称" };
-        }
-        catch (Exception ex)
-        {
-            return new SearchResult { AppId = appId, Success = false, ErrorMessage = $"备用源请求失败: {ex.Message}" };
         }
     }
 
@@ -287,69 +251,4 @@ public class SteamSearchProvider
         return results;
     }
 
-    /// <summary>
-    /// 通过 CaiGames API 按名称搜索（备用源 2）
-    /// </summary>
-    public async Task<List<SearchResult>> SearchByCaiApiByNameAsync(string query)
-    {
-        var results = new List<SearchResult>();
-        try
-        {
-            var url = $"{CaiApiBase}/search?term={Uri.EscapeDataString(query)}";
-            var request = new HttpRequestMessage(HttpMethod.Get, url);
-            request.Headers.TryAddWithoutValidation("X-Client-Auth", "CaiGames-pvzcxw");
-            request.Headers.TryAddWithoutValidation("Accept", "application/json");
-
-            var response = await _http.SendAsync(request);
-            if (!response.IsSuccessStatusCode)
-                return results;
-
-            var raw = await response.Content.ReadAsStringAsync();
-            if (!(raw.StartsWith("{") || raw.StartsWith("[")))
-                return results;
-
-            var root = JsonSerializer.Deserialize<JsonElement>(raw);
-            if (root.ValueKind != JsonValueKind.Object ||
-                !root.TryGetProperty("data", out var dataArr) ||
-                dataArr.ValueKind != JsonValueKind.Array)
-                return results;
-
-            foreach (var item in dataArr.EnumerateArray())
-            {
-                var appId = item.TryGetProperty("appid", out var idElem)
-                    ? idElem.ValueKind == JsonValueKind.Number ? idElem.GetInt32().ToString() : idElem.GetString() ?? ""
-                    : "";
-                var name = item.TryGetProperty("name", out var nameElem) ? nameElem.GetString() : "";
-                var image = item.TryGetProperty("image", out var imgElem) ? imgElem.GetString() : "";
-
-                if (string.IsNullOrEmpty(appId) || string.IsNullOrEmpty(name))
-                    continue;
-
-                results.Add(new SearchResult
-                {
-                    AppId = appId,
-                    Name = name,
-                    ImageUrl = image ?? "",
-                    Success = true
-                });
-                _nameCache.Set(appId, name);
-
-                if (results.Count >= MaxSearchResults)
-                    break;
-            }
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine("CaiGames 搜索失败: " + ex.Message);
-        }
-        return results;
-    }
-
-    private class CaiApiResponse
-    {
-        [JsonPropertyName("success")]
-        public bool Success { get; set; }
-        [JsonPropertyName("data")]
-        public JsonElement Data { get; set; }
-    }
 }

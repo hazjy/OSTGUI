@@ -54,10 +54,44 @@ public sealed partial class SearchPage : Page
 
     private async void ShowShareDialog(SearchResult result)
     {
+        // AppID 行 + 透明底复制图标（横向排列，图标随 AppID 文本长度自动右移）
+        var appIdText = new TextBlock
+        {
+            Text = $"AppID：{result.AppId}",
+            FontSize = 13,
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        var copyButton = new Button
+        {
+            Padding = new Thickness(8, 4, 8, 4),
+            MinWidth = 0,
+            MinHeight = 0,
+            Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Transparent),
+            BorderThickness = new Thickness(0),
+            Content = new FontIcon { Glyph = "\uE8C8", FontSize = 14 },
+            VerticalAlignment = VerticalAlignment.Center
+        };
+        ToolTipService.SetToolTip(copyButton, "复制 AppID");
+        copyButton.Click += (_, _) =>
+        {
+            var dataPackage = new DataPackage();
+            dataPackage.SetText(result.AppId);
+            Clipboard.SetContent(dataPackage);
+        };
+
+        var appIdRow = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Spacing = 8
+        };
+        appIdRow.Children.Add(appIdText);
+        appIdRow.Children.Add(copyButton);
+
         var dialog = new ContentDialog
         {
             XamlRoot = this.XamlRoot,
             Title = result.Name,
+            Content = appIdRow,
             PrimaryButtonText = "Steam 商店",
             SecondaryButtonText = "SteamDB",
             CloseButtonText = "关闭"

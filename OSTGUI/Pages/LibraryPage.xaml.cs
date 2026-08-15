@@ -85,6 +85,11 @@ public sealed partial class LibraryPage : Page
         }
     }
 
+    private void RepairVersionConfig_Click(object sender, RoutedEventArgs e)
+    {
+        VM.RepairVersionConfigCommand.Execute(null);
+    }
+
     private async void InstallInfo_Click(object sender, RoutedEventArgs e)
     {
         if (VM.LastRightClickedItem != null)

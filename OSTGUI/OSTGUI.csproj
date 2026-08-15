@@ -28,4 +28,16 @@
   <ItemGroup>
     <Content Include="Assets\important.html" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <!-- MSBuild Publish 默认漏复制 WinUI 应用的 .xbf / OSTGUI.pri，
+       缺失会导致启动时 XamlParseException、窗口创建失败；发布后自动补齐 -->
+  <Target Name="CopyWinUIResourcesToPublish" AfterTargets="Publish" Condition="'$(PublishDir)' != ''">
+    <ItemGroup>
+      <_WinUiPageXbf Include="$(TargetDir)Pages\*.xbf" />
+    </ItemGroup>
+    <Copy SourceFiles="$(TargetDir)App.xbf;$(TargetDir)MainWindow.xbf;$(TargetDir)OSTGUI.pri"
+          DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_WinUiPageXbf)"
+          DestinationFolder="$(PublishDir)Pages" SkipUnchangedFiles="true" />
+  </Target>
 </Project>

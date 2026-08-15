@@ -38,6 +38,7 @@ public partial class SearchViewModel : ObservableObject
     // 入库选项（全局）
     [ObservableProperty] private bool _addAllDlc;
     [ObservableProperty] private bool _fixedVersion;
+    [ObservableProperty] private bool _downloadManifest;
 
     public ObservableCollection<string> Logs => LogService.Logs;
     public string LogText => string.Join("\n", LogService.Logs);
@@ -73,6 +74,7 @@ public partial class SearchViewModel : ObservableObject
             var c = _configService.Config;
             AddAllDlc = c.DefaultAddAllDlc;
             FixedVersion = c.StFixedVersionDefault;
+            DownloadManifest = c.StDownloadManifestDefault;
         }
         finally
         {
@@ -87,6 +89,7 @@ public partial class SearchViewModel : ObservableObject
         {
             c.DefaultAddAllDlc = AddAllDlc;
             c.StFixedVersionDefault = FixedVersion;
+            c.StDownloadManifestDefault = DownloadManifest;
         }).GetAwaiter().GetResult();
     }
 
@@ -98,6 +101,12 @@ public partial class SearchViewModel : ObservableObject
     }
 
     partial void OnFixedVersionChanged(bool value)
+    {
+        if (!_isLoadingOptions && _configService.IsLoaded)
+            SaveOptionsToConfig();
+    }
+
+    partial void OnDownloadManifestChanged(bool value)
     {
         if (!_isLoadingOptions && _configService.IsLoaded)
             SaveOptionsToConfig();
@@ -219,29 +228,39 @@ public partial class SearchViewModel : ObservableObject
             var (success, message) = (false, "");
             var missingKeys = new List<string>();
 
-            // 多源级联：MHub（配了 key 时）→ GitHub → Sudama，任一成功即完成
-            var mhubKey = _configService.Config.ManifestSources?
-                .FirstOrDefault(s => s.Id == "mhub")?.ApiKey
-                ?? _configService.Config.ManifestHubApiKey;
-
-            if (!string.IsNullOrEmpty(mhubKey))
+            if (DownloadManifest)
             {
-                LogService.AddLog("使用 ManifestHub 下载清单...");
-                (success, message, missingKeys) = await _manifestService.DownloadFromManifestHubAsync(
-                    appId, FixedVersion, AddAllDlc, progress);
+                // 多源级联：MHub（配了 key 时）→ GitHub → Sudama，任一成功即完成
+                var mhubKey = _configService.Config.ManifestSources?
+                    .FirstOrDefault(s => s.Id == "mhub")?.ApiKey
+                    ?? _configService.Config.ManifestHubApiKey;
+
+                if (!string.IsNullOrEmpty(mhubKey))
+                {
+                    LogService.AddLog("使用 ManifestHub 下载清单...");
+                    (success, message, missingKeys) = await _manifestService.DownloadFromManifestHubAsync(
+                        appId, FixedVersion, AddAllDlc, progress);
+                }
+
+                if (!success)
+                {
+                    LogService.AddLog("使用 GitHub 下载清单...");
+                    (success, message, missingKeys) = await _manifestService.DownloadFromGithubAsync(
+                        appId, FixedVersion, AddAllDlc, progress);
+                }
+
+                // GitHub 失败时兜底走 Sudama：仅作为密钥源生成 Lua（不下载清单），清单需由清单源获取
+                if (!success)
+                {
+                    LogService.AddLog("尝试 Sudama 兜底...");
+                    (success, message, missingKeys) = await _manifestService.DownloadFromSudamaAsync(
+                        appId, FixedVersion, AddAllDlc, progress);
+                }
             }
-
-            if (!success)
+            else
             {
-                LogService.AddLog("使用 GitHub 下载清单...");
-                (success, message, missingKeys) = await _manifestService.DownloadFromGithubAsync(
-                    appId, FixedVersion, AddAllDlc, progress);
-            }
-
-            // GitHub 失败时兜底走 Sudama（Sudama 自身会尽力下载 manifest，失败也给出明确日志）
-            if (!success)
-            {
-                LogService.AddLog("尝试 Sudama 兜底...");
+                // 关闭清单下载：跳过清单源，直接用密钥源生成 Lua，清单由内核运行时兜底获取
+                LogService.AddLog("已关闭清单下载，跳过清单源，清单由内核运行时兜底获取...");
                 (success, message, missingKeys) = await _manifestService.DownloadFromSudamaAsync(
                     appId, FixedVersion, AddAllDlc, progress);
             }
@@ -252,7 +271,7 @@ public partial class SearchViewModel : ObservableObject
             if (success)
             {
                 // 清单文件未获取到 → 入库异常（系统通知警告）
-                if (message.Contains("未下载到清单文件"))
+                if (DownloadManifest && message.Contains("未下载到清单文件"))
                 {
                     var abnormalMsg = $"入库异常: {message}";
                     LogService.AddLog(abnormalMsg);
@@ -271,8 +290,11 @@ public partial class SearchViewModel : ObservableObject
                 }
                 else
                 {
+                    var successMsg = DownloadManifest
+                        ? message
+                        : $"{target.Name} (AppID {appId}) 已入库（未下载清单，由内核运行时兜底）";
                     if (_configService.Config.ShowSystemNotifications)
-                        Services.ToastService.ShowSuccess("入库成功", $"{target.Name} (AppID {appId}) 已入库");
+                        Services.ToastService.ShowSuccess("入库成功", successMsg);
                     SetStatus(message, "Success");
                 }
                 SaveOptionsToConfig();

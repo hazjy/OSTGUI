@@ -123,26 +123,6 @@ public class LibraryScanner
     }
 
     /// <summary>
-    /// 检查 depotcache 目录中是否存在 {depotId}_{gid}.manifest
-    /// </summary>
-
-    public bool ManifestFileExists(string depotId, string gid)
-    {
-        var dirs = new[]
-        {
-            _steamService.GetConfigDepotCacheDir(),
-            _steamService.GetDepotCacheDir()
-        };
-        var name = $"{depotId}_{gid}.manifest";
-        foreach (var dir in dirs)
-        {
-            if (!string.IsNullOrEmpty(dir) && File.Exists(Path.Combine(dir, name)))
-                return true;
-        }
-        return false;
-    }
-
-    /// <summary>
     /// 解析 steamtools.lua（主配置文件）
     /// </summary>
 
