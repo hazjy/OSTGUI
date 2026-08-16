@@ -27,9 +27,8 @@ public partial class LibraryViewModel : ObservableObject
 
     public bool IsBusy => IsLoading;
 
-    [ObservableProperty] private string _statusMessage = "准备加载库...";
+[ObservableProperty] private string _statusMessage = "准备加载库...";
     [ObservableProperty] private string _statusType = "Info";
-    [ObservableProperty] private string _viewMode = "list"; // list, grid
     [ObservableProperty] private string _sortMode = "default"; // default, az, za
     [ObservableProperty] private string _searchFilter = "";
     [ObservableProperty] private int _totalCount;
@@ -49,10 +48,6 @@ public partial class LibraryViewModel : ObservableObject
         _gameInfoService = gameInfoService;
         _steamService = steamService;
         _configService = configService;
-
-        // 恢复上次的视图模式
-        ViewMode = configService.Config.LibraryViewMode;
-        if (string.IsNullOrEmpty(ViewMode)) ViewMode = "list";
     }
 
     /// <summary>
@@ -132,27 +127,9 @@ public partial class LibraryViewModel : ObservableObject
             var dlcInfo = await _gameInfoService.GetDlcInfoAsync(item.AppId);
             foreach (var dlc in dlcInfo)
                 dlc.Status = item.InstalledAppIds.Contains(dlc.AppId) ? "installed" : "";
-            item.DlcList = dlcInfo;
+item.DlcList = dlcInfo;
         }
         catch { }
-    }
-
-    /// <summary>
-    /// 切换视图模式并记忆状态
-    /// </summary>
-    [RelayCommand]
-    private async Task ToggleViewModeAsync(string? mode = null)
-    {
-        if (!string.IsNullOrEmpty(mode))
-            ViewMode = mode;
-        else
-            ViewMode = ViewMode == "list" ? "grid" : "list";
-
-        // 记住视图选择
-        await _configService.UpdateAndSaveAsync(c => c.LibraryViewMode = ViewMode);
-
-        // 重新加载以应用新视图
-        await LoadLibraryAsync();
     }
 
     /// <summary>
@@ -210,7 +187,7 @@ public partial class LibraryViewModel : ObservableObject
         }
     }
 
-    /// <summary>
+/// <summary>
     /// 补齐版本配置：从 CDN 获取 depot / GID，写入注释形式的 setManifestid 对应关系（不下载清单）
     /// </summary>
     [RelayCommand]
@@ -219,34 +196,40 @@ public partial class LibraryViewModel : ObservableObject
         item ??= LastRightClickedItem;
         if (item == null || item.AppId == "N/A") return;
 
+        IsLoading = true;
         SetStatus($"正在获取 AppID {item.AppId} 的 depot / GID...", "Info");
 
-        var gameDetails = await _gameInfoService.GetGameDetailsAsync(item.AppId);
-        if (gameDetails == null || gameDetails.Depots.Count == 0)
+        try
         {
-            SetStatus("获取 depot 信息失败", "Error");
-            return;
-        }
+            var gameDetails = await _gameInfoService.GetGameDetailsAsync(item.AppId);
+            if (gameDetails == null || gameDetails.Depots.Count == 0)
+            {
+                SetStatus("获取 depot 信息失败", "Error");
+                Services.ToastService.ShowError("补齐版本配置", "获取 depot 信息失败");
+                return;
+            }
 
-        var depots = gameDetails.Depots.Values
-            .Where(d => d.Manifests.Count > 0)
-            .Select(d => (depotId: d.DepotId, manifestGid: d.Manifests[0]))
-            .ToList();
-        if (depots.Count == 0)
-        {
-            SetStatus("Steam 未返回任何 manifest GID", "Error");
-            return;
-        }
+            var depots = gameDetails.Depots.Values
+                .Select(d => (depotId: d.DepotId, manifestGid: d.Manifests.Count > 0 ? d.Manifests[0] : ""))
+                .ToList();
+            // 允许空 manifestGid，LuaConfigService 会根据 Lua 文件中的 depot 列表自动豁免无清单的 depot
 
-        var (success, message) = await _luaService.RepairVersionConfigAsync(item.AppId, depots);
-        if (success)
-        {
-            SetStatus(message, "Success");
-            await LoadLibraryAsync();
+            var (success, message) = await _luaService.RepairVersionConfigAsync(item.AppId, depots);
+            if (success)
+            {
+                SetStatus(message, "Success");
+                Services.ToastService.ShowSuccess("补齐版本配置", message);
+                await LoadLibraryAsync();
+            }
+            else
+            {
+                SetStatus(message, "Error");
+                Services.ToastService.ShowError("补齐版本配置", message);
+            }
         }
-        else
+        finally
         {
-            SetStatus(message, "Error");
+            IsLoading = false;
         }
     }
 

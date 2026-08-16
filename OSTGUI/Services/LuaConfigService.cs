@@ -24,7 +24,7 @@ public class LuaConfigService
         @"^\s*setManifestid\s*\(\s*(\d+)\s*,\s*""(\d+)""\s*(?:,\s*(\d+)\s*)?\s*\)",
         RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled);
 
-    // 匹配注释掉的 setManifestid
+// 匹配注释掉的 setManifestid
     private static readonly Regex CommentedManifestIdRegex = new(
         @"^\s*--+\s*setManifestid\s*\(\s*(\d+)\s*,\s*""(\d+)""",
         RegexOptions.IgnoreCase | RegexOptions.Multiline | RegexOptions.Compiled);
@@ -55,7 +55,7 @@ public class LuaConfigService
     /// </summary>
     public async Task<List<LibraryItem>> ScanLibraryAsync() => await _scanner.ScanLibraryAsync();
 
-    /// <summary>
+/// <summary>
     /// 补齐版本配置：根据 CDN 返回的 depot / GID 写入（或更新）注释形式的 setManifestid 对应关系。
     /// 只写配置，不下载清单。
     /// </summary>
@@ -73,11 +73,37 @@ public class LuaConfigService
 
         var content = await File.ReadAllTextAsync(filePath);
 
-        // 生成新的固定版本配置块（注释形式，预写备用）
-        var lines = depots
+        // 从 Lua 解析所有 depot ID（除主 AppID 和 DLC 外）
+        var luaDepotIds = new HashSet<string>();
+        var addAppIdMatches = AddAppIdRegex.Matches(content).Cast<Match>().ToList();
+        if (addAppIdMatches.Count > 0)
+        {
+            var mainAppId = addAppIdMatches[0].Groups[1].Value;
+            var dlcCommentIndex = content.IndexOf("-- 所有 DLC", StringComparison.OrdinalIgnoreCase);
+            foreach (var m in addAppIdMatches)
+            {
+                var id = m.Groups[1].Value;
+                if (id != mainAppId && (dlcCommentIndex < 0 || m.Index < dlcCommentIndex))
+                    luaDepotIds.Add(id);
+            }
+        }
+
+        // 将 API 返回的 manifestGid 建成字典
+        var apiManifests = depots
             .Where(d => !string.IsNullOrEmpty(d.depotId) && !string.IsNullOrEmpty(d.manifestGid))
-            .Select(d => $"--setManifestid({d.depotId}, \"{d.manifestGid}\")")
-            .ToList();
+            .ToDictionary(d => d.depotId, d => d.manifestGid);
+
+        // 生成新的固定版本配置块（注释形式，预写备用）
+        var lines = new List<string>();
+
+        foreach (var depotId in luaDepotIds.OrderBy(x => x))
+        {
+            if (apiManifests.TryGetValue(depotId, out var gid))
+            {
+                lines.Add($"--setManifestid({depotId}, \"{gid}\")");
+            }
+        }
+
         if (lines.Count == 0)
             return (false, "未获取到有效的 depot / GID 对应关系");
 
@@ -91,7 +117,12 @@ public class LuaConfigService
         string newContent;
         if (blockRegex.IsMatch(content))
         {
-            newContent = blockRegex.Replace(content, newBlock);
+            // 使用 MatchEvaluator 保留原块前的空行，确保新块前有一行空行
+            newContent = blockRegex.Replace(content, m =>
+            {
+                var prefix = m.Value.StartsWith("\n\n") ? "\n\n" : "\n";
+                return prefix + newBlock;
+            });
         }
         else
         {
@@ -274,39 +305,11 @@ public class LuaConfigService
                 newContent = SetManifestIdRegex.Replace(content, "--$&");
                 newMode = "auto";
             }
-            else
+else
             {
-                // 实际是自动更新 → 固定版本：需要 Lua 中存在可用的 setManifestid 配置
-                if (!hasCommentedConfig)
-                    return (false, "切换失败：Lua 缺少对应清单配置", "auto");
-
-                // 保险检查：固定版本配置必须覆盖全部 depot，防止个别 depot 无版本锚点导致内容不完整
-                var addAppIdMatches = AddAppIdRegex.Matches(content).Cast<Match>().ToList();
-                if (addAppIdMatches.Count > 0)
-                {
-                    var mainAppId = addAppIdMatches[0].Groups[1].Value;
-                    var dlcCommentIndex = content.IndexOf("-- 所有 DLC", StringComparison.OrdinalIgnoreCase);
-
-                    // 除主 AppID 外，"-- 所有 DLC" 注释之前的 addappid 均视为 depot
-                    var depotIds = addAppIdMatches
-                        .Where(m =>
-                            m.Groups[1].Value != mainAppId &&
-                            (dlcCommentIndex < 0 || m.Index < dlcCommentIndex))
-                        .Select(m => m.Groups[1].Value)
-                        .Distinct()
-                        .ToHashSet();
-
-                    // 已激活 + 注释形式的 setManifestid 都算已覆盖
-                    var manifestDepotIds = new HashSet<string>();
-                    foreach (Match m in SetManifestIdRegex.Matches(content))
-                        manifestDepotIds.Add(m.Groups[1].Value);
-                    foreach (Match m in CommentedManifestIdRegex.Matches(content))
-                        manifestDepotIds.Add(m.Groups[1].Value);
-
-                    var missingDepots = depotIds.Except(manifestDepotIds).ToList();
-                    if (missingDepots.Count > 0)
-                        return (false, $"切换失败：固定版本配置缺少以下 depot 的 setManifestid：{string.Join(", ", missingDepots)}", "auto");
-                }
+                // 实际是自动更新 → 固定版本：只需存在任意注释形式的 setManifestid
+                if (!CommentedManifestIdRegex.IsMatch(content))
+                    return (false, "切换失败：Lua 缺少固定版本配置", "auto");
 
                 // 自动更新 → 固定版本（取消注释 setManifestid）
                 newContent = Regex.Replace(

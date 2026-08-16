@@ -37,7 +37,6 @@ public class AppConfig
     public bool IsWindowMaximized { get; set; }
 
     // === 界面状态记忆 ===
-    public string LibraryViewMode { get; set; } = "list"; // list, grid
     public string DefaultPage { get; set; } = "home";
     public bool IsNavigationPaneOpen { get; set; } = true;
     public double NavigationPaneWidth { get; set; } = 360;
@@ -62,7 +61,7 @@ public class AppConfig
     /// <summary>
     /// 获取默认配置
     /// </summary>
-    public static AppConfig GetDefault() => new()
+public static AppConfig GetDefault() => new()
     {
         SteamPath = string.Empty,
         GithubToken = string.Empty,
@@ -84,7 +83,6 @@ public class AppConfig
         WindowX = -1,
         WindowY = -1,
         IsWindowMaximized = false,
-        LibraryViewMode = "list",
         DefaultPage = "home",
         IsNavigationPaneOpen = true,
         NavigationPaneWidth = 360,

@@ -57,6 +57,7 @@ public partial class App : Application
         services.AddTransient<SearchViewModel>();
         services.AddTransient<LibraryViewModel>();
         services.AddTransient<DenuvoViewModel>();
+        services.AddTransient<NoSteamViewModel>();
         services.AddTransient<SettingsViewModel>();
         Services = services.BuildServiceProvider();
 

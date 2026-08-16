@@ -44,7 +44,7 @@
             PaneOpening="MainNavView_PaneOpening"
             PaneClosing="MainNavView_PaneClosing">
 
-            <NavigationView.MenuItems>
+<NavigationView.MenuItems>
                 <NavigationViewItem x:Name="NavHome" Tag="home">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE80F;" /></NavigationViewItem.Icon>
                     <NavigationViewItem.Content>主页</NavigationViewItem.Content>
@@ -64,6 +64,10 @@
                 <NavigationViewItem x:Name="NavDenuvo" Tag="denuvo">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xEA18;" /></NavigationViewItem.Icon>
                     <NavigationViewItem.Content>D加密授权</NavigationViewItem.Content>
+                </NavigationViewItem>
+                <NavigationViewItem x:Name="NavNoSteam" Tag="nosteam">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE711;" /></NavigationViewItem.Icon>
+                    <NavigationViewItem.Content>免Steam</NavigationViewItem.Content>
                 </NavigationViewItem>
             </NavigationView.MenuItems>
 

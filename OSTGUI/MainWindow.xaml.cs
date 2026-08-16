@@ -504,6 +504,7 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
                 "library" => new LibraryPage(_mainVM.LibraryVM),
                 "online" => new OnlinePage(_mainVM.OnlineVM),
                 "denuvo" => new DenuvoPage(_mainVM.DenuvoVM),
+                "nosteam" => new NoSteamPage(App.Services.GetRequiredService<NoSteamViewModel>()),
                 "settings" => new SettingsPage(_mainVM.SettingsVM),
                 _ => new HomePage(_mainVM),
             };
