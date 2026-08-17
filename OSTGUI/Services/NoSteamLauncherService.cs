@@ -7,8 +7,8 @@ using System.IO;
 namespace OSTGUI.Services;
 
 /// <summary>
-/// OSTGUI ä¾§çš„ NoSteamLauncher æœåŠ¡åŒ…è£…å™¨ã€‚
-/// è´Ÿè´£è§£å‹åµŒå…¥èµ„æºåˆ°ä¸´æ—¶ç›®å½•ï¼Œåˆ›å»ºå¸¦èµ„æºç›®å½•çš„ç¼–æ’å™¨ï¼Œè½¬å‘è¿›åº¦æ—¥å¿—ã€‚
+/// OSTGUI ²àµÄ NoSteamLauncher ·şÎñ°ü×°Æ÷¡£
+/// ¸ºÔğ½âÑ¹Ç¶Èë×ÊÔ´µ½ÁÙÊ±Ä¿Â¼£¬´´½¨´ø×ÊÔ´Ä¿Â¼µÄ±àÅÅÆ÷£¬×ª·¢½ø¶ÈÈÕÖ¾¡£
 /// </summary>
 public sealed class NoSteamLauncherService : IDisposable
 {
@@ -21,7 +21,7 @@ public sealed class NoSteamLauncherService : IDisposable
     {
         _logger = logger;
 
-        // åˆ›å»ºä¸“ç”¨ä¸´æ—¶ç›®å½•ï¼Œé¿å…ä¸å…¶ä»–è¿›ç¨‹å†²çª
+        // ´´½¨×¨ÓÃÁÙÊ±Ä¿Â¼£¬±ÜÃâÓëÆäËû½ø³Ì³åÍ»
         var assembly = Assembly.GetExecutingAssembly();
         var hash = assembly.GetName().Version?.ToString().Replace(".", "") ?? "unknown";
         _tempRoot = Path.Combine(Path.GetTempPath(), "OSTGUI_NoSteamLauncher", hash);
@@ -29,7 +29,7 @@ public sealed class NoSteamLauncherService : IDisposable
     }
 
     /// <summary>
-    /// ç¡®ä¿ Resources å’Œ Plugins å·²è§£å‹åˆ°ä¸´æ—¶ç›®å½•ï¼Œå¹¶è¿”å›ç›®å½•è·¯å¾„ã€‚
+    /// È·±£ Resources ºÍ Plugins ÒÑ½âÑ¹µ½ÁÙÊ±Ä¿Â¼£¬²¢·µ»ØÄ¿Â¼Â·¾¶¡£
     /// </summary>
     private (string ResourcesDir, string PluginsDir) EnsureExtracted()
     {
@@ -39,9 +39,24 @@ public sealed class NoSteamLauncherService : IDisposable
         var resourcesDir = Path.Combine(_tempRoot, "Resources");
         var pluginsDir = Path.Combine(_tempRoot, "Plugins");
 
-        if (!Directory.Exists(resourcesDir))
+        // ĞèÒªÑéÖ¤µÄ¹Ø¼üÎÄ¼ş£¨generate_interfaces_x86.exe ²»´æÔÚ£¬ÒÆ³ı£©
+        var requiredResourceFiles = new[] 
+        { 
+            "steam_api.dll", 
+            "steam_api64.dll", 
+            "Steamless.CLI.exe",
+            "generate_interfaces_x64.exe",
+        };
+
+        var needExtractResources = !Directory.Exists(resourcesDir) || 
+            !requiredResourceFiles.All(f => File.Exists(Path.Combine(resourcesDir, f)));
+
+        if (needExtractResources)
         {
             _logger.LogInformation("Extracting embedded Resources to {Dir}", resourcesDir);
+            // ÏÈÇåÀí¿ÉÄÜ²»ÍêÕûµÄÄ¿Â¼
+            if (Directory.Exists(resourcesDir))
+                Directory.Delete(resourcesDir, true);
             ExtractEmbeddedFolder("Resources", resourcesDir);
         }
 
@@ -60,42 +75,91 @@ public sealed class NoSteamLauncherService : IDisposable
 
     private void ExtractEmbeddedFolder(string folderName, string targetDir)
     {
-        var assembly = Assembly.GetExecutingAssembly();
-        var prefix = $"{assembly.GetName().Name}.{folderName}.";
+        // »ñÈ¡°üº¬Ç¶Èë×ÊÔ´µÄ NoSteamLauncher ³ÌĞò¼¯
+        var assembly = typeof(NoSteamLaunchOrchestrator).Assembly;
         
+        // ×ÊÔ´Ãû³ÆÇ°×º
+        var prefixDot = $"{folderName}.";
+        var prefixBackslash = $"{folderName}\\";
+        
+        var extracted = 0;
         foreach (var resourceName in assembly.GetManifestResourceNames())
         {
-            if (!resourceName.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+            string? relativePath = null;
+            
+            // 1. Æ¥ÅäÖ¸¶¨ÎÄ¼ş¼ĞÇ°×º£¨µãºÅ·Ö¸ô£ºResources.xxx »ò Resources.Plugins\xxx£©
+            if (resourceName.StartsWith(prefixDot, StringComparison.OrdinalIgnoreCase))
+            {
+                var afterPrefix = resourceName[prefixDot.Length..];
+                
+                // ×ÊÔ´Ãû³Æ¸ñÊ½£ºÎÄ¼şÃû »ò ×ÓÄ¿Â¼\ÎÄ¼şÃû
+                // Ê¹ÓÃ·´Ğ±¸Ü·Ö¸îÂ·¾¶¶Î£¬×îºóÒ»¶ÎÊÇÎÄ¼şÃû£¨±£ÁôµãºÅ£©
+                var segments = afterPrefix.Split('\\');
+                if (segments.Length > 1)
+                {
+                    // ÓĞ×ÓÄ¿Â¼£ºÇ°ÃæµÄ¶ÎÊÇÄ¿Â¼£¬×îºóÒ»¶ÎÊÇÎÄ¼şÃû
+                    var dirSegments = segments[..^1];
+                    var fileName = segments[^1];
+                    var dirPath = string.Join(Path.DirectorySeparatorChar.ToString(), dirSegments);
+                    relativePath = Path.Combine(dirPath, fileName);
+                }
+                else
+                {
+                    // ¸ùÄ¿Â¼ÎÄ¼ş£ºÖ±½ÓÊ¹ÓÃÎÄ¼şÃû£¨±£ÁôµãºÅ£©
+                    relativePath = afterPrefix;
+                }
+            }
+            // 2. Æ¥ÅäÖ¸¶¨ÎÄ¼ş¼ĞÇ°×º£¨·´Ğ±¸Ü·Ö¸ô£ºResources\xxx£©
+            else if (resourceName.StartsWith(prefixBackslash, StringComparison.OrdinalIgnoreCase))
+            {
+                relativePath = resourceName[prefixBackslash.Length..].Replace('\\', Path.DirectorySeparatorChar);
+            }
+            // 3. ÌØÊâ´¦Àí£ºPlugins Ä¿Â¼Ç¶Ì×ÔÚ Resources ÏÂ£¨Êµ¼ÊÇ°×ºÎª Resources.Plugins\£©
+            else if (folderName == "Plugins")
+            {
+                const string nestedPrefix = "Resources.Plugins\\";
+                
+                if (resourceName.StartsWith(nestedPrefix, StringComparison.OrdinalIgnoreCase))
+                {
+                    relativePath = resourceName[nestedPrefix.Length..].Replace('\\', Path.DirectorySeparatorChar);
+                }
+                else
+                {
+                    continue;
+                }
+            }
+            else
+            {
                 continue;
+            }
 
-            var relativePath = resourceName[prefix.Length..].Replace('.', Path.DirectorySeparatorChar);
             var targetPath = Path.Combine(targetDir, relativePath);
             Directory.CreateDirectory(Path.GetDirectoryName(targetPath)!);
 
             using var stream = assembly.GetManifestResourceStream(resourceName)!;
             using var fileStream = File.Create(targetPath);
             stream.CopyTo(fileStream);
+            extracted++;
         }
         
-        _logger.LogDebug("Extracted {Count} files from {Folder}", 
-            Directory.GetFiles(targetDir, "*", SearchOption.AllDirectories).Length, folderName);
+        _logger.LogDebug("Extracted {Count} files from {Folder}", extracted, folderName);
     }
 
     /// <summary>
-    /// åˆ›å»ºå¸¦æœ‰èµ„æºç›®å½•çš„ç¼–æ’å™¨å®ä¾‹ã€‚
+    /// ´´½¨´øÓĞ×ÊÔ´Ä¿Â¼µÄ±àÅÅÆ÷ÊµÀı¡£
     /// </summary>
     private INoSteamLauncherService CreateOrchestrator(string resourcesDir, 
         ILogger<NoSteamLaunchOrchestrator> orchestratorLogger,
         ILogger<SteamlessService> steamlessLogger,
         ILogger<GBEDeploymentService> gbeLogger)
     {
-        // ä»è§£å‹åçš„ Resources ç›®å½•æ„å»ºå·¥å…·è·¯å¾„
+        // ´Ó½âÑ¹ºóµÄ Resources Ä¿Â¼¹¹½¨¹¤¾ßÂ·¾¶
         var steamlessExePath = Path.Combine(resourcesDir, "Steamless.CLI.exe");
         var gbeDllPath = Path.Combine(resourcesDir, "steam_api64.dll");
         var gbeDll32Path = Path.Combine(resourcesDir, "steam_api.dll");
         var genInterfacesTool64Path = Path.Combine(resourcesDir, "generate_interfaces_x64.exe");
         var genInterfacesTool32Path = Path.Combine(resourcesDir, "generate_interfaces_x86.exe");
-        // steam_settings.EXAMPLE æ˜¯ç›®å½•ï¼Œä¸æ˜¯æ–‡ä»¶
+        // steam_settings.EXAMPLE ÊÇÄ¿Â¼£¬²»ÊÇÎÄ¼ş
         var steamSettingsTemplatePath = Path.Combine(resourcesDir, "steam_settings.EXAMPLE");
 
         return NoSteamLaunchOrchestrator.CreateWithResourcesDir(
@@ -112,7 +176,7 @@ public sealed class NoSteamLauncherService : IDisposable
     }
 
     /// <summary>
-    /// æ‰§è¡Œå… Steam éƒ¨ç½²ï¼Œè‡ªåŠ¨å¤„ç†èµ„æºè§£å‹å’Œè¿›åº¦æ—¥å¿—è½¬å‘ã€‚
+    /// Ö´ĞĞÃâ Steam ²¿Êğ£¬×Ô¶¯´¦Àí×ÊÔ´½âÑ¹ºÍ½ø¶ÈÈÕÖ¾×ª·¢¡£
     /// </summary>
     public async Task<LaunchResult> ExecuteAsync(
         LaunchOptions options,
@@ -124,7 +188,7 @@ public sealed class NoSteamLauncherService : IDisposable
         var (resourcesDir, _) = EnsureExtracted();
         var orchestrator = CreateOrchestrator(resourcesDir, orchestratorLogger, steamlessLogger, gbeLogger);
 
-        // è¿›åº¦å›è°ƒï¼šè½¬å‘åˆ° LogService
+        // ½ø¶È»Øµ÷£º×ª·¢µ½ LogService
         var progress = new Progress<string>(msg => 
         {
             LogService.AddLog($"[NoSteam] {msg}");
@@ -134,7 +198,7 @@ public sealed class NoSteamLauncherService : IDisposable
     }
 
     /// <summary>
-    /// éªŒè¯é€‰é¡¹ï¼ˆä¸æ‰§è¡Œéƒ¨ç½²ï¼‰ã€‚
+    /// ÑéÖ¤Ñ¡Ïî£¨²»Ö´ĞĞ²¿Êğ£©¡£
     /// </summary>
     public string? ValidateOptions(LaunchOptions options,
         ILogger<NoSteamLaunchOrchestrator> orchestratorLogger,

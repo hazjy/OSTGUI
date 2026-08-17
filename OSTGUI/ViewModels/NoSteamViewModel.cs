@@ -9,6 +9,7 @@ using OSTGUI.Services;
 using System.Diagnostics;
 using System.IO;
 using System.Collections.Generic;
+using System.Threading.Tasks;
 
 namespace OSTGUI.ViewModels;
 
@@ -23,8 +24,6 @@ public partial class NoSteamViewModel : ObservableObject
     private readonly ILogger<GBEDeploymentService> _gbeLogger;
     private readonly ConfigService _configService;
 
-    [ObservableProperty] private string _statusMessage = "就绪";
-    [ObservableProperty] private string _statusType = "Info";
     [ObservableProperty] private string _gameExePath = "";
     [ObservableProperty] private string _appId = "";
     [ObservableProperty] private bool _isUEGame;
@@ -159,22 +158,27 @@ public partial class NoSteamViewModel : ObservableObject
     {
         if (App.MainWindow is Window window)
         {
+            var cbBackup = new CheckBox { Content = "备份原 EXE", IsChecked = BackupOriginalExe };
+            ToolTipService.SetToolTip(cbBackup, "部署前将原 EXE 备份为 .bak");
+            
+            var cbInterfaces = new CheckBox { Content = "生成 steam_interfaces.txt", IsChecked = GenerateInterfaces };
+            ToolTipService.SetToolTip(cbInterfaces, "使用 generate_interfaces 工具生成接口文件");
+            
+            var cbSkipSteamless = new CheckBox { Content = "跳过 Steamless 脱壳", IsChecked = SkipSteamless };
+            ToolTipService.SetToolTip(cbSkipSteamless, "跳过 SteamStub 脱壳步骤（适用于无 Stub 的游戏）");
+            
+            var cbSkipGBE = new CheckBox { Content = "跳过 GBE 部署", IsChecked = SkipGBE };
+            ToolTipService.SetToolTip(cbSkipGBE, "仅运行 Steamless，不部署 Goldberg 模拟器");
+            
+            var cbDryRun = new CheckBox { Content = "仅干跑 (不修改文件)", IsChecked = DryRun };
+            ToolTipService.SetToolTip(cbDryRun, "模拟部署流程，不实际写入文件，用于预览/调试");
+            
             var panel = new StackPanel { Spacing = 16, MinWidth = 360 };
-            var cb1 = new CheckBox { Content = "备份原 EXE", IsChecked = BackupOriginalExe };
-            ToolTipService.SetToolTip(cb1, "部署前将原 EXE 备份为 .bak");
-            panel.Children.Add(cb1);
-            var cb2 = new CheckBox { Content = "生成 steam_interfaces.txt", IsChecked = GenerateInterfaces };
-            ToolTipService.SetToolTip(cb2, "使用 generate_interfaces 工具生成接口文件");
-            panel.Children.Add(cb2);
-            var cb3 = new CheckBox { Content = "跳过 Steamless 脱壳", IsChecked = SkipSteamless };
-            ToolTipService.SetToolTip(cb3, "跳过 SteamStub 脱壳步骤（适用于无 Stub 的游戏）");
-            panel.Children.Add(cb3);
-            var cb4 = new CheckBox { Content = "跳过 GBE 部署", IsChecked = SkipGBE };
-            ToolTipService.SetToolTip(cb4, "仅运行 Steamless，不部署 Goldberg 模拟器");
-            panel.Children.Add(cb4);
-            var cb5 = new CheckBox { Content = "仅干跑 (不修改文件)", IsChecked = DryRun };
-            ToolTipService.SetToolTip(cb5, "模拟部署流程，不实际写入文件，用于预览/调试");
-            panel.Children.Add(cb5);
+            panel.Children.Add(cbBackup);
+            panel.Children.Add(cbInterfaces);
+            panel.Children.Add(cbSkipSteamless);
+            panel.Children.Add(cbSkipGBE);
+            panel.Children.Add(cbDryRun);
 
             var dialog = new ContentDialog
             {
@@ -187,16 +191,16 @@ public partial class NoSteamViewModel : ObservableObject
             };
             
             var result = await dialog.ShowAsync();
+            
+            if (result == ContentDialogResult.Primary)
+            {
+                BackupOriginalExe = cbBackup.IsChecked ?? false;
+                GenerateInterfaces = cbInterfaces.IsChecked ?? false;
+                SkipSteamless = cbSkipSteamless.IsChecked ?? false;
+                SkipGBE = cbSkipGBE.IsChecked ?? false;
+                DryRun = cbDryRun.IsChecked ?? false;
+            }
         }
-    }
-
-    public void RefreshStatus()
-    {
-        var isSteamRunning = _steamService.IsSteamRunning();
-        var isInjected = _steamDllService.IsOSTDllInjected();
-
-        StatusMessage = isSteamRunning ? "Steam 正在运行" : "Steam 未运行";
-        StatusType = isSteamRunning ? "Warning" : "Success";
     }
 
     [RelayCommand]
@@ -300,31 +304,31 @@ public partial class NoSteamViewModel : ObservableObject
 
         if (string.IsNullOrWhiteSpace(GameExePath) || !File.Exists(GameExePath))
         {
-            ShowError("请选择有效的游戏 EXE 文件");
+            ProgressLog += "[ERROR] 请选择有效的游戏 EXE 文件\n";
             return;
         }
 
         if (string.IsNullOrWhiteSpace(AppId) || !int.TryParse(AppId, out _))
         {
-            ShowError("请输入有效的 Steam AppID (数字)");
+            ProgressLog += "[ERROR] 请输入有效的 Steam AppID (数字)\n";
             return;
         }
 
         if (IsUEGame && string.IsNullOrWhiteSpace(UEEnginePath))
         {
-            ShowError("UE 游戏必须指定 Engine 路径");
+            ProgressLog += "[ERROR] UE 游戏必须指定 Engine 路径\n";
             return;
         }
 
         if (IsUEGame && !Directory.Exists(UEEnginePath))
         {
-            ShowError("UE Engine 路径不存在");
+            ProgressLog += "[ERROR] UE Engine 路径不存在\n";
             return;
         }
 
         IsRunning = true;
         ProgressLog = "";
-        ShowInfo("开始部署...");
+        ProgressLog += "[INFO] 开始部署...\n";
 
         try
         {
@@ -358,17 +362,17 @@ public partial class NoSteamViewModel : ObservableObject
                     : $"✅ 部署成功！部署了 {result.GBEDeploy.DeployedFiles.Length} 个文件，耗时 {result.TotalDuration.TotalSeconds:F1}s";
                 if (result.GameProcessId.HasValue)
                     msg += $"\n游戏进程 PID: {result.GameProcessId}";
-                ShowSuccess(msg);
+                ProgressLog += $"[SUCCESS] {msg}\n";
             }
             else
             {
-                ShowError($"❌ 部署失败: {result.ErrorMessage}");
+                ProgressLog += $"[ERROR] 部署失败: {result.ErrorMessage}\n";
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Deploy failed");
-            ShowError($"❌ 异常: {ex.Message}");
+            ProgressLog += $"[ERROR] 异常: {ex.Message}\n";
         }
         finally
         {
@@ -382,26 +386,5 @@ public partial class NoSteamViewModel : ObservableObject
     private void ClearLog()
     {
         ProgressLog = "";
-    }
-
-    private void ShowInfo(string msg)
-    {
-        StatusMessage = msg;
-        StatusType = "Info";
-        ProgressLog += $"[INFO] {msg}\n";
-    }
-
-    private void ShowSuccess(string msg)
-    {
-        StatusMessage = msg;
-        StatusType = "Success";
-        ProgressLog += $"[SUCCESS] {msg}\n";
-    }
-
-    private void ShowError(string msg)
-    {
-        StatusMessage = msg;
-        StatusType = "Error";
-        ProgressLog += $"[ERROR] {msg}\n";
     }
 }

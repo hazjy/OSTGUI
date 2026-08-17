@@ -1,7 +1,6 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using OSTGUI.ViewModels;
-using System.Diagnostics;
 
 namespace OSTGUI.Pages;
 
@@ -14,6 +13,5 @@ public sealed partial class NoSteamPage : Page
         this.InitializeComponent();
         VM = vm;
         DataContext = VM;
-        Loaded += (_, _) => VM.RefreshStatus();
     }
 }

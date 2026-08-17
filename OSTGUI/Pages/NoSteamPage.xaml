@@ -46,15 +46,6 @@
                 <StackPanel Spacing="20" MaxWidth="900" HorizontalAlignment="Center">
 
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
-                            CornerRadius="8" Padding="12" BorderThickness="1" 
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
-                        <StackPanel Orientation="Horizontal" Spacing="12">
-                            <TextBlock x:Name="StatusText" Text="{Binding StatusMessage, Mode=OneWay}" 
-                                       FontWeight="SemiBold" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Border>
-
-                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
                             CornerRadius="8" Padding="16" BorderThickness="1" 
                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
                         <StackPanel Spacing="12">
