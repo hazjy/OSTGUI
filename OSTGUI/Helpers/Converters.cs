@@ -77,22 +77,38 @@ public class VersionModeToBrushConverter : IValueConverter
 }
 
 /// <summary>
-/// 入库状态到颜色转换器（异常状态 → 红色，正常 → 默认文本色）
-/// </summary>
-public class StatusToBrushConverter : IValueConverter
-{
-    public object Convert(object value, Type targetType, object parameter, string language)
+    /// 入库状态到颜色转换器（异常状态 → 红色，正常 → 默认文本色）
+    /// </summary>
+    public class StatusToBrushConverter : IValueConverter
     {
-        if (value is string status && status != "ok")
+        public object Convert(object value, Type targetType, object parameter, string language)
         {
-            return new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 196, 43, 28));
+            if (value is string status && status != "ok")
+            {
+                return new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 196, 43, 28));
+            }
+
+            return ThemeColorHelper.DefaultTextBrush();
         }
 
-        return ThemeColorHelper.DefaultTextBrush();
+        public object ConvertBack(object value, Type targetType, object parameter, string language)
+        {
+            throw new NotImplementedException();
+        }
     }
 
-    public object ConvertBack(object value, Type targetType, object parameter, string language)
+    /// <summary>
+    /// 非空字符串到 Visibility 转换器
+    /// </summary>
+    public class StringToVisibilityConverter : IValueConverter
     {
-        throw new NotImplementedException();
+        public object Convert(object value, Type targetType, object parameter, string language)
+        {
+            return !string.IsNullOrWhiteSpace(value as string) ? Visibility.Visible : Visibility.Collapsed;
+        }
+
+        public object ConvertBack(object value, Type targetType, object parameter, string language)
+        {
+            throw new NotImplementedException();
+        }
     }
-}

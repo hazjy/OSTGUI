@@ -2,6 +2,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using OSTGUI.ViewModels;
 using OSTGUI.Services;
+using NoSteamLauncher.Services;
 using System.Net.Http;
 using System.Text.Json;
 
@@ -59,6 +60,13 @@ public partial class App : Application
         services.AddTransient<DenuvoViewModel>();
         services.AddTransient<NoSteamViewModel>();
         services.AddTransient<SettingsViewModel>();
+
+        // NoSteamLauncher services
+        services.AddSingleton<NoSteamLauncherService>();
+        services.AddSingleton<SteamlessService>();
+        services.AddSingleton<GBEDeploymentService>();
+        services.AddSingleton<INoSteamLauncherService, NoSteamLaunchOrchestrator>();
+
         Services = services.BuildServiceProvider();
 
         // 初始化日志文件（本地数据目录）

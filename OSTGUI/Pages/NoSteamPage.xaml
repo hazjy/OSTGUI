@@ -1,14 +1,207 @@
 <Page
     x:Class="OSTGUI.Pages.NoSteamPage"
+    x:Name="PageRoot"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
+    xmlns:converters="using:OSTGUI.Helpers"
     mc:Ignorable="d">
 
-    <ScrollViewer>
-        <StackPanel Margin="40,32,40,40" Spacing="24">
-            <TextBlock Text="免Steam 运行" FontSize="24" FontWeight="Bold" />
+    <Page.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVis" />
+        <converters:StringToVisibilityConverter x:Key="StrToVis" />
+        <Style TargetType="TextBlock" x:Key="LabelStyle">
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Margin" Value="0,0,12,0" />
+            <Setter Property="MinWidth" Value="140" />
+        </Style>
+        <Style TargetType="TextBox" x:Key="InputBoxStyle">
+            <Setter Property="MinWidth" Value="300" />
+            <Setter Property="Margin" Value="0,4,0,4" />
+        </Style>
+    </Page.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 固定标题栏 -->
+        <StackPanel Grid.Row="0" Margin="40,32,40,12">
+            <TextBlock Text="免steam运行" FontSize="24" FontWeight="Bold" />
         </StackPanel>
-    </ScrollViewer>
+
+        <!-- 内容区域 -->
+        <Grid Grid.Row="1" Margin="40,0,40,0">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <ScrollViewer Grid.Row="1" VerticalScrollMode="Auto" VerticalScrollBarVisibility="Auto">
+                <StackPanel Spacing="20" MaxWidth="900" HorizontalAlignment="Center">
+
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                            CornerRadius="8" Padding="12" BorderThickness="1" 
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBlock x:Name="StatusText" Text="{Binding StatusMessage, Mode=OneWay}" 
+                                       FontWeight="SemiBold" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                            CornerRadius="8" Padding="16" BorderThickness="1" 
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="游戏选择" FontSize="16" FontWeight="SemiBold" />
+
+                            <Grid ColumnSpacing="12" RowSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="游戏 EXE:" Style="{StaticResource LabelStyle}" />
+                                <TextBox Grid.Row="0" Grid.Column="1" Text="{Binding GameExePath, Mode=TwoWay}" 
+                                         Style="{StaticResource InputBoxStyle}" PlaceholderText="选择游戏主程序 .exe" IsReadOnly="True" />
+                                <Button Grid.Row="0" Grid.Column="2" Content="浏览..." Command="{Binding BrowseGameExeCommand}" 
+                                        Margin="0,4,0,4" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="AppID:" Style="{StaticResource LabelStyle}" />
+                                <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding AppId, Mode=TwoWay}" 
+                                         Style="{StaticResource InputBoxStyle}" PlaceholderText="Steam AppID" 
+                                         InputScope="Number" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                            CornerRadius="8" Padding="16" BorderThickness="1" 
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            Visibility="{Binding IsUEGame, Converter={StaticResource BoolToVis}, Mode=OneWay}">
+                        <StackPanel Spacing="12">
+                            <StackPanel Orientation="Horizontal" Spacing="12">
+                                <CheckBox Content="Unreal Engine 游戏" IsChecked="{Binding IsUEGame, Mode=TwoWay}" 
+                                          FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </StackPanel>
+
+                            <Grid ColumnSpacing="12" RowSpacing="8" Visibility="{Binding IsUEGame, Converter={StaticResource BoolToVis}, Mode=OneWay}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0" Text="Engine 路径:" Style="{StaticResource LabelStyle}" />
+                                <TextBox Grid.Column="1" Text="{Binding UEEnginePath, Mode=TwoWay}" 
+                                         Style="{StaticResource InputBoxStyle}" PlaceholderText="UE Engine 根目录 (如 D:\UE_5.3\Engine)" IsReadOnly="True" />
+                                <Button Grid.Column="2" Content="浏览..." Command="{Binding BrowseUEEnginePathCommand}" 
+                                        Margin="0,4,0,4" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                            CornerRadius="8" Padding="16,12,16,12" BorderThickness="1" 
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+
+                            <TextBlock Grid.Column="0" Text="部署选项" FontSize="14" FontWeight="SemiBold" 
+                                       VerticalAlignment="Center" />
+                            <Button Grid.Column="1" Content="设置" 
+                                    Command="{Binding OpenDeploymentOptionsCommand}"
+                                    VerticalAlignment="Center" Margin="0"
+                                    Style="{StaticResource DefaultButtonStyle}" />
+                        </Grid>
+                    </Border>
+
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                            CornerRadius="8" Padding="16" BorderThickness="1" 
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                        <StackPanel Spacing="12">
+                            <TextBlock Text="高级设置" FontSize="16" FontWeight="SemiBold" />
+
+                            <Grid ColumnSpacing="12" RowSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="200" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="200" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Steamless 超时 (分钟):" Style="{StaticResource LabelStyle}" />
+                                <NumberBox Grid.Row="0" Grid.Column="1" Value="{Binding SteamlessTimeoutMinutes, Mode=TwoWay}" 
+                                           Minimum="1" Maximum="60" SpinButtonPlacementMode="Inline" />
+
+                                <TextBlock Grid.Row="0" Grid.Column="2" Text="启动验证超时 (秒):" Style="{StaticResource LabelStyle}" />
+                                <NumberBox Grid.Row="0" Grid.Column="3" Value="{Binding VerifyLaunchTimeoutSeconds, Mode=TwoWay}" 
+                                           Minimum="1" Maximum="120" SpinButtonPlacementMode="Inline" />
+
+                                <TextBlock Grid.Row="1" Grid.Column="0" Text="启动参数:" Style="{StaticResource LabelStyle}" />
+                                <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3" 
+                                         Text="{Binding LaunchArgs, Mode=TwoWay}" 
+                                         Style="{StaticResource InputBoxStyle}" PlaceholderText="传给游戏的命令行参数 (可选)" />
+                            </Grid>
+
+                            <Grid ColumnSpacing="12" RowSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+
+                                <TextBlock Grid.Column="0" Text="工作目录:" Style="{StaticResource LabelStyle}" />
+                                <TextBox Grid.Column="1" Text="{Binding WorkingDirectory, Mode=TwoWay}" 
+                                         Style="{StaticResource InputBoxStyle}" PlaceholderText="游戏运行时的工作目录 (可选，默认 EXE 所在目录)" IsReadOnly="True" />
+                                <Button Grid.Column="2" Content="浏览..." Command="{Binding BrowseWorkingDirectoryCommand}" 
+                                        Margin="0,4,0,4" Visibility="{Binding WorkingDirectory, Converter={StaticResource StrToVis}, Mode=OneWay}" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button Content="开始部署" Command="{Binding DeployCommand}" 
+                                Style="{StaticResource AccentButtonStyle}" 
+                                Width="140" Height="40" FontSize="14"
+                                IsEnabled="{Binding CanExecuteDeploy, Mode=OneWay}" />
+                        <Button Content="清空日志" Command="{Binding ClearLogCommand}" 
+                                Width="100" Height="40" FontSize="14" />
+                    </StackPanel>
+
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" 
+                            CornerRadius="8" Padding="12" BorderThickness="1" 
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="部署日志" FontSize="16" FontWeight="SemiBold" />
+                            <TextBox Text="{Binding ProgressLog, Mode=OneWay}" 
+                                     IsReadOnly="True" AcceptsReturn="True" 
+                                     TextWrapping="Wrap" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                     FontFamily="Cascadia Code, Consolas, monospace" FontSize="12"
+                                     MinHeight="200" MaxHeight="400"
+                                     Background="{ThemeResource TextControlBackgroundFocused}" />
+                        </StackPanel>
+                    </Border>
+
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
 </Page>

@@ -26,6 +26,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\NoSteamLauncher\NoSteamLauncher.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="Assets\important.html" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

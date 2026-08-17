@@ -23,6 +23,17 @@ public class AppConfig
     public string StFixedManifestMode { get; set; } = "ask"; // always, never, ask
     public bool StDownloadManifestDefault { get; set; } = true;
 
+    // === 免Steam运行设置 ===
+    public bool DefaultBackupOriginalExe { get; set; } = true;
+    public bool GenerateInterfacesDefault { get; set; } = true;
+    public bool SkipSteamlessDefault { get; set; }
+    public bool SkipGBEDefault { get; set; }
+    public bool DryRunDefault { get; set; }
+    public int SteamlessTimeoutMinutesDefault { get; set; } = 5;
+    public int VerifyLaunchTimeoutSecondsDefault { get; set; } = 5;
+    public string LaunchArgsDefault { get; set; } = string.Empty;
+    public string WorkingDirectoryDefault { get; set; } = string.Empty;
+
     // === 外观设置 ===
     public string ThemeMode { get; set; } = "auto"; // light, dark, auto
     public string ThemeColor { get; set; } = "#0078d4";
@@ -59,9 +70,9 @@ public class AppConfig
     public Dictionary<string, object> Extensions { get; set; } = new();
 
     /// <summary>
-    /// 获取默认配置
+    /// 获取默极配置
     /// </summary>
-public static AppConfig GetDefault() => new()
+    public static AppConfig GetDefault() => new()
     {
         SteamPath = string.Empty,
         GithubToken = string.Empty,
@@ -95,6 +106,16 @@ public static AppConfig GetDefault() => new()
         CustomGithubRepos = new(),
         CustomZipUrls = new(),
         CustomManifestSources = new(),
-        Extensions = new()
+        Extensions = new(),
+        // NoSteam options
+        DefaultBackupOriginalExe = true,
+        GenerateInterfacesDefault = true,
+        SkipSteamlessDefault = false,
+        SkipGBEDefault = false,
+        DryRunDefault = false,
+        SteamlessTimeoutMinutesDefault = 5,
+        VerifyLaunchTimeoutSecondsDefault = 5,
+        LaunchArgsDefault = string.Empty,
+        WorkingDirectoryDefault = string.Empty
     };
 }
