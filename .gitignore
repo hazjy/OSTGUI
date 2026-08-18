@@ -15,3 +15,9 @@ deepseek_usage.html
 
 # 调试符号
 *.pdb
+
+# 项目沉淀文档（不纳入版本控制）
+NoSteam.md
+plan1.md
+plan2.md
+plan3.md
