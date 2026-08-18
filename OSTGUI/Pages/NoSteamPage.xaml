@@ -109,12 +109,17 @@
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="*" />
                                 <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
 
                             <TextBlock Grid.Column="0" Text="部署选项" FontSize="14" FontWeight="SemiBold" 
                                        VerticalAlignment="Center" />
                             <Button Grid.Column="1" Content="设置" 
                                     Command="{Binding OpenDeploymentOptionsCommand}"
+                                    VerticalAlignment="Center" Margin="0"
+                                    Style="{StaticResource DefaultButtonStyle}" />
+                            <Button Grid.Column="2" Content="更多配置" 
+                                    Command="{Binding OpenAdvancedConfigCommand}"
                                     VerticalAlignment="Center" Margin="0"
                                     Style="{StaticResource DefaultButtonStyle}" />
                         </Grid>

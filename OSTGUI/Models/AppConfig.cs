@@ -34,6 +34,18 @@ public class AppConfig
     public string LaunchArgsDefault { get; set; } = string.Empty;
     public string WorkingDirectoryDefault { get; set; } = string.Empty;
 
+    // === 免Steam高级配置 (GBE steam_settings) ===
+    public string AdvancedAccountName { get; set; } = string.Empty;
+    public string AdvancedSteamId { get; set; } = string.Empty;
+    public string AdvancedLanguage { get; set; } = "schinese";
+    public bool AdvancedUnlockAllDlc { get; set; } = true;
+    public string AdvancedDlcList { get; set; } = string.Empty;
+    public bool AdvancedOfflineMode { get; set; }
+    public bool AdvancedDisableNetworking { get; set; }
+    public string AdvancedControllerType { get; set; } = "XBOX360";
+    public bool AdvancedSteamDeck { get; set; }
+    public string AdvancedCustomBroadcast { get; set; } = string.Empty;
+
     // === 外观设置 ===
     public string ThemeMode { get; set; } = "auto"; // light, dark, auto
     public string ThemeColor { get; set; } = "#0078d4";
@@ -116,6 +128,17 @@ public class AppConfig
         SteamlessTimeoutMinutesDefault = 5,
         VerifyLaunchTimeoutSecondsDefault = 5,
         LaunchArgsDefault = string.Empty,
-        WorkingDirectoryDefault = string.Empty
+        WorkingDirectoryDefault = string.Empty,
+        // Advanced GBE config
+        AdvancedAccountName = string.Empty,
+        AdvancedSteamId = string.Empty,
+        AdvancedLanguage = "schinese",
+        AdvancedUnlockAllDlc = true,
+        AdvancedDlcList = string.Empty,
+        AdvancedOfflineMode = false,
+        AdvancedDisableNetworking = false,
+        AdvancedControllerType = "XBOX360",
+        AdvancedSteamDeck = false,
+        AdvancedCustomBroadcast = string.Empty
     };
 }
