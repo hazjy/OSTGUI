@@ -17,6 +17,7 @@ deepseek_usage.html
 *.pdb
 
 # 项目沉淀文档（不纳入版本控制）
+AGENTS.md
 NoSteam.md
 plan1.md
 plan2.md
