@@ -39,13 +39,13 @@ public sealed class NoSteamLauncherService : IDisposable
         var resourcesDir = Path.Combine(_tempRoot, "Resources");
         var pluginsDir = Path.Combine(_tempRoot, "Plugins");
 
-        // ��Ҫ��֤�Ĺؼ��ļ���generate_interfaces_x86.exe �����ڣ��Ƴ���
+        // SAC-style template: Steamless in root, GBE under emu/game_goldberg/files/
         var requiredResourceFiles = new[] 
         { 
-            "steam_api.dll", 
-            "steam_api64.dll", 
             "Steamless.CLI.exe",
-            "generate_interfaces_x64.exe",
+            Path.Combine("emu", "game_goldberg", "files", "steam_api.dll"),
+            Path.Combine("emu", "game_goldberg", "files", "steam_api64.dll"),
+            Path.Combine("emu", "game_goldberg", "files", "steam_settings", "steam_appid.txt"),
         };
 
         var needExtractResources = !Directory.Exists(resourcesDir) || 
