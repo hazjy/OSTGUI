@@ -25,7 +25,6 @@ public class AppConfig
 
     // === 免Steam运行设置 ===
     public bool DefaultBackupOriginalExe { get; set; } = true;
-    public bool GenerateInterfacesDefault { get; set; } = true;
     public bool SkipSteamlessDefault { get; set; }
     public bool SkipGBEDefault { get; set; }
     public bool DryRunDefault { get; set; }
@@ -42,9 +41,6 @@ public class AppConfig
     public string AdvancedDlcList { get; set; } = string.Empty;
     public bool AdvancedOfflineMode { get; set; }
     public bool AdvancedDisableNetworking { get; set; }
-    public string AdvancedControllerType { get; set; } = "XBOX360";
-    public bool AdvancedSteamDeck { get; set; }
-    public string AdvancedCustomBroadcast { get; set; } = string.Empty;
 
     // === 外观设置 ===
     public string ThemeMode { get; set; } = "auto"; // light, dark, auto
@@ -121,7 +117,6 @@ public class AppConfig
         Extensions = new(),
         // NoSteam options
         DefaultBackupOriginalExe = true,
-        GenerateInterfacesDefault = true,
         SkipSteamlessDefault = false,
         SkipGBEDefault = false,
         DryRunDefault = false,
@@ -136,9 +131,6 @@ public class AppConfig
         AdvancedUnlockAllDlc = true,
         AdvancedDlcList = string.Empty,
         AdvancedOfflineMode = false,
-        AdvancedDisableNetworking = false,
-        AdvancedControllerType = "XBOX360",
-        AdvancedSteamDeck = false,
-        AdvancedCustomBroadcast = string.Empty
+        AdvancedDisableNetworking = false
     };
 }

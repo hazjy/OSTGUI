@@ -29,10 +29,7 @@ public partial class NoSteamViewModel : ObservableObject
 
     [ObservableProperty] private string _gameExePath = "";
     [ObservableProperty] private string _appId = "";
-    [ObservableProperty] private bool _isUEGame;
-    [ObservableProperty] private string _UEEnginePath = "";
     [ObservableProperty] private bool _backupOriginalExe = true;
-    [ObservableProperty] private bool _generateInterfaces = true;
     [ObservableProperty] private bool _skipSteamless;
     [ObservableProperty] private bool _skipGBE;
     [ObservableProperty] private bool _dryRun;
@@ -51,9 +48,6 @@ public partial class NoSteamViewModel : ObservableObject
     [ObservableProperty] private string _advancedDlcList = "";
     [ObservableProperty] private bool _advancedOfflineMode;
     [ObservableProperty] private bool _advancedDisableNetworking;
-    [ObservableProperty] private string _advancedControllerType = "XBOX360";
-    [ObservableProperty] private bool _advancedSteamDeck;
-    [ObservableProperty] private string _advancedCustomBroadcast = "";
 
     public NoSteamViewModel(
         NoSteamLauncherService noSteamService,
@@ -83,7 +77,6 @@ public partial class NoSteamViewModel : ObservableObject
         {
             var c = _configService.Config;
             BackupOriginalExe = c.DefaultBackupOriginalExe;
-            GenerateInterfaces = c.GenerateInterfacesDefault;
             SkipSteamless = c.SkipSteamlessDefault;
             SkipGBE = c.SkipGBEDefault;
             DryRun = c.DryRunDefault;
@@ -99,9 +92,6 @@ public partial class NoSteamViewModel : ObservableObject
             AdvancedDlcList = c.AdvancedDlcList;
             AdvancedOfflineMode = c.AdvancedOfflineMode;
             AdvancedDisableNetworking = c.AdvancedDisableNetworking;
-            AdvancedControllerType = c.AdvancedControllerType;
-            AdvancedSteamDeck = c.AdvancedSteamDeck;
-            AdvancedCustomBroadcast = c.AdvancedCustomBroadcast;
         }
         catch (Exception ex)
         {
@@ -114,7 +104,6 @@ public partial class NoSteamViewModel : ObservableObject
         _configService.UpdateAndSaveAsync(c =>
         {
             c.DefaultBackupOriginalExe = BackupOriginalExe;
-            c.GenerateInterfacesDefault = GenerateInterfaces;
             c.SkipSteamlessDefault = SkipSteamless;
             c.SkipGBEDefault = SkipGBE;
             c.DryRunDefault = DryRun;
@@ -136,19 +125,10 @@ public partial class NoSteamViewModel : ObservableObject
             c.AdvancedDlcList = AdvancedDlcList;
             c.AdvancedOfflineMode = AdvancedOfflineMode;
             c.AdvancedDisableNetworking = AdvancedDisableNetworking;
-            c.AdvancedControllerType = AdvancedControllerType;
-            c.AdvancedSteamDeck = AdvancedSteamDeck;
-            c.AdvancedCustomBroadcast = AdvancedCustomBroadcast;
         }).GetAwaiter().GetResult();
     }
 
     partial void OnBackupOriginalExeChanged(bool value)
-    {
-        if (_configService.IsLoaded)
-            SaveOptionsToConfig();
-    }
-
-    partial void OnGenerateInterfacesChanged(bool value)
     {
         if (_configService.IsLoaded)
             SaveOptionsToConfig();
@@ -203,22 +183,18 @@ public partial class NoSteamViewModel : ObservableObject
         {
             var cbBackup = new CheckBox { Content = "备份原 EXE", IsChecked = BackupOriginalExe };
             ToolTipService.SetToolTip(cbBackup, "部署前将原 EXE 备份为 .bak");
-            
-            var cbInterfaces = new CheckBox { Content = "生成 steam_interfaces.txt", IsChecked = GenerateInterfaces };
-            ToolTipService.SetToolTip(cbInterfaces, "使用 generate_interfaces 工具生成接口文件");
-            
+
             var cbSkipSteamless = new CheckBox { Content = "跳过 Steamless 脱壳", IsChecked = SkipSteamless };
             ToolTipService.SetToolTip(cbSkipSteamless, "跳过 SteamStub 脱壳步骤（适用于无 Stub 的游戏）");
-            
+
             var cbSkipGBE = new CheckBox { Content = "跳过 GBE 部署", IsChecked = SkipGBE };
             ToolTipService.SetToolTip(cbSkipGBE, "仅运行 Steamless，不部署 Goldberg 模拟器");
-            
+
             var cbDryRun = new CheckBox { Content = "仅干跑 (不修改文件)", IsChecked = DryRun };
             ToolTipService.SetToolTip(cbDryRun, "模拟部署流程，不实际写入文件，用于预览/调试");
-            
+
             var panel = new StackPanel { Spacing = 16, MinWidth = 360 };
             panel.Children.Add(cbBackup);
-            panel.Children.Add(cbInterfaces);
             panel.Children.Add(cbSkipSteamless);
             panel.Children.Add(cbSkipGBE);
             panel.Children.Add(cbDryRun);
@@ -232,13 +208,12 @@ public partial class NoSteamViewModel : ObservableObject
                 XamlRoot = window.Content.XamlRoot,
                 Content = panel
             };
-            
+
             var result = await dialog.ShowAsync();
-            
+
             if (result == ContentDialogResult.Primary)
             {
                 BackupOriginalExe = cbBackup.IsChecked ?? false;
-                GenerateInterfaces = cbInterfaces.IsChecked ?? false;
                 SkipSteamless = cbSkipSteamless.IsChecked ?? false;
                 SkipGBE = cbSkipGBE.IsChecked ?? false;
                 DryRun = cbDryRun.IsChecked ?? false;
@@ -251,69 +226,75 @@ public partial class NoSteamViewModel : ObservableObject
     {
         if (App.MainWindow is not Window window) return;
 
-        // 账号名称
-        var tbAccountName = new TextBox { PlaceholderText = "账号名称 (显示在好友列表/成就)", Text = AdvancedAccountName, MinWidth = 600 };
-        ToolTipService.SetToolTip(tbAccountName, "对应 configs.user.ini 的 account_name");
-
-        // SteamID64
-        var tbSteamId = new TextBox { PlaceholderText = "SteamID64 (17位数字，留空自动生成)", Text = AdvancedSteamId, MinWidth = 600 };
-        tbSteamId.InputScope = new InputScope { Names = { new InputScopeName { NameValue = InputScopeNameValue.Number } } };
-        ToolTipService.SetToolTip(tbSteamId, "对应 configs.user.ini 的 account_steamid，用于存档隔离和联机识别");
+        // 账户选择下拉菜单
+        var accounts = _steamService.GetSteamAccounts();
+        var cbAccount = new ComboBox { PlaceholderText = "选择账户", MinWidth = 600 };
+        cbAccount.Items.Add("不指定账户");
+        foreach (var acc in accounts)
+        {
+            cbAccount.Items.Add($"{acc.AccountName} ({acc.PersonaName})");
+        }
+        // 设置当前选中的账户
+        if (!string.IsNullOrWhiteSpace(AdvancedAccountName))
+        {
+            var match = accounts.FirstOrDefault(a => a.AccountName == AdvancedAccountName);
+            if (match.AccountName != null)
+            {
+                cbAccount.SelectedItem = $"{match.AccountName} ({match.PersonaName})";
+            }
+            else
+            {
+                cbAccount.SelectedItem = "不指定账户";
+            }
+        }
+        else
+        {
+            cbAccount.SelectedItem = "不指定账户";
+        }
+        ToolTipService.SetToolTip(cbAccount, "选择本机 Steam 账户，将自动填充账号名称和 SteamID");
 
         // 语言
-        var cbLanguage = new ComboBox { PlaceholderText = "语言", SelectedItem = AdvancedLanguage, MinWidth = 600 };
+        var cbLanguage = new ComboBox { PlaceholderText = "语言", MinWidth = 600 };
         cbLanguage.Items.Add("schinese"); cbLanguage.Items.Add("english"); cbLanguage.Items.Add("japanese"); cbLanguage.Items.Add("korean"); cbLanguage.Items.Add("french"); cbLanguage.Items.Add("german"); cbLanguage.Items.Add("spanish"); cbLanguage.Items.Add("russian"); cbLanguage.Items.Add("portuguese"); cbLanguage.Items.Add("polish"); cbLanguage.Items.Add("italian"); cbLanguage.Items.Add("turkish"); cbLanguage.Items.Add("tchinese");
-        ToolTipService.SetToolTip(cbLanguage, "对应 configs.user.ini 的 language，需在 supported_languages.txt 中存在");
+        cbLanguage.SelectedItem = AdvancedLanguage;
+        ToolTipService.SetToolTip(cbLanguage, "对应 configs.user.ini 的 language");
 
         // DLC 模式
-        var rbUnlockAll = new RadioButton { Content = "全解锁所有 DLC (unlock_all=1)", IsChecked = AdvancedUnlockAllDlc, GroupName = "DlcMode", Margin = new Thickness(0, 4, 0, 0) };
-        var rbWhitelist = new RadioButton { Content = "仅解锁 DLC.txt 白名单 (unlock_all=0)", IsChecked = !AdvancedUnlockAllDlc, GroupName = "DlcMode", Margin = new Thickness(0, 4, 0, 0) };
+        var rbUnlockAll = new RadioButton { Content = "全解锁所有 DLC", IsChecked = AdvancedUnlockAllDlc, GroupName = "DlcMode" };
+        var rbWhitelist = new RadioButton { Content = "仅解锁 DLC.txt 白名单", IsChecked = !AdvancedUnlockAllDlc, GroupName = "DlcMode" };
         ToolTipService.SetToolTip(rbUnlockAll, "开启后自动解锁游戏所有 DLC，无需手动维护列表");
         ToolTipService.SetToolTip(rbWhitelist, "仅解锁 DLC.txt 中列出的 DLC，更安全但需手动维护");
+        var dlcPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 20 };
+        dlcPanel.Children.Add(rbUnlockAll);
+        dlcPanel.Children.Add(rbWhitelist);
 
         // DLC 白名单编辑
         var tbDlcList = new TextBox { PlaceholderText = "DLC 白名单，每行格式: AppID=名称", Text = AdvancedDlcList, MinWidth = 600, MinHeight = 100, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, FontFamily = new FontFamily("Cascadia Code, Consolas, monospace") };
         ScrollViewer.SetVerticalScrollBarVisibility(tbDlcList, ScrollBarVisibility.Auto);
-        ToolTipService.SetToolTip(tbDlcList, "unlock_all=0 时生效，对应 steam_settings/DLC.txt");
+        ToolTipService.SetToolTip(tbDlcList, "白名单模式时生效，对应 steam_settings/DLC.txt");
 
         // 离线模式
-        var cbOffline = new CheckBox { Content = "离线模式 (模拟 Steam 离线状态)", IsChecked = AdvancedOfflineMode, Margin = new Thickness(0, 4, 0, 0) };
-        ToolTipService.SetToolTip(cbOffline, "创建 offline.txt，游戏将在离线模式下运行，不尝试连接 Steam 网络");
+        var cbOffline = new CheckBox { Content = "离线模式", IsChecked = AdvancedOfflineMode };
+        ToolTipService.SetToolTip(cbOffline, "configs.main.ini 的 offline=1，游戏将在离线模式下运行");
 
         // 禁用网络
-        var cbDisableNet = new CheckBox { Content = "完全禁用网络 (破坏大厅/联机功能)", IsChecked = AdvancedDisableNetworking, Margin = new Thickness(0, 4, 0, 0) };
-        ToolTipService.SetToolTip(cbDisableNet, "创建 disable_networking.txt，彻底断开 Steam 网络连接，联机游戏慎用");
+        var cbDisableNet = new CheckBox { Content = "完全禁用网络", IsChecked = AdvancedDisableNetworking };
+        ToolTipService.SetToolTip(cbDisableNet, "configs.main.ini 的 disable_networking=1，联机游戏慎用");
 
-        // 控制器类型
-        var cbControllerType = new ComboBox { PlaceholderText = "控制器类型", SelectedItem = AdvancedControllerType, MinWidth = 600, Margin = new Thickness(0, 4, 0, 0) };
-        cbControllerType.Items.Add("XBOX360"); cbControllerType.Items.Add("XBOXONE"); cbControllerType.Items.Add("PS4"); cbControllerType.Items.Add("PS5"); cbControllerType.Items.Add("SWITCH");
-        ToolTipService.SetToolTip(cbControllerType, "对应 configs.app.ini [app::controller] type，游戏只识别特定手柄时设置");
-
-        // Steam Deck 伪装
-        var cbSteamDeck = new CheckBox { Content = "伪装为 Steam Deck", IsChecked = AdvancedSteamDeck, Margin = new Thickness(0, 4, 0, 0) };
-        ToolTipService.SetToolTip(cbSteamDeck, "对应 configs.main.ini steam_deck=1，触发 Deck 专用 UI/配置");
-
-        // 自定义广播
-        var tbCustomBroadcast = new TextBox { PlaceholderText = "自定义广播地址 (每行一个 IP/域名)", Text = AdvancedCustomBroadcast, MinWidth = 600, MinHeight = 60, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap };
-        ToolTipService.SetToolTip(tbCustomBroadcast, "对应 custom_broadcasts.txt，局域网联机指定广播目标");
+        var networkPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 20 };
+        networkPanel.Children.Add(cbOffline);
+        networkPanel.Children.Add(cbDisableNet);
 
         var panel = new StackPanel { Spacing = 12, MinWidth = 700 };
-        panel.Children.Add(new TextBlock { Text = "账号与身份", FontWeight = FontWeights.SemiBold, FontSize = 14, Margin = new Thickness(0, 0, 0, 4) });
-        panel.Children.Add(tbAccountName);
-        panel.Children.Add(tbSteamId);
+        panel.Children.Add(new TextBlock { Text = "账号与身份 (选择账户后自动填充)", FontWeight = FontWeights.SemiBold, FontSize = 14, Margin = new Thickness(0, 0, 0, 4) });
+        panel.Children.Add(cbAccount);
+        panel.Children.Add(new TextBlock { Text = "语言", FontWeight = FontWeights.SemiBold, FontSize = 14, Margin = new Thickness(0, 8, 0, 4) });
         panel.Children.Add(cbLanguage);
         panel.Children.Add(new TextBlock { Text = "DLC 管理", FontWeight = FontWeights.SemiBold, FontSize = 14, Margin = new Thickness(0, 8, 0, 4) });
-        panel.Children.Add(rbUnlockAll);
-        panel.Children.Add(rbWhitelist);
+        panel.Children.Add(dlcPanel);
         panel.Children.Add(tbDlcList);
-        panel.Children.Add(new TextBlock { Text = "网络与模式", FontWeight = FontWeights.SemiBold, FontSize = 14, Margin = new Thickness(0, 8, 0, 4) });
-        panel.Children.Add(cbOffline);
-        panel.Children.Add(cbDisableNet);
-        panel.Children.Add(cbSteamDeck);
-        panel.Children.Add(new TextBlock { Text = "输入设备", FontWeight = FontWeights.SemiBold, FontSize = 14, Margin = new Thickness(0, 8, 0, 4) });
-        panel.Children.Add(cbControllerType);
-        panel.Children.Add(new TextBlock { Text = "局域网联机", FontWeight = FontWeights.SemiBold, FontSize = 14, Margin = new Thickness(0, 8, 0, 4) });
-        panel.Children.Add(tbCustomBroadcast);
+        panel.Children.Add(new TextBlock { Text = "网络模式", FontWeight = FontWeights.SemiBold, FontSize = 14, Margin = new Thickness(0, 8, 0, 4) });
+        panel.Children.Add(networkPanel);
 
         var scrollViewer = new ScrollViewer
         {
@@ -326,7 +307,7 @@ public partial class NoSteamViewModel : ObservableObject
 
         var dialog = new ContentDialog
         {
-            Title = "高级配置 (GBE steam_settings)",
+            Title = "高级配置 (GBE)",
             PrimaryButtonText = "应用",
             CloseButtonText = "取消",
             DefaultButton = ContentDialogButton.Primary,
@@ -339,30 +320,81 @@ public partial class NoSteamViewModel : ObservableObject
 
         if (result == ContentDialogResult.Primary)
         {
-            AdvancedAccountName = tbAccountName.Text?.Trim() ?? "";
-            AdvancedSteamId = tbSteamId.Text?.Trim() ?? "";
+            // 处理账户选择
+            var selectedAccount = cbAccount.SelectedItem?.ToString();
+            if (selectedAccount == "不指定账户")
+            {
+                AdvancedAccountName = "";
+                AdvancedSteamId = "";
+            }
+            else if (selectedAccount != null && selectedAccount.Contains("("))
+            {
+                // 从 "AccountName (PersonaName)" 格式提取
+                var accountName = selectedAccount.Split(' ')[0];
+                var matched = accounts.FirstOrDefault(a => a.AccountName == accountName);
+                if (matched.AccountName != null)
+                {
+                    AdvancedAccountName = matched.AccountName;
+                    // 从 loginusers.vdf 中查找对应的 SteamID
+                    AdvancedSteamId = FindSteamIdByAccountName(matched.AccountName, accounts);
+                }
+            }
+
             AdvancedLanguage = cbLanguage.SelectedItem?.ToString() ?? "schinese";
             AdvancedUnlockAllDlc = rbUnlockAll.IsChecked == true;
             AdvancedDlcList = tbDlcList.Text?.Trim() ?? "";
             AdvancedOfflineMode = cbOffline.IsChecked ?? false;
             AdvancedDisableNetworking = cbDisableNet.IsChecked ?? false;
-            AdvancedControllerType = cbControllerType.SelectedItem?.ToString() ?? "XBOX360";
-            AdvancedSteamDeck = cbSteamDeck.IsChecked ?? false;
-            AdvancedCustomBroadcast = tbCustomBroadcast.Text?.Trim() ?? "";
 
             SaveAdvancedConfigToConfig();
         }
     }
 
+    private string FindSteamIdByAccountName(string accountName, List<(string AccountName, string PersonaName, bool RememberPassword)> accounts)
+    {
+        // 从 loginusers.vdf 中读取 SteamID
+        try
+        {
+            var steamPath = _steamService.GetSteamPath();
+            if (string.IsNullOrEmpty(steamPath)) return "";
+
+            var vdfPath = Path.Combine(steamPath, "config", "loginusers.vdf");
+            if (!File.Exists(vdfPath)) return "";
+
+            var content = File.ReadAllText(vdfPath);
+            // 简单的 VDF 解析：查找 "AccountName" "xxx" 后的 SteamID
+            var lines = content.Split('\n');
+            string currentSteamId = "";
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var line = lines[i].Trim();
+                if (line.StartsWith("\"") && line.EndsWith("\"") && line.Count(c => c == '"') == 2)
+                {
+                    // 这可能是 SteamID 行
+                    var id = line.Trim('"');
+                    if (id.Length > 15 && id.StartsWith("7656119"))
+                    {
+                        currentSteamId = id;
+                    }
+                }
+                if (line.Contains($"\"AccountName\"") && line.Contains($"\"{accountName}\""))
+                {
+                    return currentSteamId;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "FindSteamIdByAccountName failed");
+        }
+        return "";
+    }
+
     private string? BuildDlcContent()
     {
         if (AdvancedUnlockAllDlc)
-        {
-            // 全解锁模式：写入 unlock_all = 1
-            return "unlock_all = 1\n";
-        }
+            return null;
 
-        // 白名单模式：使用用户输入的 DLC 列表
         if (string.IsNullOrWhiteSpace(AdvancedDlcList))
             return null;
 
@@ -372,14 +404,29 @@ public partial class NoSteamViewModel : ObservableObject
     [RelayCommand]
     private async Task BrowseGameExeAsync()
     {
+        if (App.MainWindow is not Window window) return;
+
+        // 选择前提示
+        var tipDialog = new ContentDialog
+        {
+            Title = "选择游戏",
+            PrimaryButtonText = "选择",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Primary,
+            XamlRoot = window.Content.XamlRoot,
+            Content = "请选择游戏的主程序 EXE 文件\n\n请确保选择的是正确的游戏启动程序"
+        };
+
+        var tipResult = await tipDialog.ShowAsync();
+        if (tipResult != ContentDialogResult.Primary) return;
+
         var picker = new Windows.Storage.Pickers.FileOpenPicker
         {
             ViewMode = Windows.Storage.Pickers.PickerViewMode.List,
             SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.ComputerFolder,
             FileTypeFilter = { ".exe" }
         };
-
-        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(window);
         WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
 
         var file = await picker.PickSingleFileAsync();
@@ -427,25 +474,6 @@ public partial class NoSteamViewModel : ObservableObject
     }
 
     [RelayCommand]
-    private async Task BrowseUEEnginePathAsync()
-    {
-        var picker = new Windows.Storage.Pickers.FolderPicker
-        {
-            SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.ComputerFolder
-        };
-
-        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-
-        var folder = await picker.PickSingleFolderAsync();
-        if (folder != null)
-        {
-            UEEnginePath = folder.Path;
-            _logger.LogInformation("Selected UE Engine path: {Path}", folder.Path);
-        }
-    }
-
-    [RelayCommand]
     private async Task BrowseWorkingDirectoryAsync()
     {
         var picker = new Windows.Storage.Pickers.FolderPicker
@@ -480,18 +508,6 @@ public partial class NoSteamViewModel : ObservableObject
             return;
         }
 
-        if (IsUEGame && string.IsNullOrWhiteSpace(UEEnginePath))
-        {
-            ProgressLog += "[ERROR] UE 游戏必须指定 Engine 路径\n";
-            return;
-        }
-
-        if (IsUEGame && !Directory.Exists(UEEnginePath))
-        {
-            ProgressLog += "[ERROR] UE Engine 路径不存在\n";
-            return;
-        }
-
         IsRunning = true;
         ProgressLog = "";
         ProgressLog += "[INFO] 开始部署...\n";
@@ -502,10 +518,7 @@ public partial class NoSteamViewModel : ObservableObject
             {
                 GameExePath = GameExePath,
                 AppId = AppId,
-                IsUEGame = IsUEGame,
-                UEEnginePath = IsUEGame ? UEEnginePath : null,
                 BackupOriginalExe = BackupOriginalExe,
-                GenerateInterfaces = GenerateInterfaces,
                 SkipSteamless = SkipSteamless,
                 SkipGBE = SkipGBE,
                 DryRun = DryRun,
@@ -521,11 +534,20 @@ public partial class NoSteamViewModel : ObservableObject
                 DlcContent = BuildDlcContent(),
                 OfflineMode = AdvancedOfflineMode,
                 DisableNetworking = AdvancedDisableNetworking,
-                ControllerType = !string.IsNullOrWhiteSpace(AdvancedControllerType) ? AdvancedControllerType.Trim() : null,
-                SpoofSteamDeck = AdvancedSteamDeck,
-                CustomBroadcasts = !string.IsNullOrWhiteSpace(AdvancedCustomBroadcast) ? AdvancedCustomBroadcast.Trim() : null,
                 UnlockAllDlc = AdvancedUnlockAllDlc
             };
+
+            // 验证配置
+            try
+            {
+                options.Validate();
+            }
+            catch (Exception ex)
+            {
+                ProgressLog += $"[ERROR] 配置验证失败: {ex.Message}\n";
+                IsRunning = false;
+                return;
+            }
 
             var result = await _noSteamService.ExecuteAsync(
                 options,
@@ -535,9 +557,9 @@ public partial class NoSteamViewModel : ObservableObject
 
             if (result.Success)
             {
-                var msg = DryRun 
-                    ? $"✅ 干跑完成！将部署 {result.GBEDeploy.DeployedFiles.Length} 个文件，耗时 {result.TotalDuration.TotalSeconds:F1}s"
-                    : $"✅ 部署成功！部署了 {result.GBEDeploy.DeployedFiles.Length} 个文件，耗时 {result.TotalDuration.TotalSeconds:F1}s";
+                var msg = DryRun
+                    ? $"干跑完成！将部署 {result.GBEDeploy.DeployedFiles.Length} 个文件，耗时 {result.TotalDuration.TotalSeconds:F1}s"
+                    : $"部署成功！部署了 {result.GBEDeploy.DeployedFiles.Length} 个文件，耗时 {result.TotalDuration.TotalSeconds:F1}s";
                 if (result.GameProcessId.HasValue)
                     msg += $"\n游戏进程 PID: {result.GameProcessId}";
                 ProgressLog += $"[SUCCESS] {msg}\n";
