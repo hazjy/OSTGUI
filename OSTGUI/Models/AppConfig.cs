@@ -18,6 +18,9 @@ public class AppConfig
     // === 入库设置 ===
     public bool DefaultAddAllDlc { get; set; } = true;
     public bool DefaultPatchManifest { get; set; } = true;
+    // 隐藏调优参数：无 UI，仅手改 config.json 生效。消费点：
+    //   ManifestDownloadService 清单文件下载 max(60, 此值)
+    //   SudamaKeyCache 缓存下载 max(120, 此值)
     public int DownloadTimeout { get; set; } = 120;
     public bool StFixedVersionDefault { get; set; } = true;
     public string StFixedManifestMode { get; set; } = "ask"; // always, never, ask
