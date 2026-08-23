@@ -1,4 +1,4 @@
-﻿using System.IO.Compression;
+using System.IO.Compression;
 using System.Text.RegularExpressions;
 using System.Text.Json;
 using OSTGUI.Models;
@@ -50,12 +50,17 @@ public class LuaBuilder
         lines.Add($"addappid({appId})");
         lines.Add("");
 
-        foreach (var (depotId, _, _) in allDepots)
+        foreach (var (depotId, manifestGid, _) in allDepots)
         {
             // OpenSteamTool 只接受恰好 64 字符的 depot key
             var hasKey = keys.TryGetValue(depotId, out var key) && key.Length == 64;
-            if (!hasKey)
+
+            // 无 manifest 的壳型 depot（纯所有权声明，如部分 DLC 占位）没有可解密的内容，
+            // 本就不需要密钥，不计入缺失警告
+            var requiresKey = !string.IsNullOrEmpty(manifestGid);
+            if (requiresKey && !hasKey)
                 missingKeyDepots.Add(depotId);
+
             lines.Add(hasKey ? $"addappid({depotId}, 1, \"{key}\")" : $"addappid({depotId})");
         }
         if (missingKeyDepots.Count > 0)

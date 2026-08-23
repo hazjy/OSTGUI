@@ -33,7 +33,7 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
 - **manifest**：某 depot 某版本的文件清单；"下哪些 depot"由 appinfo 决定，manifest 管"下哪些文件块"
 - **gid**：manifest ID，代表某次内容快照，每次更新换新；完整版本 = 全部 depot 的 gid 组合
 - **key**：AES-256 密钥 per-depot 且对所有用户相同 → 第三方密钥库可行的根本原因
-- 所有 depot 内容均 AES-256 加密；裸 `addappid(depotId)` 是碰运气的降级写法
+- 有内容清单（manifests）的 depot 内容均为 AES-256 加密，下载必须有 key；也存在**无 manifests 的纯所有权壳 depot**（常见于 DLC 占位，SteamCMD 数据中连 manifests 字段都没有），本就没有可解密内容，裸 `addappid(depotId)` 即为正确写法，不应计入"缺密钥"警告
 
 ### manifest 获取门槛（查证）
 
