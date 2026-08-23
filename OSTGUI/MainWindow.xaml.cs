@@ -431,19 +431,26 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
             return;
         }
 
+        var secondaryBrush = Application.Current.Resources["TextFillColorSecondaryBrush"] as Microsoft.UI.Xaml.Media.Brush;
+        var cardBrush = Application.Current.Resources["CardBackgroundFillColorDefaultBrush"] as Microsoft.UI.Xaml.Media.Brush;
+        var strokeBrush = Application.Current.Resources["CardStrokeColorDefaultBrush"] as Microsoft.UI.Xaml.Media.Brush;
+        var accentBrush = Application.Current.Resources["AccentFillColorDefaultBrush"] as Microsoft.UI.Xaml.Media.Brush;
+
         var panel = new StackPanel { Spacing = 8 };
         var scroll = new ScrollViewer
         {
-            MaxHeight = 320,
+            MaxHeight = 280,
             VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
             HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
             Content = panel
         };
 
-        var cardBrush = Application.Current.Resources["CardBackgroundFillColorDefaultBrush"] as Microsoft.UI.Xaml.Media.Brush;
-        var secondaryBrush = Application.Current.Resources["TextFillColorSecondaryBrush"] as Microsoft.UI.Xaml.Media.Brush;
-
+        // 账户卡片：点击仅做选中（高亮描边），不直接触发重启
+        string? selected = null;
+        var cards = new List<(Button Btn, string AccountName)>();
+        Button confirmBtn = null!;
         ContentDialog dialog = null!;
+
         foreach (var acc in accounts)
         {
             var display = string.IsNullOrEmpty(acc.PersonaName) ? acc.AccountName : acc.PersonaName;
@@ -455,7 +462,7 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
                 CornerRadius = new CornerRadius(6),
                 Background = cardBrush,
                 BorderThickness = new Thickness(1),
-                BorderBrush = Application.Current.Resources["CardStrokeColorDefaultBrush"] as Microsoft.UI.Xaml.Media.Brush,
+                BorderBrush = strokeBrush,
                 Content = new StackPanel
                 {
                     Spacing = 2,
@@ -466,20 +473,68 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
                     }
                 }
             };
+
+            var captured = btn;
             var accountName = acc.AccountName;
-            btn.Click += async (s, args) =>
+            btn.Click += (s, args) =>
             {
-                dialog.Hide();
-                await RestartToAccountAsync(accountName);
+                selected = accountName;
+                foreach (var (b, _) in cards)
+                {
+                    var isSelected = ReferenceEquals(b, captured);
+                    b.BorderBrush = isSelected ? accentBrush : strokeBrush;
+                    b.BorderThickness = new Thickness(isSelected ? 2 : 1);
+                }
+                confirmBtn.IsEnabled = true;
             };
+
+            cards.Add((captured, accountName));
             panel.Children.Add(btn);
         }
+
+        // 确认按钮：位于账户列表下方，蓝色主样式；未选中时禁用
+        confirmBtn = new Button
+        {
+            Content = "确认重启",
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            Padding = new Thickness(0, 10, 0, 10),
+            CornerRadius = new CornerRadius(6),
+            IsEnabled = false,
+        };
+        try { confirmBtn.Style = (Microsoft.UI.Xaml.Style)Application.Current.Resources["AccentButtonStyle"]; }
+        catch
+        {
+            // 主题样式查找失败时手动保证蓝色观感
+            if (Application.Current.Resources.TryGetValue("SystemAccentColor", out var accentObj) &&
+                accentObj is Windows.UI.Color accent)
+                confirmBtn.Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(accent);
+            confirmBtn.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White);
+        }
+        confirmBtn.Click += async (s, args) =>
+        {
+            if (string.IsNullOrEmpty(selected)) return;
+            var name = selected;
+            dialog.Hide();
+            await RestartToAccountAsync(name);
+        };
+
+        var hint = new TextBlock
+        {
+            Text = "选中账户后，点击下方按钮确认重启",
+            FontSize = 12,
+            Foreground = secondaryBrush,
+        };
+
+        var rootPanel = new StackPanel { Spacing = 10 };
+        rootPanel.Children.Add(hint);
+        rootPanel.Children.Add(scroll);
+        rootPanel.Children.Add(confirmBtn);
 
         dialog = new ContentDialog
         {
             XamlRoot = RootGrid.XamlRoot,
             Title = "选择要登录的账号",
-            Content = scroll,
+            Content = rootPanel,
             CloseButtonText = "取消"
         };
 
