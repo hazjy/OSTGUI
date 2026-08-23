@@ -17,6 +17,8 @@
                 <MenuFlyoutSeparator x:Name="RestartSteamSeparator" />
                 <MenuFlyoutItem Text="使用其他账号登录" Click="RestartSteamAccount_Click" />
             </MenuFlyout>
+            <!-- ContentDialog 主按钮默认非蓝色，显式派生强调样式 -->
+            <Style x:Key="AccentDialogButton" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}" />
         </Grid.Resources>
 
         <Grid.RowDefinitions>

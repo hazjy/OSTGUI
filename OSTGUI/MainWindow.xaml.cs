@@ -509,7 +509,9 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
             Content = rootPanel,
             PrimaryButtonText = "确认重启",
             CloseButtonText = "取消",
-            IsPrimaryButtonEnabled = false
+            IsPrimaryButtonEnabled = false,
+            // 主按钮默认样式非蓝色，显式套用强调色按钮样式
+            PrimaryButtonStyle = (Style)RootGrid.Resources["AccentDialogButton"]
         };
         dialog.PrimaryButtonClick += (s, args) =>
         {
