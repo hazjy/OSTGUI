@@ -448,6 +448,7 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
         // 账户卡片：点击仅做选中（高亮描边），不直接触发重启
         string? selected = null;
         var cards = new List<(Button Btn, string AccountName)>();
+        Button confirmBtn = null!;
         ContentDialog dialog = null!;
 
         foreach (var acc in accounts)
@@ -484,7 +485,14 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
                     b.BorderBrush = isSelected ? accentBrush : strokeBrush;
                     b.BorderThickness = new Thickness(isSelected ? 2 : 1);
                 }
-                dialog!.IsPrimaryButtonEnabled = true;
+                // 现场染色：与卡片高亮描边同源的强调色（AccentFillColorDefaultBrush，跟随系统主题）
+                if (accentBrush != null)
+                    confirmBtn.Background = accentBrush;
+                confirmBtn.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
+                    RootGrid.ActualTheme == ElementTheme.Dark
+                        ? Microsoft.UI.Colors.Black
+                        : Microsoft.UI.Colors.White);
+                confirmBtn.IsEnabled = true;
             };
 
             cards.Add((captured, accountName));
@@ -493,25 +501,49 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
 
         var hint = new TextBlock
         {
-            Text = "选中账户后，点击左下角“确认重启”",
+            Text = "选中账户后，点击“确认重启”",
             FontSize = 12,
             Foreground = secondaryBrush,
         };
 
+        // 底部按钮行：确认按钮此刻仍为框架默认灰色，选中账户后才现场染为主题蓝
+        confirmBtn = new Button
+        {
+            Content = "确认重启",
+            Padding = new Thickness(18, 8, 18, 8),
+            CornerRadius = new CornerRadius(6),
+            IsEnabled = false,
+        };
+        confirmBtn.Click += async (s, args) =>
+        {
+            if (string.IsNullOrEmpty(selected)) return;
+            var name = selected;
+            dialog.Hide();
+            await RestartToAccountAsync(name);
+        };
+
+        var cancelBtn = new Button
+        {
+            Content = "取消",
+            Padding = new Thickness(18, 8, 18, 8),
+            CornerRadius = new CornerRadius(6),
+        };
+        cancelBtn.Click += (s, args) => dialog.Hide();
+
+        var buttonRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 10 };
+        buttonRow.Children.Add(confirmBtn);
+        buttonRow.Children.Add(cancelBtn);
+
         var rootPanel = new StackPanel { Spacing = 10 };
         rootPanel.Children.Add(hint);
         rootPanel.Children.Add(scroll);
+        rootPanel.Children.Add(buttonRow);
 
         dialog = new ContentDialog
         {
             XamlRoot = RootGrid.XamlRoot,
             Title = "选择要登录的账号",
-            Content = rootPanel,
-            PrimaryButtonText = "确认重启",
-            CloseButtonText = "取消",
-            IsPrimaryButtonEnabled = false,
-            // 主按钮默认样式非蓝色，显式套用强调色按钮样式
-            PrimaryButtonStyle = (Style)RootGrid.Resources["AccentDialogButton"]
+            Content = rootPanel
         };
         dialog.PrimaryButtonClick += (s, args) =>
         {
