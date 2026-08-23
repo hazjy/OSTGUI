@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Net.Http.Json;
 using System.Text.RegularExpressions;
 using System.Text.Json;
 using OSTGUI.Models;
@@ -73,7 +74,7 @@ public class ManifestDownloadService
             if (!branchResponse.IsSuccessStatusCode)
                 return (false, $"GitHub API 错误: {(int)branchResponse.StatusCode}", new List<string>());
 
-            var branchData = await branchResponse.Content.ReadAsStringJsonAsync();
+            var branchData = await branchResponse.Content.ReadFromJsonAsync<JsonElement>();
             var commitSha = branchData.GetProperty("commit").GetProperty("sha").GetString()!;
             Log($"获取到 commit SHA: {commitSha}");
 
@@ -86,7 +87,7 @@ public class ManifestDownloadService
             if (!treeResponse.IsSuccessStatusCode)
                 return (false, "无法获取文件树", new List<string>());
 
-            var treeData = await treeResponse.Content.ReadAsStringJsonAsync();
+            var treeData = await treeResponse.Content.ReadFromJsonAsync<JsonElement>();
             var files = treeData.GetProperty("tree").EnumerateArray()
                 .Where(f => f.GetProperty("type").GetString() == "blob")
                 .ToList();

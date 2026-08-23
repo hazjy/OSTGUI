@@ -143,7 +143,7 @@ public sealed class NoSteamLauncherService : IDisposable
     /// <summary>
     /// 用解压出的资源目录构造编排器实例。
     /// </summary>
-    private INoSteamLauncherService CreateOrchestrator(string resourcesDir, string pluginsDir,
+    private NoSteamLaunchOrchestrator CreateOrchestrator(string resourcesDir, string pluginsDir,
         ILogger<NoSteamLaunchOrchestrator> orchestratorLogger,
         ILogger<SteamlessService> steamlessLogger,
         ILogger<GBEDeploymentService> gbeLogger)

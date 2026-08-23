@@ -245,12 +245,12 @@ item.DlcList = dlcInfo;
         if (SelectedItems.Count > 1)
         {
             var ids = string.Join("\n", SelectedItems.Select(i => i.AppId));
-            await CopyToClipboardAsync(ids);
+            CopyToClipboard(ids);
             SetStatus($"已复制 {SelectedItems.Count} 个 AppID 到剪贴板", "Success");
         }
         else
         {
-            await CopyToClipboardAsync(item.AppId);
+            CopyToClipboard(item.AppId);
             SetStatus($"已复制 AppID {item.AppId} 到剪贴板", "Success");
         }
     }
@@ -388,13 +388,12 @@ item.DlcList = dlcInfo;
             i.AppId.Contains(filter, StringComparison.OrdinalIgnoreCase)).ToList();
     }
 
-    private static async Task CopyToClipboardAsync(string text)
+    private static void CopyToClipboard(string text)
     {
         // WinUI 3 clipboard
         var dataPackage = new Windows.ApplicationModel.DataTransfer.DataPackage();
         dataPackage.SetText(text);
         Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
-        await Task.CompletedTask;
     }
 
     private void SetStatus(string message, string type)

@@ -12,7 +12,7 @@ namespace OSTGUI.ViewModels;
 public partial class SearchViewModel : ObservableObject
 {
     private readonly GameSearchService _searchService;
-    private readonly ManifestService _manifestService;
+    private readonly ManifestDownloadService _manifestService;
     private readonly SteamService _steamService;
     private readonly ConfigService _configService;
     private bool _isLoadingOptions;
@@ -47,7 +47,7 @@ public partial class SearchViewModel : ObservableObject
 
     public SearchViewModel(
         GameSearchService searchService,
-        ManifestService manifestService,
+        ManifestDownloadService manifestService,
         SteamService steamService,
         ConfigService configService)
     {

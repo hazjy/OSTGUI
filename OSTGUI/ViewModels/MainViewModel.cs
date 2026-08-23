@@ -16,7 +16,7 @@ public partial class MainViewModel : ObservableObject
     private readonly SteamDllService _steamDllService;
     public GameSearchService SearchService { get; }
     public LuaConfigService LuaService { get; }
-    public ManifestService ManifestService { get; }
+    public ManifestDownloadService ManifestService { get; }
     public TicketService TicketService { get; }
 
     [ObservableProperty] private string _statusMessage = "就绪";
@@ -83,7 +83,7 @@ public partial class MainViewModel : ObservableObject
         GameNameCacheService gameNameCacheService,
         OnlineFixService onlineFixService,
         LuaConfigService luaService,
-        ManifestService manifestService,
+        ManifestDownloadService manifestService,
         TicketService ticketService,
         OstFileService ostFileService,
         SteamGameInfoService steamGameInfoService,
@@ -96,8 +96,7 @@ public partial class MainViewModel : ObservableObject
         SearchService = searchService;
         LuaService = luaService;
         ManifestService = manifestService;
-        TicketService = ticketService;
-        _steamDllService = steamDllService;
+        TicketService = ticketService;        _steamDllService = steamDllService;
 
         // 初始化子 ViewModel
         SearchVM = new SearchViewModel(searchService, manifestService, steamService, configService);

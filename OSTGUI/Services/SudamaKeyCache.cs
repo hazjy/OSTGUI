@@ -10,15 +10,13 @@ namespace OSTGUI.Services;
 /// </summary>
 public class SudamaKeyCache
 {
-    private readonly HttpClient _http;
     private readonly ConfigService _configService;
 
     private const string SudamaApiUrl = "https://api.993499094.xyz/depotkeys.json";
     private const string SudamaTokensUrl = "https://api.993499094.xyz/appaccesstokens.json";
 
-    public SudamaKeyCache(HttpClient http, ConfigService configService)
+    public SudamaKeyCache(ConfigService configService)
     {
-        _http = http;
         _configService = configService;
     }
 

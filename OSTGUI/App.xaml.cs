@@ -72,7 +72,6 @@ public partial class App : Application
         services.AddSingleton<LuaBuilder>();
         services.AddSingleton<ManifestFileService>();
         services.AddSingleton<ManifestDownloadService>();
-        services.AddSingleton<ManifestService>();
         services.AddSingleton<TicketService>();
         services.AddSingleton<OstFileService>();
         services.AddSingleton<SteamTicketExtractor>();
@@ -80,12 +79,7 @@ public partial class App : Application
         services.AddSingleton<NoSteamLauncherService>();
         services.AddSingleton<SteamlessService>();
         services.AddSingleton<GBEDeploymentService>();
-        services.AddSingleton<INoSteamLauncherService, NoSteamLaunchOrchestrator>();
-        services.AddSingleton<ILogger<NoSteamLauncherService>>(sp => sp.GetRequiredService<ILoggerFactory>().CreateLogger<NoSteamLauncherService>());
-        services.AddSingleton<ILogger<NoSteamLaunchOrchestrator>>(sp => sp.GetRequiredService<ILoggerFactory>().CreateLogger<NoSteamLaunchOrchestrator>());
-        services.AddSingleton<ILogger<SteamlessService>>(sp => sp.GetRequiredService<ILoggerFactory>().CreateLogger<SteamlessService>());
-        services.AddSingleton<ILogger<GBEDeploymentService>>(sp => sp.GetRequiredService<ILoggerFactory>().CreateLogger<GBEDeploymentService>());
-        services.AddSingleton<ILogger<NoSteamViewModel>>(sp => sp.GetRequiredService<ILoggerFactory>().CreateLogger<NoSteamViewModel>());
+        services.AddSingleton<NoSteamLaunchOrchestrator>();
         services.AddSingleton<MainViewModel>();
         services.AddTransient<SearchViewModel>();
         services.AddTransient<LibraryViewModel>();

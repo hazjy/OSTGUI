@@ -8,7 +8,7 @@ namespace NoSteamLauncher.Services;
 /// <summary>
     /// NoSteamLauncher 编排器，实现核心服务接口。
     /// </summary>
-    public sealed class NoSteamLaunchOrchestrator : INoSteamLauncherService
+    public sealed class NoSteamLaunchOrchestrator
     {
         private readonly SteamlessService _steamless;
         private readonly GBEDeploymentService _gbeDeploy;

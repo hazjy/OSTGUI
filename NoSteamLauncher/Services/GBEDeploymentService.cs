@@ -64,10 +64,6 @@ public sealed class GBEDeploymentService
         string[]? dlcList = null,
         CancellationToken ct = default)
     {
-        // 确保有真正的异步操作，避免 Stopwatch 计时为 0 秒
-        // Stopwatch 精度约 10-15ms，需要足够延迟才能正确计时
-        await Task.Delay(10, ct);
-
         var deployedFiles = new List<string>();
         var gameDir = Path.GetDirectoryName(gameExePath)!;
 
@@ -149,13 +145,13 @@ public sealed class GBEDeploymentService
             // 3a. 部署 steam_api.dll (x86) - 仅在包含 x86 DLL 的目录中部署
             foreach (var dllDir in x86DllLocations)
             {
-                await DeploySingleDll(dllDir, "steam_api.dll", templateX86, deployedFiles);
+                DeploySingleDll(dllDir, "steam_api.dll", templateX86, deployedFiles);
             }
 
             // 3b. 部署 steam_api64.dll (x64) - 仅在包含 x64 DLL 的目录中部署
             foreach (var dllDir in x64DllLocations)
             {
-                await DeploySingleDll(dllDir, "steam_api64.dll", templateX64, deployedFiles);
+                DeploySingleDll(dllDir, "steam_api64.dll", templateX64, deployedFiles);
             }
 
             // 3c. 部署 steam_settings/ - 对每个包含 DLL 的目录
@@ -324,7 +320,7 @@ public sealed class GBEDeploymentService
     /// <summary>
     /// 部署单个 DLL（对齐 SAC Applyx86/Applyx64 逻辑）
     /// </summary>
-    private async Task DeploySingleDll(string dllDir, string dllName, string templateDll, List<string> deployedFiles)
+    private void DeploySingleDll(string dllDir, string dllName, string templateDll, List<string> deployedFiles)
     {
         var destDll = Path.Combine(dllDir, dllName);
         var bakDll = Path.ChangeExtension(destDll, ".dll.bak");
@@ -365,8 +361,6 @@ public sealed class GBEDeploymentService
             deployedFiles.Add(destDll);
             _logger.LogInformation("Deployed {Dll}", dllName);
         }
-
-        await Task.CompletedTask;
     }
 
     /// <summary>

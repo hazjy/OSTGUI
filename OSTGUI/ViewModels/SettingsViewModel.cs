@@ -293,17 +293,6 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 手动选择 Steam 目录
-    /// </summary>
-    [RelayCommand]
-    private async Task BrowseSteamPathAsync()
-    {
-        // WinUI3 FolderPicker 需要在 UI 线程上调用
-        // 这里由 View code-behind 处理，此处提供占位
-        await Task.CompletedTask;
-    }
-
-    /// <summary>
     /// 保存所有设置
     /// </summary>
     public void SaveAllToConfig()
@@ -390,15 +379,6 @@ public partial class SettingsViewModel : ObservableObject
         IsOstInjected = _steamDllService.IsOSTDllInjected();
         OstStatusText = IsOstInjected ? "已注入" : "未注入";
         OstStatusType = IsOstInjected ? "Success" : "Warning";
-    }
-
-    /// <summary>
-    /// 手动选择 OST DLL 源目录
-    /// </summary>
-    [RelayCommand]
-    private async Task BrowseOstSourceAsync()
-    {
-        await Task.CompletedTask; // View code-behind 处理
     }
 
     /// <summary>
