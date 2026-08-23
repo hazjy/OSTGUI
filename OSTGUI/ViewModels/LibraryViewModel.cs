@@ -31,7 +31,6 @@ public partial class LibraryViewModel : ObservableObject
 
 [ObservableProperty] private string _statusMessage = "准备加载库...";
     [ObservableProperty] private string _statusType = "Info";
-    [ObservableProperty] private string _sortMode = "default"; // default, az, za
     [ObservableProperty] private string _searchFilter = "";
     [ObservableProperty] private int _totalCount;
     [ObservableProperty] private int _fixedCount;
@@ -128,16 +127,6 @@ public partial class LibraryViewModel : ObservableObject
 item.DlcList = dlcInfo;
         }
         catch { }
-    }
-
-    /// <summary>
-    /// 切换排序模式
-    /// </summary>
-    [RelayCommand]
-    private void ChangeSortMode(string mode)
-    {
-        SortMode = mode;
-        RefreshView();
     }
 
     /// <summary>
@@ -373,16 +362,12 @@ item.DlcList = dlcInfo;
 
     private List<LibraryItem> ApplySort(List<LibraryItem> items)
     {
-        return SortMode switch
+        // 默认排序：AppID 倒序（最新入库在前）
+        return items.OrderByDescending(i =>
         {
-            "az" => items.OrderBy(i => i.GameName).ToList(),
-            "za" => items.OrderByDescending(i => i.GameName).ToList(),
-            _ => items.OrderByDescending(i =>
-            {
-                if (int.TryParse(i.AppId, out var id)) return id;
-                return 0;
-            }).ToList(), // default: 按 appid 倒序
-        };
+            if (int.TryParse(i.AppId, out var id)) return id;
+            return 0;
+        }).ToList();
     }
 
     private List<LibraryItem> ApplyFilter(List<LibraryItem> items)
