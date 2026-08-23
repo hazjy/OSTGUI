@@ -59,7 +59,7 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
 
 ## 5. 搜索与入库链路
 
-- 搜索按 AppID 走官方 `appdetails?appids={id}&l=schinese&cc=us`；按名称不带 cc 会按 IP 判 cn 区过滤成人内容 → **搜不到黄油**，界面提示用 AppID；能搜到 ≠ 能入库（还需密钥存在）
+- 搜索全部走 `cc=us`（AppID 详情、storesearch 主源、HTML 备源、关键词源均已统一），成人内容不再被 cn 区过滤，名称搜索可直接命中；能搜到 ≠ 能入库（还需密钥存在）
 - 清单源与密钥源分离：MHub = 清单源（仅最新版），Sudama = 仅密钥源；SteamAutoCracks/ManifestHub 的分支式 GitHub 源已失效（404），GitHub(Auiowu) 分支源仍实现着
 - 入库勾选"下载 Manifest"（默认开）：MHub → GitHub → Sudama(仅密钥) 级联；不勾则跳过清单直接生成 Lua，由内核运行时兜底取清单，成功提示注明兜底
 - `LuaBuilder`：Sudama 密钥/令牌 → `MergeAllDepotsAsync` 用全量 depot 列表补全（防止只写有 manifest 的 depot 漏密钥）→ 缺密钥收集并通知

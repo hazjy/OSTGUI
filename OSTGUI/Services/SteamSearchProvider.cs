@@ -95,7 +95,7 @@ public class SteamSearchProvider
         try
         {
             var encodedQuery = Uri.EscapeDataString(query);
-            var url = $"{SteamStoreSearchApi}?term={encodedQuery}&l=schinese&cc=cn";
+            var url = $"{SteamStoreSearchApi}?term={encodedQuery}&l=schinese&cc=us";
             var response = await _http.GetAsync(url);
             if (!response.IsSuccessStatusCode)
                 return results;
@@ -154,7 +154,7 @@ public class SteamSearchProvider
         try
         {
             var encodedQuery = Uri.EscapeDataString(query);
-            var url = $"{SteamSearchWeb}?term={encodedQuery}&l=schinese&cc=cn&ndl=1";
+            var url = $"{SteamSearchWeb}?term={encodedQuery}&l=schinese&cc=us&ndl=1";
             // 商店搜索页体积较大，单独限制超时，避免拖慢整体搜索
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
             var response = await _http.GetAsync(url, cts.Token);
