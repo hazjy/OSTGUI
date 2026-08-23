@@ -108,6 +108,7 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
 - 输入框失焦方案（PointerPressed/Tapped/handledEventsToo/页面级）全部无效，已回退——别再浪费时间
 - 浅色主题下按钮图标/文字需适配 `TextFillColorPrimaryBrush` 等 ThemeResource
 - ⚠️ 强调色的主题陷阱：`SystemAccentColor` 基础色**不随应用深浅主题翻转**；深色模式下需要"提亮版强调填充"的场景应使用 `AccentFillColorDefaultBrush` 等画刷（自动按主题选择正确变体），手写浅色主题的色值在深色模式下会显得突兀
+- **ContentDialog 恒为深色是刻意行为**：弹窗位于弹出层，不继承应用 `RequestedTheme`，浅色模式下也渲染成深色。曾尝试显式同步主题，但 WinUI 浅色弹窗对比度差、观感不佳，遂回退保留深色——勿当 bug 修复
 - **构建**：只能用 VS MSBuild（`dotnet build/publish` 缺 PRI 任务必挂）；首次 Release 自包含发布需先带 RID Restore（运行时包要从源下载，直连 nuget.org 失败时可切国内镜像）；旧实例不关会 MSB3021 锁 exe
 - 版本号只在 csproj 维护三处（Version/AssemblyVersion/FileVersion），运行时从程序集读取
 

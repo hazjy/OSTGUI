@@ -543,10 +543,10 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
         {
             XamlRoot = RootGrid.XamlRoot,
             Title = "选择要登录的账号",
-            Content = rootPanel,
-            // ContentDialog 位于弹出层，不会继承 RootGrid 的 RequestedTheme，
-            // 需显式同步，否则应用切浅色时弹窗仍按默认主题渲染成深色
-            RequestedTheme = RootGrid.ActualTheme
+            Content = rootPanel
+            // 注意：此处刻意不设置 RequestedTheme。
+            // ContentDialog 在弹出层不继承应用主题，浅色模式下会渲染为深色——
+            // 这是刻意保留的效果（WinUI 浅色弹窗对比度差、观感不佳），勿当 bug 修复
         };
         dialog.PrimaryButtonClick += (s, args) =>
         {
