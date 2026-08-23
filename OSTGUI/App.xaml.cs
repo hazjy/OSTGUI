@@ -64,7 +64,6 @@ public partial class App : Application
         services.AddSingleton<GameNameCacheService>();
         services.AddSingleton<SteamSearchProvider>();
         services.AddSingleton<GameSearchService>();
-        services.AddSingleton<GameInfoService>();
         services.AddSingleton<LibraryScanner>();
         services.AddSingleton<LuaConfigService>();
         services.AddSingleton<SudamaKeyCache>();

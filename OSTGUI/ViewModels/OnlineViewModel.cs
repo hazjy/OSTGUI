@@ -9,7 +9,7 @@ namespace OSTGUI.ViewModels;
 public partial class OnlineViewModel : ObservableObject
 {
     private readonly OnlineFixService _onlineFixService;
-    private readonly GameInfoService _gameInfoService;
+    private readonly SteamGameInfoService _gameInfoService;
     private readonly GameNameCacheService _nameCache;
 
     [ObservableProperty] private string _onlineAppId = "";
@@ -27,7 +27,7 @@ public partial class OnlineViewModel : ObservableObject
 
     public OnlineViewModel(
         OnlineFixService onlineFixService,
-        GameInfoService gameInfoService,
+        SteamGameInfoService gameInfoService,
         GameNameCacheService nameCache)
     {
         _onlineFixService = onlineFixService;
@@ -55,7 +55,7 @@ public partial class OnlineViewModel : ObservableObject
 
         try
         {
-            var info = await _gameInfoService.GetGameDetailsAsync(appId);
+            var info = await _gameInfoService.GetGameDetailsFromSteamAsync(appId);
             if (info != null && !string.IsNullOrEmpty(info.Name))
             {
                 GameName = info.Name;

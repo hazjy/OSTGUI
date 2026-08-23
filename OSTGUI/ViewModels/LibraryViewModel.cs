@@ -14,7 +14,7 @@ public partial class LibraryViewModel : ObservableObject
 {
     private readonly LuaConfigService _luaService;
     private readonly GameSearchService _searchService;
-    private readonly GameInfoService _gameInfoService;
+    private readonly SteamGameInfoService _gameInfoService;
     private readonly SteamService _steamService;
     private readonly ConfigService _configService;
 
@@ -39,7 +39,7 @@ public partial class LibraryViewModel : ObservableObject
     public LibraryViewModel(
         LuaConfigService luaService,
         GameSearchService searchService,
-        GameInfoService gameInfoService,
+        SteamGameInfoService gameInfoService,
         SteamService steamService,
         ConfigService configService)
     {
@@ -201,7 +201,7 @@ item.DlcList = dlcInfo;
 
         try
         {
-            var gameDetails = await _gameInfoService.GetGameDetailsAsync(item.AppId);
+            var gameDetails = await _gameInfoService.GetGameDetailsFromSteamAsync(item.AppId);
             if (gameDetails == null || gameDetails.Depots.Count == 0)
             {
                 SetStatus("获取 depot 信息失败", "Error");

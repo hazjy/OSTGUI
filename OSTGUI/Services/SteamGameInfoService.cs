@@ -1,19 +1,22 @@
-﻿using System.IO.Compression;
+using System.IO.Compression;
 using System.Text.RegularExpressions;
 using System.Text.Json;
 using OSTGUI.Models;
 
 namespace OSTGUI.Services;
 /// <summary>
-/// Steam 游戏信息服务 - 从 SteamCMD / Steam 官方 Store API 获取游戏 depot、manifest gid 与 DLC 列表
+/// 统一的游戏信息查询服务 - depot / manifest gid / DLC 列表与名称
+/// 数据源：SteamCMD API 优先，官方 Store API 回退
 /// </summary>
 public class SteamGameInfoService
 {
     private readonly HttpClient _http;
+    private readonly GameSearchService _searchService;
 
-    public SteamGameInfoService(HttpClient http)
+    public SteamGameInfoService(HttpClient http, GameSearchService searchService)
     {
         _http = http;
+        _searchService = searchService;
     }
 
     private void Log(string message)
@@ -65,6 +68,9 @@ public class SteamGameInfoService
                 var depotData = prop.Value;
                 var depot = new DepotInfo { DepotId = prop.Name };
 
+                if (depotData.TryGetProperty("name", out var depotName))
+                    depot.Name = depotName.GetString() ?? "";
+
                 if (depotData.TryGetProperty("manifests", out var manifestsObj) &&
                     manifestsObj.TryGetProperty("public", out var publicManifest))
                 {
@@ -83,6 +89,10 @@ public class SteamGameInfoService
 
                 if (depotData.TryGetProperty("dlcappid", out var dlcElem))
                     depot.DlcAppId = dlcElem.GetString() ?? "";
+
+                if (depotData.TryGetProperty("encrypted", out var encryptedObj) &&
+                    encryptedObj.TryGetProperty("key", out var keyElem))
+                    depot.DecryptionKey = keyElem.GetString() ?? "";
 
                 game.Depots[prop.Name] = depot;
                 depotCount++;
@@ -279,8 +289,30 @@ public class SteamGameInfoService
     }
 
     /// <summary>
-    /// 写入 Lua 配置文件
+    /// 获取 DLC 列表（含名称；名称批量查询走 GameSearchService 缓存）
     /// </summary>
+    public async Task<List<DlcInfo>> GetDlcInfoAsync(string appId)
+    {
+        var result = new List<DlcInfo>();
+        try
+        {
+            var ids = await GetDlcIdsAsync(appId);
+            if (ids.Count == 0) return result;
 
-
+            var names = await _searchService.GetGameNamesBatchAsync(ids);
+            foreach (var id in ids)
+            {
+                result.Add(new DlcInfo
+                {
+                    AppId = id,
+                    Name = names.TryGetValue(id, out var n) && !string.IsNullOrEmpty(n) ? n : $"DLC {id}"
+                });
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"GetDlcInfoAsync 异常: {ex.Message}");
+        }
+        return result;
+    }
 }

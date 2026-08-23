@@ -79,7 +79,7 @@ public partial class MainViewModel : ObservableObject
         ConfigService configService,
         SteamService steamService,
         GameSearchService searchService,
-        GameInfoService gameInfoService,
+        SteamGameInfoService gameInfoService,
         GameNameCacheService gameNameCacheService,
         OnlineFixService onlineFixService,
         LuaConfigService luaService,
