@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OSTGUI.ViewModels;
@@ -32,21 +32,6 @@ public partial class App : Application
             Log($"AppDomain UnhandledException: {e.ExceptionObject}");
         };
 
-        var services = new ServiceCollection();
-        var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-        httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-        services.AddSingleton(httpClient);
-        services.AddLogging(b => b.AddDebug().SetMinimumLevel(LogLevel.Information));
-
-        // Explicitly register required ILogger<T> for NoSteamLauncher
-        services.AddSingleton<ILogger<NoSteamLauncherService>>(sp => sp.GetRequiredService<ILoggerFactory>().CreateLogger<NoSteamLauncherService>());
-        services.AddSingleton<ILogger<NoSteamLaunchOrchestrator>>(sp => sp.GetRequiredService<ILoggerFactory>().CreateLogger<NoSteamLaunchOrchestrator>());
-        services.AddSingleton<ILogger<SteamlessService>>(sp => sp.GetRequiredService<ILoggerFactory>().CreateLogger<SteamlessService>());
-        services.AddSingleton<ILogger<GBEDeploymentService>>(sp => sp.GetRequiredService<ILoggerFactory>().CreateLogger<GBEDeploymentService>());
-        services.AddSingleton<ILogger<NoSteamViewModel>>(sp => sp.GetRequiredService<ILoggerFactory>().CreateLogger<NoSteamViewModel>());
-
-        services.AddSingleton<ConfigService>();
-
         // 初始化日志文件（本地数据目录）
         LogService.Initialize(Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -68,51 +53,48 @@ public partial class App : Application
 
         // 先完整读取配置文件，再创建窗口，
         // 避免窗口先以默认状态显示、随后又被配置恢复导致闪烁
-        if (Services == null)
-            {
-                Log("ERROR: Services is null, attempting to rebuild...");
-                var services = new ServiceCollection();
-                var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-                httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
-                services.AddSingleton(httpClient);
-                services.AddLogging(b => b.AddDebug().SetMinimumLevel(LogLevel.Information));
-                services.AddSingleton<ConfigService>();
-                services.AddSingleton<SteamService>();
-                services.AddSingleton<SteamDllService>();
-                services.AddSingleton<GameNameCacheService>();
-                services.AddSingleton<SteamSearchProvider>();
-                services.AddSingleton<GameSearchService>();
-                services.AddSingleton<GameInfoService>();
-                services.AddSingleton<LibraryScanner>();
-                services.AddSingleton<LuaConfigService>();
-                services.AddSingleton<SudamaKeyCache>();
-                services.AddSingleton<SteamGameInfoService>();
-                services.AddSingleton<LuaBuilder>();
-                services.AddSingleton<ManifestFileService>();
-                services.AddSingleton<ManifestDownloadService>();
-                services.AddSingleton<ManifestService>();
-                services.AddSingleton<TicketService>();
-                services.AddSingleton<OstFileService>();
-                services.AddSingleton<SteamTicketExtractor>();
-                services.AddSingleton<OnlineFixService>();
-                services.AddSingleton<NoSteamLauncherService>();
-                services.AddSingleton<SteamlessService>();
-                services.AddSingleton<GBEDeploymentService>();
-                services.AddSingleton<INoSteamLauncherService, NoSteamLaunchOrchestrator>();
-                services.AddSingleton<ILogger<NoSteamLauncherService>>(sp => sp.GetRequiredService<ILoggerFactory>().CreateLogger<NoSteamLauncherService>());
-                services.AddSingleton<ILogger<NoSteamLaunchOrchestrator>>(sp => sp.GetRequiredService<ILoggerFactory>().CreateLogger<NoSteamLaunchOrchestrator>());
-                services.AddSingleton<ILogger<SteamlessService>>(sp => sp.GetRequiredService<ILoggerFactory>().CreateLogger<SteamlessService>());
-                services.AddSingleton<ILogger<GBEDeploymentService>>(sp => sp.GetRequiredService<ILoggerFactory>().CreateLogger<GBEDeploymentService>());
-                services.AddSingleton<ILogger<NoSteamViewModel>>(sp => sp.GetRequiredService<ILoggerFactory>().CreateLogger<NoSteamViewModel>());
-                services.AddSingleton<MainViewModel>();
-                services.AddTransient<SearchViewModel>();
-                services.AddTransient<LibraryViewModel>();
-                services.AddTransient<DenuvoViewModel>();
-                services.AddTransient<NoSteamViewModel>();
-                services.AddTransient<SettingsViewModel>();
-                Services = services.BuildServiceProvider();
-            }
-            var configService = Services.GetRequiredService<ConfigService>();
+        var services = new ServiceCollection();
+        var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+        httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36");
+        services.AddSingleton(httpClient);
+        services.AddLogging(b => b.AddDebug().SetMinimumLevel(LogLevel.Information));
+        services.AddSingleton<ConfigService>();
+        services.AddSingleton<SteamService>();
+        services.AddSingleton<SteamDllService>();
+        services.AddSingleton<GameNameCacheService>();
+        services.AddSingleton<SteamSearchProvider>();
+        services.AddSingleton<GameSearchService>();
+        services.AddSingleton<GameInfoService>();
+        services.AddSingleton<LibraryScanner>();
+        services.AddSingleton<LuaConfigService>();
+        services.AddSingleton<SudamaKeyCache>();
+        services.AddSingleton<SteamGameInfoService>();
+        services.AddSingleton<LuaBuilder>();
+        services.AddSingleton<ManifestFileService>();
+        services.AddSingleton<ManifestDownloadService>();
+        services.AddSingleton<ManifestService>();
+        services.AddSingleton<TicketService>();
+        services.AddSingleton<OstFileService>();
+        services.AddSingleton<SteamTicketExtractor>();
+        services.AddSingleton<OnlineFixService>();
+        services.AddSingleton<NoSteamLauncherService>();
+        services.AddSingleton<SteamlessService>();
+        services.AddSingleton<GBEDeploymentService>();
+        services.AddSingleton<INoSteamLauncherService, NoSteamLaunchOrchestrator>();
+        services.AddSingleton<ILogger<NoSteamLauncherService>>(sp => sp.GetRequiredService<ILoggerFactory>().CreateLogger<NoSteamLauncherService>());
+        services.AddSingleton<ILogger<NoSteamLaunchOrchestrator>>(sp => sp.GetRequiredService<ILoggerFactory>().CreateLogger<NoSteamLaunchOrchestrator>());
+        services.AddSingleton<ILogger<SteamlessService>>(sp => sp.GetRequiredService<ILoggerFactory>().CreateLogger<SteamlessService>());
+        services.AddSingleton<ILogger<GBEDeploymentService>>(sp => sp.GetRequiredService<ILoggerFactory>().CreateLogger<GBEDeploymentService>());
+        services.AddSingleton<ILogger<NoSteamViewModel>>(sp => sp.GetRequiredService<ILoggerFactory>().CreateLogger<NoSteamViewModel>());
+        services.AddSingleton<MainViewModel>();
+        services.AddTransient<SearchViewModel>();
+        services.AddTransient<LibraryViewModel>();
+        services.AddTransient<DenuvoViewModel>();
+        services.AddTransient<NoSteamViewModel>();
+        services.AddTransient<SettingsViewModel>();
+        Services = services.BuildServiceProvider();
+
+        var configService = Services.GetRequiredService<ConfigService>();
         await configService.LoadAsync();
         Log("Config loaded");
         LogService.SetMaxLines(configService.Config.LogMaxLines);

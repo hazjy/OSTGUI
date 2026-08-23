@@ -1,4 +1,3 @@
-﻿using System.Collections.ObjectModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using OSTGUI.Models;
@@ -13,7 +12,6 @@ namespace OSTGUI.Pages;
 public sealed partial class SettingsPage : Page
 {
     public SettingsViewModel VM { get; }
-    public ObservableCollection<string> Logs => LogService.Logs;
 
     public SettingsPage(SettingsViewModel vm)
     {
@@ -22,6 +20,38 @@ public sealed partial class SettingsPage : Page
         this.DataContext = VM;
 
         VM.ThemeChanged += OnThemeChanged;
+
+        // 监听日志变更，自动更新 LogsText 并滚动到底部。
+        // 必须全面防御：LogService.AddLog 可能来自任意线程（经 DispatcherQueue 封送），
+        // 本处理器抛出的异常会反向炸进日志调用方，掩盖真实错误
+        LogService.Logs.CollectionChanged += OnLogsChanged;
+    }
+
+    private void OnLogsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        try
+        {
+            VM.LogsText = string.Join("\n", LogService.Logs);
+        }
+        catch { }
+
+        try
+        {
+            var dq = DispatcherQueue;
+            if (dq == null) return;
+            _ = dq.TryEnqueue(() =>
+            {
+                try
+                {
+                    if (LogsTextBox != null && LogsTextBox.Text != null)
+                    {
+                        LogsTextBox.Select(LogsTextBox.Text.Length, 0);
+                    }
+                }
+                catch { }
+            });
+        }
+        catch { }
     }
 
     private void OnThemeChanged(object? sender, EventArgs e)
@@ -73,14 +103,13 @@ public sealed partial class SettingsPage : Page
 
     private void CopyLogs_Click(object sender, RoutedEventArgs e)
     {
-        if (LogService.Logs.Count == 0) return;
+        if (string.IsNullOrEmpty(LogsTextBox.Text)) return;
 
-        var text = string.Join("\n", LogService.Logs);
         var dataPackage = new DataPackage();
-        dataPackage.SetText(text);
+        dataPackage.SetText(LogsTextBox.Text);
         Clipboard.SetContent(dataPackage);
 
-        LogService.AddLog($"已复制 {LogService.Logs.Count} 条日志到剪贴板");
+        LogService.AddLog($"已复制日志到剪贴板");
     }
 
     private void OpenLogFile_Click(object sender, RoutedEventArgs e)
@@ -126,5 +155,33 @@ public sealed partial class SettingsPage : Page
     private void RefreshSudamaCache_Click(object sender, RoutedEventArgs e)
     {
         VM.RefreshSudamaCacheCommand.Execute(null);
+    }
+
+    private async void ImportSudamaCache_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var picker = new Windows.Storage.Pickers.FileOpenPicker
+            {
+                ViewMode = Windows.Storage.Pickers.PickerViewMode.List,
+                SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.ComputerFolder
+            };
+            picker.FileTypeFilter.Add(".json");
+
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
+            WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+
+            var files = await picker.PickMultipleFilesAsync();
+            if (files.Count == 0) return;
+
+            var paths = new List<string>();
+            foreach (var f in files) paths.Add(f.Path);
+
+            await VM.ImportSudamaCacheAsync(paths);
+        }
+        catch (Exception ex)
+        {
+            System.Diagnostics.Debug.WriteLine("ImportSudamaCache error: " + ex.Message);
+        }
     }
 }

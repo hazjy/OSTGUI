@@ -22,3 +22,7 @@ NoSteam.md
 plan1.md
 plan2.md
 plan3.md
+
+# 根级文档除 README 外暂不追踪（后续可能改写）
+/*.md
+!/README.md

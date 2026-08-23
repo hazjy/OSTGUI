@@ -34,9 +34,6 @@ public partial class NoSteamViewModel : ObservableObject
     [ObservableProperty] private bool _skipGBE;
     [ObservableProperty] private bool _dryRun;
     [ObservableProperty] private int _steamlessTimeoutMinutes = 5;
-    [ObservableProperty] private int _verifyLaunchTimeoutSeconds = 5;
-    [ObservableProperty] private string _launchArgs = "";
-    [ObservableProperty] private string _workingDirectory = "";
     [ObservableProperty] private string _progressLog = "";
     [ObservableProperty] private bool _isRunning;
 
@@ -48,6 +45,7 @@ public partial class NoSteamViewModel : ObservableObject
     [ObservableProperty] private string _advancedDlcList = "";
     [ObservableProperty] private bool _advancedOfflineMode;
     [ObservableProperty] private bool _advancedDisableNetworking;
+    [ObservableProperty] private bool _advancedBypassSteamApiCheck;
 
     public NoSteamViewModel(
         NoSteamLauncherService noSteamService,
@@ -81,9 +79,6 @@ public partial class NoSteamViewModel : ObservableObject
             SkipGBE = c.SkipGBEDefault;
             DryRun = c.DryRunDefault;
             SteamlessTimeoutMinutes = c.SteamlessTimeoutMinutesDefault;
-            VerifyLaunchTimeoutSeconds = c.VerifyLaunchTimeoutSecondsDefault;
-            LaunchArgs = c.LaunchArgsDefault;
-            WorkingDirectory = c.WorkingDirectoryDefault;
 
             AdvancedAccountName = c.AdvancedAccountName;
             AdvancedSteamId = c.AdvancedSteamId;
@@ -92,6 +87,7 @@ public partial class NoSteamViewModel : ObservableObject
             AdvancedDlcList = c.AdvancedDlcList;
             AdvancedOfflineMode = c.AdvancedOfflineMode;
             AdvancedDisableNetworking = c.AdvancedDisableNetworking;
+            AdvancedBypassSteamApiCheck = c.AdvancedSteamApiCheckBypass;
         }
         catch (Exception ex)
         {
@@ -108,9 +104,6 @@ public partial class NoSteamViewModel : ObservableObject
             c.SkipGBEDefault = SkipGBE;
             c.DryRunDefault = DryRun;
             c.SteamlessTimeoutMinutesDefault = SteamlessTimeoutMinutes;
-            c.VerifyLaunchTimeoutSecondsDefault = VerifyLaunchTimeoutSeconds;
-            c.LaunchArgsDefault = LaunchArgs;
-            c.WorkingDirectoryDefault = WorkingDirectory;
         }).GetAwaiter().GetResult();
     }
 
@@ -125,6 +118,7 @@ public partial class NoSteamViewModel : ObservableObject
             c.AdvancedDlcList = AdvancedDlcList;
             c.AdvancedOfflineMode = AdvancedOfflineMode;
             c.AdvancedDisableNetworking = AdvancedDisableNetworking;
+            c.AdvancedSteamApiCheckBypass = AdvancedBypassSteamApiCheck;
         }).GetAwaiter().GetResult();
     }
 
@@ -153,24 +147,6 @@ public partial class NoSteamViewModel : ObservableObject
     }
 
     partial void OnSteamlessTimeoutMinutesChanged(int value)
-    {
-        if (_configService.IsLoaded)
-            SaveOptionsToConfig();
-    }
-
-    partial void OnVerifyLaunchTimeoutSecondsChanged(int value)
-    {
-        if (_configService.IsLoaded)
-            SaveOptionsToConfig();
-    }
-
-    partial void OnLaunchArgsChanged(string value)
-    {
-        if (_configService.IsLoaded)
-            SaveOptionsToConfig();
-    }
-
-    partial void OnWorkingDirectoryChanged(string value)
     {
         if (_configService.IsLoaded)
             SaveOptionsToConfig();
@@ -271,7 +247,7 @@ public partial class NoSteamViewModel : ObservableObject
         // DLC 白名单编辑
         var tbDlcList = new TextBox { PlaceholderText = "DLC 白名单，每行格式: AppID=名称", Text = AdvancedDlcList, MinWidth = 600, MinHeight = 100, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, FontFamily = new FontFamily("Cascadia Code, Consolas, monospace") };
         ScrollViewer.SetVerticalScrollBarVisibility(tbDlcList, ScrollBarVisibility.Auto);
-        ToolTipService.SetToolTip(tbDlcList, "白名单模式时生效，对应 steam_settings/DLC.txt");
+        ToolTipService.SetToolTip(tbDlcList, "白名单模式时生效，写入游戏目录 steam_settings/configs.app.ini 的 [app::dlcs] 段，每行格式: AppID=名称");
 
         // 离线模式
         var cbOffline = new CheckBox { Content = "离线模式", IsChecked = AdvancedOfflineMode };
@@ -281,9 +257,16 @@ public partial class NoSteamViewModel : ObservableObject
         var cbDisableNet = new CheckBox { Content = "完全禁用网络", IsChecked = AdvancedDisableNetworking };
         ToolTipService.SetToolTip(cbDisableNet, "configs.main.ini 的 disable_networking=1，联机游戏慎用");
 
+        // SteamAPICheckBypass（反模拟器检测）
+        var cbBypass = new CheckBox { Content = "部署 SteamAPICheckBypass", IsChecked = AdvancedBypassSteamApiCheck };
+        ToolTipService.SetToolTip(cbBypass,
+            "部署 winmm.dll 劫持与文件重定向规则，向游戏的自身完整性/反作弊检查隐藏模拟器与备份痕迹（对齐 SAC）。" +
+            "个别自带 winmm 依赖或反作弊的游戏可能冲突，默认关闭");
+
         var networkPanel = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 20 };
         networkPanel.Children.Add(cbOffline);
         networkPanel.Children.Add(cbDisableNet);
+        networkPanel.Children.Add(cbBypass);
 
         var panel = new StackPanel { Spacing = 12, MinWidth = 700 };
         panel.Children.Add(new TextBlock { Text = "账号与身份 (选择账户后自动填充)", FontWeight = FontWeights.SemiBold, FontSize = 14, Margin = new Thickness(0, 0, 0, 4) });
@@ -345,6 +328,7 @@ public partial class NoSteamViewModel : ObservableObject
             AdvancedDlcList = tbDlcList.Text?.Trim() ?? "";
             AdvancedOfflineMode = cbOffline.IsChecked ?? false;
             AdvancedDisableNetworking = cbDisableNet.IsChecked ?? false;
+            AdvancedBypassSteamApiCheck = cbBypass.IsChecked ?? false;
 
             SaveAdvancedConfigToConfig();
         }
@@ -473,24 +457,6 @@ public partial class NoSteamViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
-    private async Task BrowseWorkingDirectoryAsync()
-    {
-        var picker = new Windows.Storage.Pickers.FolderPicker
-        {
-            SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.ComputerFolder
-        };
-
-        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
-
-        var folder = await picker.PickSingleFolderAsync();
-        if (folder != null)
-        {
-            WorkingDirectory = folder.Path;
-        }
-    }
-
     [RelayCommand(CanExecute = nameof(CanExecuteDeploy))]
     private async Task DeployAsync()
     {
@@ -523,9 +489,6 @@ public partial class NoSteamViewModel : ObservableObject
                 SkipGBE = SkipGBE,
                 DryRun = DryRun,
                 SteamlessTimeout = TimeSpan.FromMinutes(Math.Max(1, SteamlessTimeoutMinutes)),
-                VerifyLaunchTimeout = TimeSpan.FromSeconds(Math.Max(1, VerifyLaunchTimeoutSeconds)),
-                LaunchArgs = string.IsNullOrWhiteSpace(LaunchArgs) ? null : LaunchArgs,
-                WorkingDirectory = string.IsNullOrWhiteSpace(WorkingDirectory) ? null : WorkingDirectory,
 
                 // 高级配置映射
                 ForceAccountName = !string.IsNullOrWhiteSpace(AdvancedAccountName) ? AdvancedAccountName.Trim() : null,
@@ -534,7 +497,8 @@ public partial class NoSteamViewModel : ObservableObject
                 DlcContent = BuildDlcContent(),
                 OfflineMode = AdvancedOfflineMode,
                 DisableNetworking = AdvancedDisableNetworking,
-                UnlockAllDlc = AdvancedUnlockAllDlc
+                UnlockAllDlc = AdvancedUnlockAllDlc,
+                EnableSteamAPICheckBypass = AdvancedBypassSteamApiCheck
             };
 
             // 验证配置
@@ -560,8 +524,6 @@ public partial class NoSteamViewModel : ObservableObject
                 var msg = DryRun
                     ? $"干跑完成！将部署 {result.GBEDeploy.DeployedFiles.Length} 个文件，耗时 {result.TotalDuration.TotalSeconds:F1}s"
                     : $"部署成功！部署了 {result.GBEDeploy.DeployedFiles.Length} 个文件，耗时 {result.TotalDuration.TotalSeconds:F1}s";
-                if (result.GameProcessId.HasValue)
-                    msg += $"\n游戏进程 PID: {result.GameProcessId}";
                 ProgressLog += $"[SUCCESS] {msg}\n";
             }
             else

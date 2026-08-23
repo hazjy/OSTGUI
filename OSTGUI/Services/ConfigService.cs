@@ -101,6 +101,16 @@ public class ConfigService
     {
         config.ManifestSourceEnabled ??= defaults.ManifestSourceEnabled;
         config.ManifestSources ??= defaults.ManifestSources;
+        // 修复旧版本写入的乱码名称：预置源（非自定义）的显示字段始终以当前代码为准，
+        // 用户的 ApiKey / 启用状态 / 排序不受影响
+        if (config.ManifestSources != null)
+        {
+            foreach (var src in config.ManifestSources)
+            {
+                var preset = ManifestSource.GetPresetSources().FirstOrDefault(p => p.Id == src.Id);
+                if (preset != null) { src.Name = preset.Name; src.Description = preset.Description; }
+            }
+        }
         config.CustomManifestSources ??= defaults.CustomManifestSources;
         config.CustomGithubRepos ??= defaults.CustomGithubRepos;
         config.CustomZipUrls ??= defaults.CustomZipUrls;

@@ -94,10 +94,15 @@
                                                         <TextBlock Text="{Binding Description}" FontSize="11"
                                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                                     </StackPanel>
-                                                    <Button Grid.Column="1" Content="刷新缓存" Click="RefreshSudamaCache_Click"
-                                                            Tag="{Binding}"
-                                                            Visibility="{Binding ShowRefreshCacheButton, Converter={StaticResource BoolToVis}}"
-                                                            VerticalAlignment="Center" />
+                                                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                                        <Button Content="刷新缓存" Click="RefreshSudamaCache_Click"
+                                                                Tag="{Binding}"
+                                                                Visibility="{Binding ShowRefreshCacheButton, Converter={StaticResource BoolToVis}}" />
+                                                        <Button Content="导入文件…" Click="ImportSudamaCache_Click"
+                                                                Tag="{Binding}"
+                                                                Visibility="{Binding ShowRefreshCacheButton, Converter={StaticResource BoolToVis}}"
+                                                                ToolTipService.ToolTip="在浏览器下载好 depotkeys.json / appaccesstokens.json 后，选择文件直接导入（自动识别类型），无需应用内下载" />
+                                                    </StackPanel>
                                                 </Grid>
                                                 <StackPanel Spacing="4"
                                                             Visibility="{Binding RequiresToken, Converter={StaticResource BoolToVis}}">
@@ -137,17 +142,13 @@
                             <Button Grid.Column="1" Content="复制全部" Click="CopyLogs_Click" Margin="0,0,8,0" />
                             <Button Grid.Column="2" Content="清空" Click="ClearLogs_Click" />
                         </Grid>
-                        <ScrollViewer MaxHeight="200" VerticalScrollBarVisibility="Auto">
-                            <ItemsControl ItemsSource="{x:Bind Logs}">
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <TextBlock Text="{Binding}" FontSize="11" FontFamily="Consolas"
-                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                   TextWrapping="Wrap" Margin="0,1" IsTextSelectionEnabled="True" />
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
-                        </ScrollViewer>
+                        <TextBox x:Name="LogsTextBox"
+                                 Text="{Binding LogsText, Mode=OneWay}"
+                                 IsReadOnly="True" AcceptsReturn="True"
+                                 TextWrapping="Wrap" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                 FontFamily="Cascadia Code, Consolas" FontSize="12"
+                                 MinHeight="200" MaxHeight="400"
+                                 Background="{ThemeResource TextControlBackgroundFocused}" />
                     </StackPanel>
                 </Border>
 

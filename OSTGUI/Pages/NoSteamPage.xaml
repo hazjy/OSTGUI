@@ -106,44 +106,15 @@
                         <StackPanel Spacing="12">
                             <TextBlock Text="高级设置" FontSize="16" FontWeight="SemiBold" />
 
-                            <Grid ColumnSpacing="12" RowSpacing="12">
+                            <Grid ColumnSpacing="12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="200" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="200" />
                                 </Grid.ColumnDefinitions>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto" />
-                                    <RowDefinition Height="Auto" />
-                                </Grid.RowDefinitions>
 
-                                <TextBlock Grid.Row="0" Grid.Column="0" Text="Steamless 超时 (分钟):" Style="{StaticResource LabelStyle}" />
-                                <NumberBox Grid.Row="0" Grid.Column="1" Value="{Binding SteamlessTimeoutMinutes, Mode=TwoWay, Converter={StaticResource IntToDoubleConverter}}"
+                                <TextBlock Grid.Column="0" Text="Steamless 超时 (分钟):" Style="{StaticResource LabelStyle}" />
+                                <NumberBox Grid.Column="1" Value="{Binding SteamlessTimeoutMinutes, Mode=TwoWay, Converter={StaticResource IntToDoubleConverter}}"
                                            Minimum="1" Maximum="60" SpinButtonPlacementMode="Inline" />
-
-                                <TextBlock Grid.Row="0" Grid.Column="2" Text="启动验证超时 (秒):" Style="{StaticResource LabelStyle}" />
-                                <NumberBox Grid.Row="0" Grid.Column="3" Value="{Binding VerifyLaunchTimeoutSeconds, Mode=TwoWay, Converter={StaticResource IntToDoubleConverter}}"
-                                           Minimum="1" Maximum="120" SpinButtonPlacementMode="Inline" />
-
-                                <TextBlock Grid.Row="1" Grid.Column="0" Text="启动参数:" Style="{StaticResource LabelStyle}" />
-                                <TextBox Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="3"
-                                         Text="{Binding LaunchArgs, Mode=TwoWay}"
-                                         Style="{StaticResource InputBoxStyle}" PlaceholderText="传给游戏的命令行参数 (可选)" />
-                            </Grid>
-
-                            <Grid ColumnSpacing="12" RowSpacing="8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-
-                                <TextBlock Grid.Column="0" Text="工作目录:" Style="{StaticResource LabelStyle}" />
-                                <TextBox Grid.Column="1" Text="{Binding WorkingDirectory, Mode=TwoWay}"
-                                         Style="{StaticResource InputBoxStyle}" PlaceholderText="游戏运行时的工作目录 (可选，默认 EXE 所在目录)" IsReadOnly="True" />
-                                <Button Grid.Column="2" Content="浏览..." Command="{Binding BrowseWorkingDirectoryCommand}"
-                                        Margin="0,4,0,4" />
                             </Grid>
                         </StackPanel>
                     </Border>
@@ -151,8 +122,7 @@
                     <StackPanel Orientation="Horizontal" Spacing="12">
                         <Button Content="开始部署" Command="{Binding DeployCommand}"
                                 Style="{StaticResource AccentButtonStyle}"
-                                Width="140" Height="40" FontSize="14"
-                                IsEnabled="{Binding CanExecuteDeploy, Mode=OneWay}" />
+                                Width="140" Height="40" FontSize="14" />
                         <Button Content="清空日志" Command="{Binding ClearLogCommand}"
                                 Width="100" Height="40" FontSize="14" />
                     </StackPanel>

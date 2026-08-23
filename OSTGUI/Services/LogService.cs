@@ -54,17 +54,28 @@ public class LogService
 
     /// <summary>
     /// 运行时日志（仅内存，设置页日志栏显示，可清空）
+    /// 任意线程可调用：Logs 集合绑定着界面，非 UI 线程写入必须封送回 UI 线程，
+    /// 否则集合变更事件会在工作线程上触发绑定更新，异常会反向炸进日志调用方
     /// </summary>
     public static void AddLog(string message)
     {
         var timestamp = DateTime.Now.ToString("HH:mm:ss");
 
-        lock (_lock)
+        void Add()
         {
-            _logs.Add($"[{timestamp}] {message}");
-            while (_logs.Count > MaxLines)
-                _logs.RemoveAt(0);
+            lock (_lock)
+            {
+                _logs.Add($"[{timestamp}] {message}");
+                while (_logs.Count > MaxLines)
+                    _logs.RemoveAt(0);
+            }
         }
+
+        var dq = App.MainWindow?.DispatcherQueue;
+        if (dq == null || dq.HasThreadAccess)
+            Add();
+        else
+            dq.TryEnqueue(Add);
     }
 
     /// <summary>

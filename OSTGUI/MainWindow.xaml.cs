@@ -39,11 +39,28 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
                 AppTitleBarText.Text = _mainVM.Title;
         };
 
-        // 设置初始标题
-        AppTitleBarText.Text = _mainVM.Title;
-
+        // 窗口激活时初始化应用
         this.Activated += OnWindowActivated;
+        // 窗口关闭时清理临时资源
         this.Closed += OnClosed;
+    }
+
+    private void OnClosed(object sender, WindowEventArgs args)
+    {
+        _mainVM.StopSteamStatusPolling();
+        _mainVM.StopLibraryRefreshTimer();
+        SaveSizeToConfig();
+
+        // 清理 NoSteamLauncher 临时资源
+        try
+        {
+            var noSteamService = App.Services.GetService<NoSteamLauncherService>();
+            if (noSteamService is IDisposable disposable)
+            {
+                disposable.Dispose();
+            }
+        }
+        catch { }
     }
 
     /// <summary>
@@ -169,13 +186,6 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
             }
         }
         catch { }
-    }
-
-    private void OnClosed(object sender, WindowEventArgs args)
-    {
-        _mainVM.StopSteamStatusPolling();
-        _mainVM.StopLibraryRefreshTimer();
-        SaveSizeToConfig();
     }
 
     private void SaveSizeToConfig()

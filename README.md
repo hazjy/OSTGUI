@@ -33,8 +33,9 @@ OSTGUI 是 [OpenSteamTool](https://github.com/OpenSteam001/OpenSteamTool) 的桌
 需要 [.NET 10 SDK](https://dotnet.microsoft.com/) 与 Visual Studio 2022+（含 WinUI 工作负载）。
 
 ```bat
-REM 直接构建（Debug）
+REM 直接构建（Debug）；加 /r 构建成功后自动启动应用
 build.bat
+build.bat /r
 
 REM 自包含发布（Release，产物在 bin\Release\...\publish）
 MSBuild OSTGUI\OSTGUI.csproj /t:Publish /p:Configuration=Release ^

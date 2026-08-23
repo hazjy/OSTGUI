@@ -37,6 +37,9 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _windowEffect = "mica";
     [ObservableProperty] private string _language = "zh_CN";
 
+    // === 日志显示 ===
+    [ObservableProperty] private string _logsText = "";
+
     // === 清单源设置 ===
     public ObservableCollection<ManifestSource> Sources { get; } = new();
     // 设置页只显示已接入的有效源，Sources 保留全部用于持久化
@@ -139,6 +142,30 @@ public partial class SettingsViewModel : ObservableObject
         finally
         {
             IsRefreshingSudama = false;
+        }
+    }
+
+    /// <summary>
+    /// 手动导入本地下载的 Sudama 缓存文件（浏览器直连下载通常远快于应用内下载）
+    /// </summary>
+    public async Task ImportSudamaCacheAsync(IEnumerable<string> filePaths)
+    {
+        try
+        {
+            var (ok, message) = await _sudamaCache.ImportFilesAsync(filePaths);
+            LogService.AddLog(message);
+            SetStatus(message, ok ? "Success" : "Error");
+            if (ok)
+                Services.ToastService.ShowSuccess("Sudama 缓存导入完成", message);
+            else
+                Services.ToastService.ShowError("Sudama 缓存导入失败", message);
+        }
+        catch (Exception ex)
+        {
+            var msg = $"Sudama 缓存导入异常: {ex.Message}";
+            LogService.AddLog(msg);
+            SetStatus(msg, "Error");
+            Services.ToastService.ShowError("Sudama 缓存导入失败", msg);
         }
     }
 

@@ -1,0 +1,61 @@
+# Build outputs
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# NuGet
+packages/
+*.nupkg
+
+# Build outputs
+*.exe
+*.dll
+*.pdb
+*.deps.json
+*.runtimeconfig.json
+
+# 运行时资源必须入库：Steamless 脱壳插件、Goldberg(GSE) 模板 DLL、
+# SteamAPICheckBypass——缺失会导致免 Steam 部署静默失效
+!Resources/**/*.dll
+!Resources/**/*.exe
+
+# Test results
+TestResults/
+*.trx
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
