@@ -543,7 +543,10 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
         {
             XamlRoot = RootGrid.XamlRoot,
             Title = "选择要登录的账号",
-            Content = rootPanel
+            Content = rootPanel,
+            // ContentDialog 位于弹出层，不会继承 RootGrid 的 RequestedTheme，
+            // 需显式同步，否则应用切浅色时弹窗仍按默认主题渲染成深色
+            RequestedTheme = RootGrid.ActualTheme
         };
         dialog.PrimaryButtonClick += (s, args) =>
         {
