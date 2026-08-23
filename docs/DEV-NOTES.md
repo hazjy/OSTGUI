@@ -114,7 +114,7 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
 | 服务 | 职责 |
 |---|---|
 | `GameSearchService` / `SteamSearchProvider` | 搜索编排 / Steam 官方 API 搜索源 |
-| `SteamGameInfoService` | 统一查询：depot + manifest gid + DLC 列表与名称（SteamCMD 优先，appdetails 回退）|
+| `SteamGameInfoService` | 统一查询：depot + manifest gid + DLC 列表与名称（优先走社区非官方 API `api.steamcmd.net`——注意并非 Valve 官方，由 github.com/steamcmd/api 项目运营；失败回退官方 `store.steampowered.com/api/appdetails`，大陆网络下通常不可达）|
 | `ManifestDownloadService` | 多源清单下载 + 生成 Lua（门面已移除）|
 | `LuaBuilder` / `LuaConfigService` | Lua 生成（补全 depot/key/token/DLC/固定版本）；Lua 读写与版本模式切换 |
 | `SudamaKeyCache` | 密钥/令牌缓存（并行下载、24h TTL、手动刷新与本地导入）|
