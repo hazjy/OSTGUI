@@ -107,6 +107,7 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
 - 纯图标透明按钮：`Background=Transparent` + `BorderThickness=0` + `Padding=8,4`
 - 输入框失焦方案（PointerPressed/Tapped/handledEventsToo/页面级）全部无效，已回退——别再浪费时间
 - 浅色主题下按钮图标/文字需适配 `TextFillColorPrimaryBrush` 等 ThemeResource
+- ⚠️ 强调色的主题陷阱：`SystemAccentColor` 基础色**不随应用深浅主题翻转**；深色模式下需要"提亮版强调填充"的场景应使用 `AccentFillColorDefaultBrush` 等画刷（自动按主题选择正确变体），手写浅色主题的色值在深色模式下会显得突兀
 - **构建**：只能用 VS MSBuild（`dotnet build/publish` 缺 PRI 任务必挂）；首次 Release 自包含发布需先带 RID Restore（运行时包要从源下载，直连 nuget.org 失败时可切国内镜像）；旧实例不关会 MSB3021 锁 exe
 - 版本号只在 csproj 维护三处（Version/AssemblyVersion/FileVersion），运行时从程序集读取
 
