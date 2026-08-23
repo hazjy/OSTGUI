@@ -62,6 +62,8 @@ OSTGUI/
 
 本项目仅用于技术学习与研究，不包含任何游戏文件、清单文件或受版权保护的内容。密钥与令牌来自公开的第三方数据源，请自行判断其合规性。使用本项目产生的一切后果由使用者自行承担。
 
+免 Steam 部署功能随仓库分发了若干第三方编译组件（Goldberg 模拟器、Steamless 脱壳工具、SteamAPICheckBypass），其来源与许可证详见 [docs/THIRD-PARTY-NOTICES.md](docs/THIRD-PARTY-NOTICES.md)。
+
 ## License
 
 [GPL-3.0](LICENSE)。
