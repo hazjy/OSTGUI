@@ -36,6 +36,9 @@
                     <TextBlock Text="入库管理" FontSize="24" FontWeight="Bold" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                    <AutoSuggestBox Width="240" QueryIcon="Find"
+                                    PlaceholderText="搜索游戏 / AppID"
+                                    Text="{Binding SearchFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     <Button Click="RefreshButton_Click">
                         <ToolTipService.ToolTip><ToolTip Content="刷新" /></ToolTipService.ToolTip>
                         <FontIcon Glyph="&#xE72C;" />

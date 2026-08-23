@@ -21,6 +21,8 @@ public partial class LibraryViewModel : ObservableObject
     [ObservableProperty] private ObservableCollection<LibraryItem> _libraryItems = new();
     [ObservableProperty] private ObservableCollection<LibraryItem> _selectedItems = new();
     [ObservableProperty] private LibraryItem? _lastRightClickedItem;
+    // 全量主列表：排序/过滤的数据源；LibraryItems 仅是它的视图投影
+    private List<LibraryItem> _allItems = new();
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(IsBusy))]
     private bool _isLoading;
@@ -57,6 +59,7 @@ public partial class LibraryViewModel : ObservableObject
     private async Task LoadLibraryAsync()
     {
         IsLoading = true;
+        _allItems = new List<LibraryItem>();
         LibraryItems = new ObservableCollection<LibraryItem>();
         TotalCount = 0;
         FixedCount = 0;
@@ -92,17 +95,12 @@ public partial class LibraryViewModel : ObservableObject
             // DLC 信息不再刷新时预加载，改为点"入库信息"时按需获取
 
             // 应用排序
-            items = ApplySort(items);
+            _allItems = ApplySort(items);
 
             ProgressValue = 90;
 
-            // 应用过滤
-            var filtered = ApplyFilter(items);
-
-            LibraryItems = new ObservableCollection<LibraryItem>(filtered);
-            TotalCount = filtered.Count(i => i.AppId != "N/A");
-            FixedCount = filtered.Count(i => i.VersionMode == "fixed");
-            AutoCount = filtered.Count(i => i.VersionMode == "auto");
+            // 刷新视图（应用搜索过滤）
+            RefreshView();
 
             ProgressValue = 100;
             SetStatus($"共 {TotalCount} 个已入库游戏 | 固定版本 {FixedCount} | 自动更新 {AutoCount}", "Info");
@@ -139,18 +137,27 @@ item.DlcList = dlcInfo;
     private void ChangeSortMode(string mode)
     {
         SortMode = mode;
-        var sorted = ApplySort(LibraryItems.ToList());
-        LibraryItems = new ObservableCollection<LibraryItem>(ApplyFilter(sorted));
+        RefreshView();
     }
 
     /// <summary>
-    /// 应用搜索过滤
+    /// 搜索关键词变化时触发输入即过滤
     /// </summary>
-    [RelayCommand]
-    private void ApplySearchFilter()
+    partial void OnSearchFilterChanged(string value) => RefreshView();
+
+    /// <summary>
+    /// 以全量主列表为源，应用排序与搜索过滤后刷新视图
+    /// </summary>
+    private void RefreshView()
     {
-        var items = ApplySort(LibraryItems.ToList());
-        LibraryItems = new ObservableCollection<LibraryItem>(ApplyFilter(items));
+        var sorted = ApplySort(_allItems);
+        var filtered = ApplyFilter(sorted);
+        LibraryItems = new ObservableCollection<LibraryItem>(filtered);
+
+        // 统计始终基于全库，不随搜索过滤变化
+        TotalCount = _allItems.Count(i => i.AppId != "N/A");
+        FixedCount = _allItems.Count(i => i.VersionMode == "fixed");
+        AutoCount = _allItems.Count(i => i.VersionMode == "auto");
     }
 
     // ==================== 右键菜单操作 ====================
