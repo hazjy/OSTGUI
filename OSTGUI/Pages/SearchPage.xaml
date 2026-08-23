@@ -10,8 +10,14 @@
         <helpers:BoolNegateConverter x:Key="BoolNegateConverter" />
     </Page.Resources>
 
-    <ScrollViewer>
-        <StackPanel Margin="40,32,40,40" Spacing="20">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <!-- 固定区：标题、入库选项、搜索框（不随滚动移动） -->
+        <StackPanel Grid.Row="0" Margin="40,32,40,12" Spacing="20">
 
             <!-- 标题和入库选项 -->
             <Grid>
@@ -51,53 +57,59 @@
             <!-- 入库流程加载条（搜索框下方，入库结束自动消失） -->
             <ProgressBar x:Name="AddProgress" IsIndeterminate="True"
                          Visibility="{Binding IsAdding, Converter={StaticResource BoolToVis}}" />
-
-            <!-- 搜索结果（独立卡片） -->
-            <ItemsControl ItemsSource="{Binding SearchResults}"
-                          Visibility="{Binding HasResults, Converter={StaticResource BoolToVis}}">
-                <ItemsControl.ItemsPanel>
-                    <ItemsPanelTemplate>
-                        <StackPanel Spacing="12" />
-                    </ItemsPanelTemplate>
-                </ItemsControl.ItemsPanel>
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="models:SearchResult">
-                        <Border Padding="16" CornerRadius="12"
-                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                            <Grid ColumnSpacing="12">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                    <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                    <TextBlock Text="{Binding AppId}" FontSize="12" Margin="0,2,0,0"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                </StackPanel>
-                                <Button Grid.Column="1" Click="ListAddGame_Click" Tag="{Binding}"
-                                        Content="入库" FontSize="12" Padding="14,8" VerticalAlignment="Center" />
-                                <Button Grid.Column="2" Click="ListShareButton_Click" Tag="{Binding}"
-                                        ToolTipService.ToolTip="跳转" VerticalAlignment="Center"
-                                        Background="Transparent" BorderThickness="0" Padding="8,4">
-                                    <FontIcon Glyph="&#xE72D;" FontSize="14" />
-                                </Button>
-                            </Grid>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-
-            <!-- 无结果提示 -->
-            <Border Padding="24" CornerRadius="12"
-                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                    Visibility="{Binding ShowNoResults, Converter={StaticResource BoolToVis}}">
-                <TextBlock Text="超时或无结果" FontSize="14"
-                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
-            </Border>
-
         </StackPanel>
-    </ScrollViewer>
+
+        <!-- 滚动区：仅搜索结果与无结果提示 -->
+        <ScrollViewer Grid.Row="1" VerticalScrollMode="Auto" VerticalScrollBarVisibility="Auto">
+            <StackPanel Margin="40,4,40,40" Spacing="20">
+
+                <!-- 搜索结果（独立卡片） -->
+                <ItemsControl ItemsSource="{Binding SearchResults}"
+                              Visibility="{Binding HasResults, Converter={StaticResource BoolToVis}}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <StackPanel Spacing="12" />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate x:DataType="models:SearchResult">
+                            <Border Padding="16" CornerRadius="12"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                                <Grid ColumnSpacing="12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Text="{Binding AppId}" FontSize="12" Margin="0,2,0,0"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                    <Button Grid.Column="1" Click="ListAddGame_Click" Tag="{Binding}"
+                                            Content="入库" FontSize="12" Padding="14,8" VerticalAlignment="Center" />
+                                    <Button Grid.Column="2" Click="ListShareButton_Click" Tag="{Binding}"
+                                            ToolTipService.ToolTip="跳转" VerticalAlignment="Center"
+                                            Background="Transparent" BorderThickness="0" Padding="8,4">
+                                        <FontIcon Glyph="&#xE72D;" FontSize="14" />
+                                    </Button>
+                                </Grid>
+                            </Border>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- 无结果提示 -->
+                <Border Padding="24" CornerRadius="12"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                        Visibility="{Binding ShowNoResults, Converter={StaticResource BoolToVis}}">
+                    <TextBlock Text="超时或无结果" FontSize="14"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+                </Border>
+
+            </StackPanel>
+        </ScrollViewer>
+    </Grid>
 </Page>
