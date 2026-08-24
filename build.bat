@@ -48,6 +48,15 @@ if not "%EC%"=="0" (
     exit /b %EC%
 )
 
+REM Verify primary output FIRST; only clean up redundant nested copies
+REM afterwards. Cleaning before verification once deleted the only copy
+REM of the freshly built exe (nested dir was the one holding it).
+set "APPEXE=%~dp0%OUTDIR%\OSTGUI.exe"
+if not exist "%APPEXE%" (
+    echo [BUILD ERROR] output exe not found: %APPEXE%
+    exit /b 1
+)
+
 REM Remove redundant nested build copies produced by WindowsAppSDK
 REM self-contained mode. The nested subdir name varies with the project
 REM dir name (e.g. main\OSTGUI\bin or main\main\bin), so match any subdir
@@ -57,12 +66,6 @@ for /d %%D in ("%~dp0main\*") do (
         echo [cleanup] removing redundant nested output: %%D
         rd /s /q "%%D"
     )
-)
-
-set "APPEXE=%~dp0%OUTDIR%\OSTGUI.exe"
-if not exist "%APPEXE%" (
-    echo [BUILD ERROR] output exe not found: %APPEXE%
-    exit /b 1
 )
 
 echo [2/2] [BUILD OK] %APPEXE%
