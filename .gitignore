@@ -26,3 +26,6 @@ plan3.md
 # 根级文档除 README 外暂不追踪（后续可能改写）
 /*.md
 !/README.md
+
+# 育碧授权调研笔记：线索性质，暂不追踪（验证成熟后再并入 DEV-NOTES）
+docs/UBISOFT-NOTES.md
