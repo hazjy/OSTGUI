@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 using OSTGUI.Models;
 
 namespace OSTGUI.Services;
@@ -131,70 +131,6 @@ public class LuaConfigService
 
         await WriteFileAtomicallyAsync(filePath, newContent);
         return (true, $"已补齐 {lines.Count} 个 depot 的版本配置");
-    }
-
-    /// <summary>
-    /// 为游戏生成 Lua 配置内容
-    /// 格式: addappid(ID, KeyType, "DepotKey") 或 addappid(ID)
-    /// </summary>
-    public string GenerateLuaContent(
-        string appId,
-        List<(string depotId, string depotKey, string manifestGid, long manifestSize)> depots = null!,
-        bool fixedVersion = false,
-        string? accessToken = null)
-    {
-        var lines = new List<string>
-        {
-            $"-- OpenSteamTool 入库配置 - AppID {appId}",
-            $"-- 由 OSTGUI 自动生成",
-            $""
-        };
-
-        // 基础入库 - 带 depot key 的格式: addappid(ID, 1, "key")
-        if (depots != null && depots.Count > 0)
-        {
-            foreach (var depot in depots)
-            {
-                if (!string.IsNullOrEmpty(depot.depotKey))
-                {
-                    // 有密钥: addappid(DepotID, 1, "key")
-                    lines.Add($"addappid({depot.depotId}, 1, \"{depot.depotKey}\")");
-                }
-                else
-                {
-                    // 无密钥: addappid(DepotID)
-                    lines.Add($"addappid({depot.depotId})");
-                }
-            }
-        }
-        else
-        {
-            // 无 depot 信息，仅入库 AppID
-            lines.Add($"addappid({appId})");
-        }
-
-        // 访问令牌
-        if (!string.IsNullOrEmpty(accessToken))
-        {
-            lines.Add($"");
-            lines.Add($"addtoken({appId}, \"{accessToken}\")");
-        }
-
-        // 固定版本（manifest 绑定）
-        if (fixedVersion && depots != null)
-        {
-            lines.Add($"");
-            lines.Add($"-- 固定版本配置");
-            foreach (var depot in depots.Where(d => !string.IsNullOrEmpty(d.manifestGid)))
-            {
-                if (depot.manifestSize > 0)
-                    lines.Add($"setManifestid({depot.depotId}, \"{depot.manifestGid}\", {depot.manifestSize})");
-                else
-                    lines.Add($"setManifestid({depot.depotId}, \"{depot.manifestGid}\")");
-            }
-        }
-
-        return string.Join("\n", lines) + "\n";
     }
 
     /// <summary>
