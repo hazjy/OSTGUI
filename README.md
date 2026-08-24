@@ -51,14 +51,14 @@ build.bat /r
 自包含发布（Release，产物在 `bin\Release\...\publish`）：
 
 ```bat
-MSBuild OSTGUI\OSTGUI.csproj /t:Publish /p:Configuration=Release ^
+MSBuild main\OSTGUI.csproj /t:Publish /p:Configuration=Release ^
   /p:RuntimeIdentifier=win-x64 /p:SelfContained=true /p:WindowsAppSDKSelfContained=true
 ```
 
 ## 项目结构
 
 ```
-OSTGUI/
+main/
 ├─ Pages/            界面（主页 / 搜索 / 入库管理 / 联机 / 授权 / 免Steam / 设置）
 ├─ ViewModels/       MVVM 视图模型
 ├─ Services/         入库、清单、密钥缓存、Lua 生成、Steam 交互等
