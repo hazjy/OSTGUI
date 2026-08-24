@@ -47,7 +47,13 @@ public class LuaBuilder
             ""
         };
 
-        lines.Add($"addappid({appId})");
+        // 创意工坊密钥：Sudama depotkeys 中若收录了 AppID 自身的密钥（社区通称"创意工坊密钥"），
+        // 主游戏行带上它——Steam 客户端下载创意工坊内容时按 depot=AppID 读取解密密钥，
+        // 缺此 key 会报"内容仍处于加密"（详见 docs/DEV-NOTES.md 创意工坊章节）
+        var appKey = keys.TryGetValue(appId, out var k) ? k : "";
+        lines.Add(appKey.Length == 64
+            ? $"addappid({appId}, 1, \"{appKey}\")"
+            : $"addappid({appId})");
         lines.Add("");
 
         foreach (var (depotId, manifestGid, _) in allDepots)

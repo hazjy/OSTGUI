@@ -135,3 +135,11 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
 - DLC token 无按需查询渠道：生成 Lua 时会逐个查 Sudama 全量缓存并写入命中的 `addtoken`，但 dump 未收录的受限 DLC 没有补充途径
 - 480 联机同一时间只能运行一个
 - Sudama 大文件下载速度取决于服务器线路，慢时走浏览器下载 + 手动导入
+
+## 13. 创意工坊（Workshop）下载（Phase 1 已落地）
+
+- 创意工坊内容走 depot 加密管线：Steam 客户端把订阅的 item 当作 **depot = consumer_app_id（游戏 AppID）** 下载（depotcache 命名 `<AppID>_<manifestID>.manifest`），解密密钥按 ConfigStore `...\<AppID>\DecryptionKey` 读取
+- OST 内核已覆盖两环：manifest code（`GetManifestRequestCode` 劫持 + 第三方源仅按 gid 查询，workshop gid 被收录即可）与密钥注入（`ConfigStoreGetBinary` hook 从 Lua 的 DepotKeySet 取 key）
+- 缺口曾是 Lua 主游戏行 `addappid(appid)` 不带密钥 → 内核无 key 可喂 → 订阅下载报"内容仍处于加密"
+- Phase 1（v1.3.x）：`LuaBuilder` 主游戏行自动带上 Sudama depotkeys 中 AppID 自身的密钥（社区称"创意工坊密钥"，须恰好 64 位 hex）→ **新入库**即具备工坊下载解密能力；已入库游戏需重新入库或手动把主行改为 `addappid(appid, 1, "<key>")`
+- 边界：**限制匿名的工坊**（部分游戏/新 manifest 的 code 请求被服务器拒绝）无法绕过，需真实拥有该游戏的账号；**老式独立 workshop depot**（SteamDB 标注 Workshop 的 depot，如 Dying Light）需该 depot 单独密钥，Phase 1 不覆盖
