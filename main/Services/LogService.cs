@@ -101,10 +101,21 @@ public class LogService
 
     public static void Clear()
     {
-        lock (_lock)
+        void DoClear()
         {
-            _logs.Clear();
+            lock (_lock)
+            {
+                _logs.Clear();
+            }
         }
+
+        // 与 AddLog 同理：集合绑定着界面，Clear 的 CollectionChanged(Reset)
+        // 必须在 UI 线程触发，否则订阅了事件的页面在非 UI 线程刷新绑定
+        var dq = App.MainWindow?.DispatcherQueue;
+        if (dq == null || dq.HasThreadAccess)
+            DoClear();
+        else
+            dq.TryEnqueue(DoClear);
     }
 
     private static void TrimFileToMaxLines()
