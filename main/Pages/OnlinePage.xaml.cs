@@ -43,12 +43,15 @@ public sealed partial class OnlinePage : Page
 
     private void KernelMode_Checked(object sender, RoutedEventArgs e)
     {
+        // InitializeComponent 阶段 IsChecked="True" 会同步触发本事件，此时 VM 尚未赋值
+        if (VM == null) return;
         VM.UseCompatMode = false;
         if (CompatPanel != null) CompatPanel.Visibility = Visibility.Collapsed;
     }
 
     private void CompatMode_Checked(object sender, RoutedEventArgs e)
     {
+        if (VM == null) return;
         VM.UseCompatMode = true;
         if (CompatPanel == null) return;
         CompatPanel.Visibility = Visibility.Visible;
