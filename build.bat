@@ -4,6 +4,9 @@ cd /d "%~dp0"
 
 REM Usage: build.bat [/r]    (/r = launch app after successful build)
 REM Output: quiet console; full log at %LOG%; errors auto-printed on failure.
+REM Note: WindowsAppSDK self-contained copy leaves a redundant nested copy
+REM under OSTGUI\OSTGUI\bin on every build; it is removed after a successful
+REM build so the built app lives only in OUTDIR below.
 
 set "RUN_AFTER="
 if /i "%~1"=="/r" set "RUN_AFTER=1"
@@ -45,10 +48,23 @@ if not "%EC%"=="0" (
     exit /b %EC%
 )
 
-echo [2/2] [BUILD OK] %OUTDIR%\OSTGUI.exe
+REM Remove the redundant nested copy produced by WindowsAppSDK self-contained mode.
+set "REDUNDANT=%~dp0OSTGUI\OSTGUI"
+if exist "%REDUNDANT%\bin" (
+    echo [cleanup] removing redundant nested output...
+    rd /s /q "%REDUNDANT%"
+)
+
+set "APPEXE=%~dp0%OUTDIR%\OSTGUI.exe"
+if not exist "%APPEXE%" (
+    echo [BUILD ERROR] output exe not found: %APPEXE%
+    exit /b 1
+)
+
+echo [2/2] [BUILD OK] %APPEXE%
 
 if defined RUN_AFTER (
     echo Launching app...
-    start "" "%OUTDIR%\OSTGUI.exe"
+    start "" "%APPEXE%"
 )
 exit /b 0
