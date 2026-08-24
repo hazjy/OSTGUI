@@ -41,6 +41,24 @@ public sealed partial class OnlinePage : Page
         OtherPanel.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
     }
 
+    private void KernelMode_Checked(object sender, RoutedEventArgs e)
+    {
+        VM.UseCompatMode = false;
+        if (CompatPanel != null) CompatPanel.Visibility = Visibility.Collapsed;
+    }
+
+    private void CompatMode_Checked(object sender, RoutedEventArgs e)
+    {
+        VM.UseCompatMode = true;
+        if (CompatPanel == null) return;
+        CompatPanel.Visibility = Visibility.Visible;
+        if (string.IsNullOrEmpty(VM.InstallDir))
+            _ = VM.LoadCompatInfoAsync();
+    }
+
+    private async void RefreshCompat_Click(object sender, RoutedEventArgs e)
+        => await VM.LoadCompatInfoAsync();
+
     private async void QueryName_Click(object sender, RoutedEventArgs e)
         => await VM.LoadGameNameAsync();
 

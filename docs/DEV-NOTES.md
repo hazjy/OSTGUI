@@ -143,3 +143,11 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
 - 缺口曾是 Lua 主游戏行 `addappid(appid)` 不带密钥 → 内核无 key 可喂 → 订阅下载报"内容仍处于加密"
 - Phase 1（v1.3.x）：`LuaBuilder` 主游戏行自动带上 Sudama depotkeys 中 AppID 自身的密钥（社区称"创意工坊密钥"，须恰好 64 位 hex）→ **新入库**即具备工坊下载解密能力；已入库游戏需重新入库或手动把主行改为 `addappid(appid, 1, "<key>")`
 - 边界：**限制匿名的工坊**（部分游戏/新 manifest 的 code 请求被服务器拒绝）无法绕过，需真实拥有该游戏的账号；**老式独立 workshop depot**（SteamDB 标注 Workshop 的 depot，如 Dying Light）需该 depot 单独密钥，Phase 1 不覆盖
+
+## 14. 480 联机兼容模式（环境变量直启）
+
+- **问题背景**：`-onlinefix` 模式下内核把 `GetAppID` 响应从 480 还原成真实 AppId（为 DLC/成就/自身校验），但 Steam 网络侧一切仍是 480 → "自己认为自己是 X、世界说自己是 480"的身份分裂。游戏若做 `invite.gameID == GetAppID()` 之类自检（PEAK 实测），邀请会被静默丢弃——表现为"Steam 认为我在玩 480，但被邀请时游戏无反应、不进房"。
+- **兼容模式原理**：设 `SteamAppId/SteamGameId=480` 后直接启动游戏 exe，绕开 Steam 启动管线。游戏全程以 480 自居（人人拥有，服务端校验必过），GetAppID=480、好友=480、大厅=480，**全一致世界**，邀请校验天然通过。经典盗版联机方案（如开源 Cai Install 的 BAT 模式）即此法；此模式下 OST 内核完全旁观（无 `-onlinefix` → `g_OnlineFixRealAppId=0` → 各 hook 静默跳过）。
+- **代价**：成就计入 Spacewar；好友看到 Spacewar（extra_info 补丁不生效，它依赖 HasDepot(ResolveAppId())）；DLC 按 480 校验。
+- **实现要点**：exe 定位走 `libraryfolders.vdf` → `appmanifest_{appId}.acf` → installdir → 顶层 exe 按体积降序（过滤卸载器/运行库噪音），UI 可改选；WorkingDirectory 必须是游戏目录。兼容模式进程由服务自持 PID 管理——不经 Steam 启动管线则命令行无 `-onlinefix`，PEB 扫描不可见；应用重启后 PID 丢失属已知限制。
+- **教训**：GreenLuma/SteamTools 类 DLL 注入只解决入库（客户端层伪造所有权），Valve 服务端按账号验证匹配请求——"假入库不能联机"是系统性死穴。能联机的通用解只有"在拥有许可的 AppID 下做匹配"，即 480 一致世界。
