@@ -25,6 +25,9 @@ public sealed partial class SettingsPage : Page
         // 必须全面防御：LogService.AddLog 可能来自任意线程（经 DispatcherQueue 封送），
         // 本处理器抛出的异常会反向炸进日志调用方，掩盖真实错误
         LogService.Logs.CollectionChanged += OnLogsChanged;
+        // 初始填充：页面打开时已有日志不会再有"新增事件"触发刷新，
+        // 不预填则日志栏在无新日志时恒为空白（仅订阅事件不够）
+        VM.LogsText = string.Join("\n", LogService.Logs);
     }
 
     private void OnLogsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
