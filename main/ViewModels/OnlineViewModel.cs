@@ -1,13 +1,10 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using OSTGUI.Services;
-using System.Collections.ObjectModel;
 
 namespace OSTGUI.ViewModels;
 
 /// <summary>
-/// 联机页面 ViewModel - 480 联机
-/// 内核模式：steam.exe -applaunch {appId} -onlinefix（OST 内核改写身份）
-/// 兼容模式：环境变量直启游戏 exe，全一致 480 世界（邀请校验天然通过）
+/// 联机页面 ViewModel - 480 联机（OST -onlinefix）
 /// </summary>
 public partial class OnlineViewModel : ObservableObject
 {
@@ -24,11 +21,6 @@ public partial class OnlineViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanStart))]
     private bool _isBusy;
-    [ObservableProperty] private bool _useCompatMode;
-    [ObservableProperty] private string _compatStatus = "";
-    [ObservableProperty] private string? _selectedExe;
-
-    public ObservableCollection<string> ExeCandidates { get; } = new();
 
     public string StatusText => IsRunning ? "联机游戏中" : "未运行";
     public bool CanStart => !IsRunning && !IsBusy;
@@ -41,39 +33,6 @@ public partial class OnlineViewModel : ObservableObject
         _onlineFixService = onlineFixService;
         _gameInfoService = gameInfoService;
         _nameCache = nameCache;
-    }
-
-    partial void OnUseCompatModeChanged(bool value)
-    {
-        if (value) _ = LoadCompatInfoAsync();
-    }
-
-    partial void OnOnlineAppIdChanged(string value)
-    {
-        if (UseCompatMode) _ = LoadCompatInfoAsync();
-    }
-
-    /// <summary>
-    /// 兼容模式：解析游戏安装目录与候选 exe。
-    /// 主程序位置不单独展示——候选即完整路径，状态提示走下拉框占位文本。
-    /// </summary>
-    public async Task LoadCompatInfoAsync()
-    {
-        var appId = OnlineAppId.Trim();
-        ExeCandidates.Clear();
-        SelectedExe = null;
-
-        if (string.IsNullOrEmpty(appId) || !appId.All(char.IsDigit))
-        {
-            CompatStatus = "";
-            return;
-        }
-
-        var (dir, exes) = await Task.Run(() => _onlineFixService.ResolveGameInstall(appId));
-        CompatStatus = dir == null ? "未在 Steam 库中找到该游戏，请确认已安装" : "";
-        foreach (var exe in exes)
-            ExeCandidates.Add(exe);
-        SelectedExe = ExeCandidates.FirstOrDefault();
     }
 
     /// <summary>
@@ -114,7 +73,7 @@ public partial class OnlineViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 启动 480 联机（按当前模式分流）
+    /// 启动 480 联机
     /// </summary>
     public async Task<(bool success, string message)> StartAsync()
     {
@@ -125,15 +84,10 @@ public partial class OnlineViewModel : ObservableObject
         if (IsRunning)
             return (false, "已有联机游戏在运行，请先停止");
 
-        if (UseCompatMode && string.IsNullOrEmpty(SelectedExe))
-            return (false, "兼容模式需要选择游戏程序；列表为空请确认游戏已安装或手动刷新");
-
         IsBusy = true;
         try
         {
-            var (ok, msg) = UseCompatMode
-                ? await _onlineFixService.StartCompatAsync(appId, SelectedExe!)
-                : await _onlineFixService.StartAsync(appId);
+            var (ok, msg) = await _onlineFixService.StartAsync(appId);
             RefreshRunningState();
             return (ok, msg);
         }
