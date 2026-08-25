@@ -149,5 +149,9 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
 - **症状**：`-onlinefix` 下 Steam 正确显示在玩 480，但被好友邀请时游戏无反应、不进房（PEAK 实测；双方均为 OSTGUI 同版本）。
 - **根因分析**：内核把 `GetAppID` 响应从 480 还原成真实 AppId（为 DLC/成就/自身校验），而网络侧好友状态、邀请、大厅全是 480 → 身份分裂。游戏做 `invite.gameID == GetAppID()` 类自检时邀请被静默丢弃。内核 `SendCallbackToPipe` 的回调修改分发器目前是空的——邀请链路的数据从未做过 480↔X 翻译。
 - **环境变量直启实验（已实现后移除）**：设 `SteamAppId/SteamGameId=480` 直接启动游戏 exe 形成全一致世界，理论上邀请校验天然通过（经典盗版联机/Cai Install BAT 模式即此法）。实测两处硬伤：① **叠加层必丢**——gameoverlayui 由 Steam 启动链注入，直启进程 Steam 不感知；② **带自检的游戏直接放弃联机**——`RestartAppIfNecessary` 或 Facepunch 式 `GetAppID()==硬编码` 校验在 480 身份下失败。"自身身份自检"与"邀请一致性校验"两条要求互相矛盾，纯直启路线被夹死，仅对无自检游戏有效。
-- **既定方向（未实施）**：内核微补丁——保留 `GetAppID` 还原（自身自检通过），在 `SendCallbackToPipe` 加 `LobbyInvite_t` 分支把 `m_ulGameID` 改写回真实 AppId（该分发器即为此类用途预留，现为空），可选补 `IClientFriends::GetFriendGamePlayed` 同步改写让游戏内好友列表正确显示。两组校验同时满足。需 C++ 工具链重编内核并部署，待邀请流程验证后启动。
+- **既定方向（已实施，待好友实测）**：内核微补丁——保留 `GetAppID` 还原（自身自检通过），在 `SendCallbackToPipe` 加 `LobbyInvite_t` 分支把 `m_ulGameID` 从 480 改回真实 AppId（该分发器即为此类用途预留，原本为空）。可选补 `IClientFriends::GetFriendGamePlayed` 同步改写，若实测发现卡点在游戏内好友过滤再追加。
+  - 改动：`RefProjects/OpenSteamTool` 分支 `fix/onlinefix-lobby-invite`（提交 94a80b8）：`Steam/Callback.h` 加 `k_iSteamMatchmakingCallbacks=300` + `LobbyInvite_t`（公开 SDK 布局）；`Hook/Hooks_Misc.h/.cpp` 暴露 `IsOnlineFixActive()`；`Hook/Hooks_CallBack.cpp` 分发器加 LobbyInvite 分支（命中时 LOG_ONLINEFIX_INFO）。
+  - 构建：VS18 自带 CMake + MSVC，Debug 配置产出 `build/Debug/{OpenSteamTool,dwmapi,xinput1_4}.dll`。依赖经 FetchContent 缓存 `.deps/`（lua/spdlog/protobuf/tomlplusplus/detours 手动预填，因本机 TLS 被 Steam++ 加速器中间人拦截，schannel 全线不可用；git 需 `http.sslBackend=openssl` + 合并 SteamTools 根证书的 CA bundle）。
+  - 部署：已替换 `d:/steam/` 下三个 DLL（原内核备份在 `D:/Projects/OSTGUI/ost-backups/20260825-kernel-480fix/`，回滚=拷回）。Debug 内核默认日志可用（toml 未设 [log] 时走 Debug 级）。
+  - 验证清单：① 重启 Steam 后正常加载、入库/游玩无回归；② `-onlinefix` 启动游戏照常；③ 好友发邀请时 `onlinefix.log` 出现 `LobbyInvite: gameID 480 -> <真实>` 且游戏弹出邀请可入房。
 - 教训：GreenLuma/SteamTools 类 DLL 注入只解决入库（客户端层伪造所有权），Valve 服务端按账号验证匹配请求——"假入库不能联机"是系统性死穴；能联机的通用解只有"在拥有许可的 AppID 下做匹配"，即 480 一致世界。
