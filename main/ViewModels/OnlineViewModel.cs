@@ -25,7 +25,7 @@ public partial class OnlineViewModel : ObservableObject
     [NotifyPropertyChangedFor(nameof(CanStart))]
     private bool _isBusy;
     [ObservableProperty] private bool _useCompatMode;
-    [ObservableProperty] private string _installDir = "";
+    [ObservableProperty] private string _compatStatus = "";
     [ObservableProperty] private string? _selectedExe;
 
     public ObservableCollection<string> ExeCandidates { get; } = new();
@@ -54,7 +54,8 @@ public partial class OnlineViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 兼容模式：解析游戏安装目录与候选 exe
+    /// 兼容模式：解析游戏安装目录与候选 exe。
+    /// 主程序位置不单独展示——候选即完整路径，状态提示走下拉框占位文本。
     /// </summary>
     public async Task LoadCompatInfoAsync()
     {
@@ -64,12 +65,12 @@ public partial class OnlineViewModel : ObservableObject
 
         if (string.IsNullOrEmpty(appId) || !appId.All(char.IsDigit))
         {
-            InstallDir = "";
+            CompatStatus = "";
             return;
         }
 
         var (dir, exes) = await Task.Run(() => _onlineFixService.ResolveGameInstall(appId));
-        InstallDir = dir ?? "未在 Steam 库中找到该游戏，请确认已安装";
+        CompatStatus = dir == null ? "未在 Steam 库中找到该游戏，请确认已安装" : "";
         foreach (var exe in exes)
             ExeCandidates.Add(exe);
         SelectedExe = ExeCandidates.FirstOrDefault();

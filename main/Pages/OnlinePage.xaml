@@ -40,12 +40,12 @@
 
                                     <StackPanel Orientation="Horizontal" Spacing="16" Margin="0,4,0,0">
                                         <RadioButton x:Name="KernelModeRadio"
-                                                     Content="内核模式 (-onlinefix)"
+                                                     Content="内核模式"
                                                      GroupName="LaunchMode"
                                                      IsChecked="True"
                                                      Checked="KernelMode_Checked" />
                                         <RadioButton x:Name="CompatModeRadio"
-                                                     Content="兼容模式 (环境变量直启)"
+                                                     Content="兼容模式"
                                                      GroupName="LaunchMode"
                                                      Checked="CompatMode_Checked" />
                                     </StackPanel>
@@ -59,11 +59,8 @@
 
                                     <TextBlock Text="{Binding GameName}" FontSize="16" FontWeight="SemiBold" />
 
-                                    <!-- 兼容模式专属面板 -->
+                                    <!-- 兼容模式专属面板：主程序位置只在下拉框内显示（候选项为完整路径） -->
                                     <StackPanel x:Name="CompatPanel" Spacing="8" Visibility="Collapsed">
-                                        <TextBlock Text="{Binding InstallDir}" FontSize="12"
-                                                   TextWrapping="Wrap"
-                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                         <Grid>
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
@@ -71,6 +68,7 @@
                                             </Grid.ColumnDefinitions>
                                             <ComboBox Grid.Column="0"
                                                       Header="游戏程序"
+                                                      PlaceholderText="{Binding CompatStatus}"
                                                       ItemsSource="{Binding ExeCandidates}"
                                                       SelectedItem="{Binding SelectedExe, Mode=TwoWay}"
                                                       HorizontalAlignment="Stretch" />
@@ -79,9 +77,6 @@
                                                     Margin="8,0,0,0"
                                                     VerticalAlignment="Bottom" />
                                         </Grid>
-                                        <TextBlock FontSize="12" TextWrapping="Wrap"
-                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                   Text="兼容模式直接以 Spacewar(480) 身份运行游戏程序，不经过 Steam 启动管线，邀请/入房一致性最好。代价：成就计入 Spacewar，好友看到的是 Spacewar。" />
                                     </StackPanel>
 
                                     <StackPanel Orientation="Horizontal" Spacing="12">

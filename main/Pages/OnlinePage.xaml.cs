@@ -55,8 +55,7 @@ public sealed partial class OnlinePage : Page
         VM.UseCompatMode = true;
         if (CompatPanel == null) return;
         CompatPanel.Visibility = Visibility.Visible;
-        if (string.IsNullOrEmpty(VM.InstallDir))
-            _ = VM.LoadCompatInfoAsync();
+        _ = VM.LoadCompatInfoAsync();
     }
 
     private async void RefreshCompat_Click(object sender, RoutedEventArgs e)
