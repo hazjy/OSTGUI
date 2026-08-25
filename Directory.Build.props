@@ -1,0 +1,11 @@
+<Project>
+  <!-- 构建产物集中到仓库级 .build\ 目录，脱离各项目源码树。
+       背景：WindowsAppSDK 自包含部署偶发把产物写进项目目录下的嵌套 bin
+       （如 main\main\bin），与源码树内的规范路径互相干扰，曾导致清理脚本
+       误删唯一副本、旧 exe 冒充新构建。产物外迁后该类问题整体消失。 -->
+  <PropertyGroup>
+    <BaseOutputPath>$(MSBuildThisFileDirectory).build\$(MSBuildProjectName)\bin\</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).build\$(MSBuildProjectName)\obj\</BaseIntermediateOutputPath>
+    <DefaultItemExcludes>$(DefaultItemExcludes);.build/**</DefaultItemExcludes>
+  </PropertyGroup>
+</Project>
