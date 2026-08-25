@@ -48,6 +48,26 @@ if not "%EC%"=="0" (
     exit /b %EC%
 )
 
+REM WindowsAppSDK self-contained deploy occasionally writes ALL outputs
+REM into a nested dir (main\<X>\bin) while leaving the canonical path
+REM untouched (tied to leftover intermediate state from a failed build;
+REM not reproducible every run). After a successful build: if a nested
+REM dir holds a fresh copy, mirror it into the canonical path first,
+REM then clean up -- so we never delete the only copy of the exe.
+set "CANON=%~dp0%OUTDIR%"
+set "FRESH="
+for /d %%D in ("%~dp0main\*") do (
+    if exist "%%D\bin\Debug\net10.0-windows10.0.19041.0\win-x64\OSTGUI.exe" set "FRESH=%%D\bin\Debug\net10.0-windows10.0.19041.0\win-x64"
+)
+if defined FRESH (
+    echo [sync] nested output detected, mirroring into canonical path
+    robocopy "%FRESH%" "%CANON%" /MIR /NFL /NDL /NJH /NJS >nul
+    if errorlevel 8 (
+        echo [BUILD ERROR] robocopy failed syncing %FRESH%
+        exit /b 1
+    )
+)
+
 REM Verify primary output FIRST; only clean up redundant nested copies
 REM afterwards. Cleaning before verification once deleted the only copy
 REM of the freshly built exe (nested dir was the one holding it).
