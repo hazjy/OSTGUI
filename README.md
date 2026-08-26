@@ -85,7 +85,7 @@ main/
 | [Steamless](https://github.com/atom0s/Steamless) | 移除 SteamStub 壳 | CC BY-NC-ND 4.0 |
 | [SteamAPICheckBypass](https://github.com/SteamAutoCracks/Steam-auto-crack) | 隐藏模拟器痕迹 | MIT |
 
-来源与许可证详情见 [docs/THIRD-PARTY-NOTICES.md](docs/THIRD-PARTY-NOTICES.md)。
+来源与许可证详情见 [docs/dev/THIRD-PARTY-NOTICES.md](docs/dev/THIRD-PARTY-NOTICES.md)。
 
 ## License
 

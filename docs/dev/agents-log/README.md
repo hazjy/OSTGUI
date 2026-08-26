@@ -12,7 +12,7 @@
 
 - 每个**变更发生日**一个记录文件：`YYYY-MM-DD.md`（如 `2026-08-25.md`）
 - 同一天的多条变更追加进当天文件，按时间先后排列（新的在下/按 commit 时间）
-- 目录：`docs/agents-log/`
+- 目录：`docs/dev/agents-log/`
 - 事实源：`git log`；本台账是"谁、何时、改了什么"的解读层
 
 ## 填写规范
@@ -36,8 +36,8 @@
 
 1. 每次改动完成后：在当天记录文件追加条目，再与代码**同一 commit** 提交
 2. commit message 保持前缀规范（feat:/fix:/refactor:/build:/docs:/chore:/ui:/revert:）
-3. 修改共享构建/目录约定（build.bat、.build、NoSteamLauncher 资源、ZTool、docs/DEV-NOTES.md）前，先读本台账对应日期文件与该文件现状
-4. 重大领域结论与踩坑沉淀进 `docs/DEV-NOTES.md`；发布说明写 `docs/UPDATE-NOTES-*.md`；本台账只记"发生了"
+3. 修改共享构建/目录约定（build.bat、.build、NoSteamLauncher 资源、ZTool、docs/dev/DEV-NOTES.md）前，先读本台账对应日期文件与该文件现状
+4. 重大领域结论与踩坑沉淀进 `docs/dev/DEV-NOTES.md`；发布说明写 `docs/changelog/UPDATE-NOTES-*.md`；本台账只记"发生了"
 
 ## 当前基线
 
