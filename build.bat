@@ -77,10 +77,11 @@ exit /b 1
 
 :verify_ok
 REM The WindowsAppSDK quirk also plants a duplicate managed-output copy at
-REM main\.build\ (drive-stripped BaseOutputPath resolved against the project
-REM dir) on every build. Canonical output here is authoritative -- drop the
-REM duplicate so it never lingers and confuses.
+REM main\.build\ and NoSteamLauncher\.build\ (drive-stripped BaseOutputPath
+REM resolved against the project dir) on every build. Canonical output here
+REM is authoritative -- drop the duplicates so they never linger/confuse.
 rd /s /q "%~dp0main\.build" 2>nul
+rd /s /q "%~dp0NoSteamLauncher\.build" 2>nul
 echo [2/2] [BUILD OK] %APPEXE%
 
 if defined RUN_AFTER (
