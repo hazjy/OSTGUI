@@ -98,7 +98,7 @@ public class SudamaKeyCache
     }
 
     /// <summary>
-    /// 从 Sudama API 获取全量 App 访问令牌（24h 缓存）
+    /// 从 Sudama API 获取全量 App 访问令牌（缓存不自动过期，手动刷新更新）
     /// </summary>
 
     public async Task<Dictionary<string, string>> GetAccessTokensAsync()
@@ -114,7 +114,7 @@ public class SudamaKeyCache
     {
         var cachePath = CacheFilePath(cacheFileName);
         Directory.CreateDirectory(Path.GetDirectoryName(cachePath)!);
-        var cache = new SudamaCache { Timestamp = DateTime.UtcNow, Data = data };
+        var cache = new SudamaCache { Data = data };
         await File.WriteAllTextAsync(cachePath, JsonSerializer.Serialize(cache)).ConfigureAwait(false);
     }
 
@@ -122,7 +122,7 @@ public class SudamaKeyCache
     /// 手动导入本地下载的缓存文件（浏览器直连下载通常远快于应用内下载）。
     /// 文件名含 depotkey/token 即可自动识别类型；识别不出时按内容启发：
     /// 密钥值均为 64 位十六进制，令牌为长数字串。兼容包装格式 {"Data":{...}}，
-    /// 也兼容明文 {"id":"value"} 字典。导入成功即重置 24h 缓存计时。
+    /// 也兼容明文 {"id":"value"} 字典。导入成功即写入新缓存。
     /// </summary>
     public async Task<(bool ok, string message)> ImportFilesAsync(IEnumerable<string> filePaths)
     {
@@ -236,7 +236,7 @@ public class SudamaKeyCache
     }
 
     /// <summary>
-    /// 通用缓存 JSON 下载（24h 有效，失败时尽量用旧缓存）
+    /// 通用缓存 JSON 下载（缓存不过期自动刷新；无缓存时才下载，手动刷新见 RefreshAsync）
     /// </summary>
 
     private async Task<Dictionary<string, string>> GetCachedJsonAsync(string cacheFileName, string url, string label)
@@ -252,7 +252,7 @@ public class SudamaKeyCache
             {
                 var cachedJson = await File.ReadAllTextAsync(cachePath);
                 var cache = JsonSerializer.Deserialize<SudamaCache>(cachedJson);
-                if (cache != null && DateTime.UtcNow.Subtract(cache.Timestamp).TotalHours < 24)
+                if (cache is { Data.Count: > 0 })
                 {
                     Log($"使用本地缓存的 {label}");
                     return cache.Data;
@@ -299,6 +299,5 @@ public class SudamaKeyCache
 }
 public class SudamaCache
 {
-    public DateTime Timestamp { get; set; }
     public Dictionary<string, string> Data { get; set; } = new();
 }
