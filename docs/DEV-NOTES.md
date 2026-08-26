@@ -155,3 +155,11 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
   - 部署：已替换 `d:/steam/` 下三个 DLL（原内核备份在 `D:/Projects/OSTGUI/ost-backups/20260825-kernel-480fix/`，回滚=拷回）。Debug 内核默认日志可用（toml 未设 [log] 时走 Debug 级）。
   - 验证清单：① 重启 Steam 后正常加载、入库/游玩无回归；② `-onlinefix` 启动游戏照常；③ 好友发邀请时 `onlinefix.log` 出现 `LobbyInvite: gameID 480 -> <真实>` 且游戏弹出邀请可入房。
 - 教训：GreenLuma/SteamTools 类 DLL 注入只解决入库（客户端层伪造所有权），Valve 服务端按账号验证匹配请求——"假入库不能联机"是系统性死穴；能联机的通用解只有"在拥有许可的 AppID 下做匹配"，即 480 一致世界。
+
+### 实证轮（v1/v2/v3，PEAK + 日志探针）
+
+- **v1（仅 LobbyInvite_t 改写）实测结果**：补丁生效（`SpawnProcess: 3527290 -> 480`、`OnlineFix: 480 -> name 'PEAK'` 均出现），但**全程零 `LobbyInvite:` 日志、零 MMS/大厅流量、零 JoinLobby 尝试**——邀请根本没有走大厅邀请通道，只收到 2 条旧式 `InviteToGame(7005)`。LobbyInvite 假设不成立。
+- **v2（增 Persona 好友改写 + 全回调探针）实测**：回调探针显示 21 次 cb=304 等（内部回调号无法直接映射）；但 `Persona friend` 改写一次未触发——两处缺陷：① 改写块放在 `if (!selfEntry) return false` 之后，而好友增量推送常不含 self 条目被提前拦掉；② 好友的 480 状态若在启动游戏前就已推送进客户端缓存，后续不再有推送 → 改写永远无机会执行。
+- **v3（真凶落点）**：结合用户观察"邀请时弹出的是普通好友界面而非邀请界面"，定位到内核提交 **#40（Restore controllers and overlay identity）**：`BuildSpawnEnvBlock` 把 `SteamOverlayGameId` 还原成真实 AppId → 叠加层身份与 480 空间大厅不匹配 → `ActivateGameOverlayInviteDialog` 降级为普通好友列表 → 邀请退化为 7005，游戏无处理。**v3 撤销 #40 的叠加层还原**（保留 OptedInMask 手柄还原），叠加层回到 480，邀请对话框正确绑定 480 大厅；代价仅截图标签/社区链接显示 Spacewar。同时把 Persona 改写移到 selfEntry 早退之前。
+  - 提交：内核分支 `fix/onlinefix-lobby-invite`（v1: 94a80b8，v3: 36708b9）。部署备份：`ost-backups/20260825-kernel-480fix`（原版）、`20260825-kernel-v2-friendpatch`、`20260826-kernel-v2-persona`。
+  - 验证判据（v3，待好友实测）：邀请时应弹出**真正的邀请对话框**（每好友带"邀请"按钮）；命中后 `onlinefix.log` 出现 `Persona friend ... gameid 480 -> 3527290`（好友上线后）或叠加层行为正常；邀约发出/接受后有 MMS/大厅流量与 `LobbyInvite` 改写日志。
