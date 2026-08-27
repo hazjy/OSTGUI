@@ -172,6 +172,17 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 记录某需 token 源的 API Key 上次设置时间，并触发该行重绑定显示
+    /// </summary>
+    public void MarkManifestKeyUpdated(ManifestSource source)
+    {
+        if (!source.RequiresToken) return;
+        source.ApiKeyUpdatedAtText = "上次更新：" + DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+        var i = VisibleSources.IndexOf(source);
+        if (i >= 0) VisibleSources[i] = VisibleSources[i];
+    }
+
+    /// <summary>
     /// 依据缓存文件修改时间刷新"上次刷新/导入时间"文案到 Sudama 源行（不引入额外存储状态）
     /// </summary>
     public void RefreshSudamaCacheAge()

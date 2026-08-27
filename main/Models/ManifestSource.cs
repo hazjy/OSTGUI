@@ -48,6 +48,13 @@ public class ManifestSource
     public string SudamaCacheAgeText { get; set; } = "";
 
     /// <summary>
+    /// 该源 API Key / Token 上次设置时间文案（需 token 的源显示；页面加载时的绑定初始化不触发）
+    /// </summary>
+    public string ApiKeyUpdatedAtText { get; set; } = "";
+
+    public bool ShowApiKeyUpdatedAt => RequiresToken && !string.IsNullOrEmpty(ApiKeyUpdatedAtText);
+
+    /// <summary>
     /// 获取该源 API Key / Token 的页面地址（无则返回 null）
     /// </summary>
     public static string? GetTokenPageUrl(string sourceId) => sourceId switch

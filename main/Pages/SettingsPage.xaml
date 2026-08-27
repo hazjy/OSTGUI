@@ -121,6 +121,9 @@
                                                         <Button Grid.Column="1" Content="获取" Tag="{Binding}"
                                                                 Click="OpenTokenPage_Click" VerticalAlignment="Center" />
                                                     </Grid>
+                                                    <TextBlock Text="{Binding ApiKeyUpdatedAtText}" FontSize="12"
+                                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                               Visibility="{Binding ShowApiKeyUpdatedAt, Converter={StaticResource BoolToVis}}" />
                                                 </StackPanel>
                                             </StackPanel>
                                         </Border>
