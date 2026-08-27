@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Text;
 using OSTGUI.Models;
@@ -94,7 +94,7 @@ public sealed partial class LibraryPage : Page
     {
         if (VM.LastRightClickedItem != null)
         {
-            await VM.LoadDlcInfoAsync(VM.LastRightClickedItem);
+            // 立即打开对话框，DLC 列表在后台加载（转圈），不再先等 API 再弹窗
             ShowInstallInfoDialog(VM.LastRightClickedItem);
         }
     }
@@ -147,10 +147,13 @@ public sealed partial class LibraryPage : Page
         filterPanel.Children.Add(installedRadio);
         filterPanel.Children.Add(uninstalledRadio);
 
-        // DLC 列表
+        // DLC 列表（先显示转圈，后台加载完成后再填充）
         var dlcScroll = new ScrollViewer { MaxHeight = 300, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
         var dlcPanel = new StackPanel { Spacing = 8, Padding = new Thickness(0, 8, 0, 0) };
         dlcScroll.Content = dlcPanel;
+
+        var dlcLoading = true;
+        var dlcSpinner = new ProgressRing { IsActive = true, Width = 24, Height = 24, Margin = new Thickness(0, 8, 0, 0) };
 
         var secondaryBrush = Application.Current.Resources["TextFillColorSecondaryBrush"] as Microsoft.UI.Xaml.Media.Brush;
         var cardBrush = Application.Current.Resources["CardBackgroundFillColorDefaultBrush"] as Microsoft.UI.Xaml.Media.Brush;
@@ -160,6 +163,13 @@ public sealed partial class LibraryPage : Page
         void RebuildDlcPanel()
         {
             dlcPanel.Children.Clear();
+
+            // 加载中只显示转圈，过滤按钮点击也不闪"无 DLC"
+            if (dlcLoading)
+            {
+                dlcPanel.Children.Add(dlcSpinner);
+                return;
+            }
 
             var mode = installedRadio.IsChecked == true ? 1 : uninstalledRadio.IsChecked == true ? 2 : 0;
             IEnumerable<DlcInfo> list = item.DlcList;
@@ -209,6 +219,19 @@ public sealed partial class LibraryPage : Page
         installedRadio.Checked += (s, e) => RebuildDlcPanel();
         uninstalledRadio.Checked += (s, e) => RebuildDlcPanel();
         RebuildDlcPanel();
+
+        // 后台实时拉取 DLC（不阻塞对话框打开），完成后填充
+        _ = LoadDlcBackgroundAsync();
+        async Task LoadDlcBackgroundAsync()
+        {
+            try
+            {
+                await VM.LoadDlcInfoAsync(item);
+            }
+            catch { }
+            dlcLoading = false;
+            RebuildDlcPanel();
+        }
 
         // 主布局
         var rootPanel = new StackPanel { Spacing = 12, MaxHeight = 500 };

@@ -289,7 +289,7 @@ public class SteamGameInfoService
     }
 
     /// <summary>
-    /// 获取 DLC 列表（含名称；名称批量查询走 GameSearchService 缓存）
+    /// 获取 DLC 列表（含名称；名称每次实时向 API 获取，不参与名称缓存）
     /// </summary>
     public async Task<List<DlcInfo>> GetDlcInfoAsync(string appId)
     {
@@ -299,7 +299,26 @@ public class SteamGameInfoService
             var ids = await GetDlcIdsAsync(appId);
             if (ids.Count == 0) return result;
 
-            var names = await _searchService.GetGameNamesBatchAsync(ids);
+            // 实时批量取 DLC 名（限并发 6），不读写名称缓存
+            using var gate = new SemaphoreSlim(6);
+            var nameTasks = ids.Select(async id =>
+            {
+                await gate.WaitAsync();
+                try
+                {
+                    var info = await GetGameDetailsFromSteamAsync(id);
+                    return (id, name: string.IsNullOrEmpty(info?.Name) ? "" : info.Name);
+                }
+                finally
+                {
+                    gate.Release();
+                }
+            });
+            var got = await Task.WhenAll(nameTasks);
+            var names = got
+                .Where(t => !string.IsNullOrEmpty(t.name))
+                .ToDictionary(t => t.id, t => t.name);
+
             foreach (var id in ids)
             {
                 result.Add(new DlcInfo
