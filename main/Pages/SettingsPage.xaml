@@ -73,8 +73,6 @@
                             <TextBlock Text="需要密钥的源在此配置 API Key / Token"
                                        FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                        TextWrapping="Wrap" />
-                            <TextBlock Text="{Binding SudamaCacheAgeText}" FontSize="12"
-                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
 
                         <!-- 源列表（内置 + 自定义，通用格式） -->
@@ -106,6 +104,9 @@
                                                                 ToolTipService.ToolTip="在浏览器下载好 depotkeys.json / appaccesstokens.json 后，选择文件直接导入（自动识别类型），无需应用内下载" />
                                                     </StackPanel>
                                                 </Grid>
+                                                <TextBlock Text="{Binding SudamaCacheAgeText}" FontSize="12"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                           Visibility="{Binding ShowRefreshCacheButton, Converter={StaticResource BoolToVis}}" />
                                                 <StackPanel Spacing="4"
                                                             Visibility="{Binding RequiresToken, Converter={StaticResource BoolToVis}}">
                                                     <TextBlock Text="API Key / Token" FontSize="12" />

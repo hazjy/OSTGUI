@@ -101,7 +101,6 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _statusMessage = "";
     [ObservableProperty] private string _statusType = "Info";
     [ObservableProperty] private bool _isRefreshingSudama;
-    [ObservableProperty] private string _sudamaCacheAgeText = "";
 
     public SettingsViewModel(ConfigService configService, SteamService steamService,
         SteamDllService steamDllService, SudamaKeyCache sudamaCache)
@@ -173,7 +172,7 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 依据缓存文件修改时间刷新"上次刷新/导入时间"文案（不引入额外存储状态）
+    /// 依据缓存文件修改时间刷新"上次刷新/导入时间"文案到 Sudama 源行（不引入额外存储状态）
     /// </summary>
     public void RefreshSudamaCacheAge()
     {
@@ -185,9 +184,19 @@ public partial class SettingsViewModel : ObservableObject
             .Select(File.GetLastWriteTimeUtc)
             .ToList();
 
-        SudamaCacheAgeText = times.Count == 0
+        var text = times.Count == 0
             ? "尚未生成缓存"
             : $"缓存更新于 {times.Max().ToLocalTime():yyyy-MM-dd HH:mm}";
+
+        // 写进 Sudama 源行自身，集合元素替换触发该行重绑定
+        for (var i = 0; i < VisibleSources.Count; i++)
+        {
+            if (VisibleSources[i].Id == "sudama")
+            {
+                VisibleSources[i].SudamaCacheAgeText = text;
+                VisibleSources[i] = VisibleSources[i];
+            }
+        }
     }
 
     /// <summary>

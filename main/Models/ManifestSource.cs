@@ -43,6 +43,11 @@ public class ManifestSource
     public bool ShowRefreshCacheButton => Id == "sudama";
 
     /// <summary>
+    /// Sudama 缓存上次刷新/导入时间文案（仅 Sudama 行显示）
+    /// </summary>
+    public string SudamaCacheAgeText { get; set; } = "";
+
+    /// <summary>
     /// 获取该源 API Key / Token 的页面地址（无则返回 null）
     /// </summary>
     public static string? GetTokenPageUrl(string sourceId) => sourceId switch
