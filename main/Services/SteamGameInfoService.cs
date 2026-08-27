@@ -225,7 +225,8 @@ public class SteamGameInfoService
     {
         var ids = new List<string>();
 
-        // 1. SteamCMD API：extended/common 下的 listofdlc（逗号分隔字符串）
+        // 只走 SteamCMD API：extended/common 下的 listofdlc（逗号分隔字符串）。
+        // 官方 store 兜底已删——大陆网络不可达，只会让每次打开都空转 30s 超时。
         try
         {
             var response = await _http.GetAsync($"https://api.steamcmd.net/v1/info/{appId}");
@@ -258,31 +259,6 @@ public class SteamGameInfoService
         catch (Exception ex)
         {
             Log($"获取 DLC 列表异常(SteamCMD): {ex.Message}");
-        }
-
-        // 2. Steam 官方 API：dlc 数组
-        try
-        {
-            var response = await _http.GetAsync($"https://store.steampowered.com/api/appdetails?appids={appId}&l=schinese&cc=us");
-            if (response.IsSuccessStatusCode)
-            {
-                var json = await response.Content.ReadAsStringAsync();
-                var doc = JsonDocument.Parse(json);
-                if (doc.RootElement.TryGetProperty(appId, out var appData) &&
-                    appData.TryGetProperty("data", out var data) &&
-                    data.TryGetProperty("dlc", out var dlcArr))
-                {
-                    ids = dlcArr.EnumerateArray()
-                        .Where(e => e.ValueKind == JsonValueKind.Number && e.TryGetInt32(out _))
-                        .Select(e => e.GetInt32().ToString())
-                        .Distinct()
-                        .ToList();
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            Log($"获取 DLC 列表异常(Steam API): {ex.Message}");
         }
 
         return ids;
