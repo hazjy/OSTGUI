@@ -73,6 +73,8 @@
                             <TextBlock Text="需要密钥的源在此配置 API Key / Token"
                                        FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                        TextWrapping="Wrap" />
+                            <TextBlock Text="{Binding SudamaCacheAgeText}" FontSize="12"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
 
                         <!-- 源列表（内置 + 自定义，通用格式） -->

@@ -13,6 +13,8 @@ public sealed partial class SettingsPage : Page
 {
     public SettingsViewModel VM { get; }
 
+    private DispatcherTimer? _cacheAgeTimer;
+
     public SettingsPage(SettingsViewModel vm)
     {
         this.InitializeComponent();
@@ -28,8 +30,27 @@ public sealed partial class SettingsPage : Page
 
         // 每次进入页面（缓存页经 ContentFrame.Content 切换，Loaded 会重新触发，
         // OnNavigatedTo 不会）同步一次当前日志：仅在无新日志事件时，日志栏不依赖事件也有内容
-        Loaded += (s, e) => VM.LogsText = string.Join("\n", LogService.Logs);
+        Loaded += (s, e) =>
+        {
+            VM.LogsText = string.Join("\n", LogService.Logs);
+            VM.RefreshSudamaCacheAge();
+            _cacheAgeTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) };
+            _cacheAgeTimer.Tick -= OnCacheAgeTick;
+            _cacheAgeTimer.Tick += OnCacheAgeTick;
+            _cacheAgeTimer.Start();
+        };
+        Unloaded += (s, e) =>
+        {
+            if (_cacheAgeTimer != null)
+            {
+                _cacheAgeTimer.Stop();
+                _cacheAgeTimer.Tick -= OnCacheAgeTick;
+            }
+        };
     }
+
+    private void OnCacheAgeTick(object? sender, object e)
+        => VM.RefreshSudamaCacheAge();
 
     private void OnLogsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
     {

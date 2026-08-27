@@ -101,6 +101,7 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _statusMessage = "";
     [ObservableProperty] private string _statusType = "Info";
     [ObservableProperty] private bool _isRefreshingSudama;
+    [ObservableProperty] private string _sudamaCacheAgeText = "";
 
     public SettingsViewModel(ConfigService configService, SteamService steamService,
         SteamDllService steamDllService, SudamaKeyCache sudamaCache)
@@ -142,6 +143,7 @@ public partial class SettingsViewModel : ObservableObject
         finally
         {
             IsRefreshingSudama = false;
+            RefreshSudamaCacheAge();
         }
     }
 
@@ -167,6 +169,32 @@ public partial class SettingsViewModel : ObservableObject
             SetStatus(msg, "Error");
             Services.ToastService.ShowError("Sudama 缓存导入失败", msg);
         }
+        RefreshSudamaCacheAge();
+    }
+
+    /// <summary>
+    /// 依据缓存文件修改时间刷新"距离上次刷新/导入"文案（不引入额外存储状态）
+    /// </summary>
+    public void RefreshSudamaCacheAge()
+    {
+        var dir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OSTGUI");
+        var times = new[] { "sudama_cache.json", "token_cache.json" }
+            .Select(f => Path.Combine(dir, f))
+            .Where(File.Exists)
+            .Select(File.GetLastWriteTimeUtc)
+            .ToList();
+
+        if (times.Count == 0) { SudamaCacheAgeText = "尚未生成缓存"; return; }
+
+        var ago = DateTime.UtcNow - times.Max();
+        SudamaCacheAgeText = ago < TimeSpan.FromMinutes(1)
+            ? "缓存于刚刚更新"
+            : ago < TimeSpan.FromHours(1)
+                ? $"缓存于 {(int)ago.TotalMinutes} 分钟前更新"
+                : ago < TimeSpan.FromDays(1)
+                    ? $"缓存于 {(int)ago.TotalHours} 小时 {(int)(ago.TotalMinutes % 60)} 分钟前更新"
+                    : $"缓存于 {(int)ago.TotalDays} 天前更新";
     }
 
     /// <summary>
