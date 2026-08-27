@@ -42,11 +42,15 @@ public class GameNameCacheService
     }
 
     /// <summary>
-    /// 写入名称缓存并落盘
+    /// 写入名称缓存并落盘。
+    /// 有效期内（30 天）不覆盖：改名游戏在 TTL 内保持旧名（预期行为），
+    /// 过期/缺失条目由下一次查询自然刷新。
     /// </summary>
     public void Set(string appId, string name)
     {
         if (string.IsNullOrWhiteSpace(name))
+            return;
+        if (TryGet(appId, out _))   // 仍有效的缓存条目保持原样
             return;
         _nameCache[appId] = (name, DateTime.Now);
         SaveCache();
