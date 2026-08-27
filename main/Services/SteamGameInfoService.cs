@@ -289,6 +289,26 @@ public class SteamGameInfoService
     }
 
     /// <summary>
+    /// 轻量获取 AppID 的游戏名（只读 steamcmd 响应的 name，不要求 depots，不做官方兜底）。
+    /// 供 DLC 名单取名用——DLC 多无 depots，走完整解析会被判 null 再跌进官方 30s 超时。
+    /// </summary>
+    private async Task<string?> GetNameFromSteamCmdAsync(string appId)
+    {
+        try
+        {
+            var response = await _http.GetAsync($"https://api.steamcmd.net/v1/info/{appId}");
+            if (!response.IsSuccessStatusCode) return null;
+            var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+            if (doc.RootElement.TryGetProperty("data", out var data) &&
+                data.TryGetProperty(appId, out var appData) &&
+                appData.TryGetProperty("name", out var nameElem))
+                return nameElem.GetString();
+        }
+        catch { }
+        return null;
+    }
+
+    /// <summary>
     /// 获取 DLC 列表（含名称；名称每次实时向 API 获取，不参与名称缓存）
     /// </summary>
     public async Task<List<DlcInfo>> GetDlcInfoAsync(string appId)
@@ -299,15 +319,14 @@ public class SteamGameInfoService
             var ids = await GetDlcIdsAsync(appId);
             if (ids.Count == 0) return result;
 
-            // 实时批量取 DLC 名（限并发 6），不读写名称缓存
+            // 实时批量取 DLC 名（限并发 6），不读写名称缓存、不走官方 store 兜底
             using var gate = new SemaphoreSlim(6);
             var nameTasks = ids.Select(async id =>
             {
                 await gate.WaitAsync();
                 try
                 {
-                    var info = await GetGameDetailsFromSteamAsync(id);
-                    return (id, name: string.IsNullOrEmpty(info?.Name) ? "" : info.Name);
+                    return (id, name: await GetNameFromSteamCmdAsync(id) ?? "");
                 }
                 finally
                 {
