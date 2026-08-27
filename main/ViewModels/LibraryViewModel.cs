@@ -76,7 +76,7 @@ public partial class LibraryViewModel : ObservableObject
 
             // 1) 显示名直接读缓存（零联网）；2) 缺失名的主游戏后台静默补（限流在批量方法内）。
             //    DLC/depot 引用 ID 不是有效游戏，不参与取名（避免每次启动对它们无效重试）
-            var luaDir = _steamService.GetLuaConfigDir();
+            var luaDir = _steamService.GetLuaConfigDir() ?? "";
             var mainIds = items
                 .Where(i => i.AppId != "N/A" && !string.IsNullOrEmpty(i.GameName) && i.GameName.StartsWith("AppID")
                     && File.Exists(Path.Combine(luaDir, i.AppId + ".lua")))
