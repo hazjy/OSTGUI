@@ -13,8 +13,6 @@ public sealed partial class SettingsPage : Page
 {
     public SettingsViewModel VM { get; }
 
-    private DispatcherTimer? _cacheAgeTimer;
-
     public SettingsPage(SettingsViewModel vm)
     {
         this.InitializeComponent();
@@ -34,23 +32,8 @@ public sealed partial class SettingsPage : Page
         {
             VM.LogsText = string.Join("\n", LogService.Logs);
             VM.RefreshSudamaCacheAge();
-            _cacheAgeTimer ??= new DispatcherTimer { Interval = TimeSpan.FromMinutes(1) };
-            _cacheAgeTimer.Tick -= OnCacheAgeTick;
-            _cacheAgeTimer.Tick += OnCacheAgeTick;
-            _cacheAgeTimer.Start();
-        };
-        Unloaded += (s, e) =>
-        {
-            if (_cacheAgeTimer != null)
-            {
-                _cacheAgeTimer.Stop();
-                _cacheAgeTimer.Tick -= OnCacheAgeTick;
-            }
         };
     }
-
-    private void OnCacheAgeTick(object? sender, object e)
-        => VM.RefreshSudamaCacheAge();
 
     private void OnLogsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
     {

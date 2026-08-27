@@ -173,7 +173,7 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 依据缓存文件修改时间刷新"距离上次刷新/导入"文案（不引入额外存储状态）
+    /// 依据缓存文件修改时间刷新"上次刷新/导入时间"文案（不引入额外存储状态）
     /// </summary>
     public void RefreshSudamaCacheAge()
     {
@@ -185,16 +185,9 @@ public partial class SettingsViewModel : ObservableObject
             .Select(File.GetLastWriteTimeUtc)
             .ToList();
 
-        if (times.Count == 0) { SudamaCacheAgeText = "尚未生成缓存"; return; }
-
-        var ago = DateTime.UtcNow - times.Max();
-        SudamaCacheAgeText = ago < TimeSpan.FromMinutes(1)
-            ? "缓存于刚刚更新"
-            : ago < TimeSpan.FromHours(1)
-                ? $"缓存于 {(int)ago.TotalMinutes} 分钟前更新"
-                : ago < TimeSpan.FromDays(1)
-                    ? $"缓存于 {(int)ago.TotalHours} 小时 {(int)(ago.TotalMinutes % 60)} 分钟前更新"
-                    : $"缓存于 {(int)ago.TotalDays} 天前更新";
+        SudamaCacheAgeText = times.Count == 0
+            ? "尚未生成缓存"
+            : $"缓存更新于 {times.Max().ToLocalTime():yyyy-MM-dd HH:mm}";
     }
 
     /// <summary>
