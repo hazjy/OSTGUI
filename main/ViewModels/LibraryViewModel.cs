@@ -17,6 +17,7 @@ public partial class LibraryViewModel : ObservableObject
     private readonly SteamGameInfoService _gameInfoService;
     private readonly SteamService _steamService;
     private readonly ConfigService _configService;
+    private readonly GameNameCacheService _nameCache;
 
     [ObservableProperty] private ObservableCollection<LibraryItem> _libraryItems = new();
     [ObservableProperty] private ObservableCollection<LibraryItem> _selectedItems = new();
@@ -42,13 +43,15 @@ public partial class LibraryViewModel : ObservableObject
         GameSearchService searchService,
         SteamGameInfoService gameInfoService,
         SteamService steamService,
-        ConfigService configService)
+        ConfigService configService,
+        GameNameCacheService nameCache)
     {
         _luaService = luaService;
         _searchService = searchService;
         _gameInfoService = gameInfoService;
         _steamService = steamService;
         _configService = configService;
+        _nameCache = nameCache;
     }
 
     /// <summary>
@@ -71,25 +74,26 @@ public partial class LibraryViewModel : ObservableObject
             var items = await _luaService.ScanLibraryAsync();
             ProgressValue = 30;
 
-            // 批量补游戏名：缓存命中不联网，仅缓存缺失的联网获取（限并发，只慢一次）
-            var appIds = items
-                .Where(i => i.AppId != "N/A" && !string.IsNullOrEmpty(i.GameName) && i.GameName.StartsWith("AppID"))
+            // 1) 显示名直接读缓存（零联网）；2) 缺失名的主游戏后台静默补（限流在批量方法内）。
+            //    DLC/depot 引用 ID 不是有效游戏，不参与取名（避免每次启动对它们无效重试）
+            var luaDir = _steamService.GetLuaConfigDir();
+            var mainIds = items
+                .Where(i => i.AppId != "N/A" && !string.IsNullOrEmpty(i.GameName) && i.GameName.StartsWith("AppID")
+                    && File.Exists(Path.Combine(luaDir, i.AppId + ".lua")))
                 .Select(i => i.AppId)
                 .Distinct()
                 .ToList();
 
-            if (appIds.Count > 0)
+            foreach (var item in items)
             {
-                ProgressValue = 50;
-                var names = await _searchService.GetGameNamesBatchAsync(appIds);
-                ProgressValue = 80;
-
-                foreach (var item in items)
-                {
-                    if (names.TryGetValue(item.AppId, out var name))
-                        item.GameName = name;
-                }
+                if (_nameCache.TryGet(item.AppId, out var name))
+                    item.GameName = name;
             }
+            ProgressValue = 50;
+
+            // 后台补名：成功后下次刷新列表即显示新名（不阻塞页面）
+            if (mainIds.Count > 0)
+                _ = BackfillNamesAsync(mainIds);
 
             // DLC 信息不再刷新时预加载，改为点"入库信息"时按需获取
 
@@ -112,6 +116,18 @@ public partial class LibraryViewModel : ObservableObject
         {
             IsLoading = false;
         }
+    }
+
+    /// <summary>
+    /// 后台静默补主游戏名（缓存缺失/过期项，限流并发，失败不影响页面）
+    /// </summary>
+    private async Task BackfillNamesAsync(List<string> mainIds)
+    {
+        try
+        {
+            await _searchService.GetGameNamesBatchAsync(mainIds);
+        }
+        catch { }
     }
 
     /// <summary>

@@ -10,7 +10,6 @@ public partial class OnlineViewModel : ObservableObject
 {
     private readonly OnlineFixService _onlineFixService;
     private readonly SteamGameInfoService _gameInfoService;
-    private readonly GameNameCacheService _nameCache;
 
     [ObservableProperty] private string _onlineAppId = "";
     [ObservableProperty] private string _gameName = "";
@@ -27,16 +26,14 @@ public partial class OnlineViewModel : ObservableObject
 
     public OnlineViewModel(
         OnlineFixService onlineFixService,
-        SteamGameInfoService gameInfoService,
-        GameNameCacheService nameCache)
+        SteamGameInfoService gameInfoService)
     {
         _onlineFixService = onlineFixService;
         _gameInfoService = gameInfoService;
-        _nameCache = nameCache;
     }
 
     /// <summary>
-    /// 根据 AppID 查询游戏名（先查本地缓存）
+    /// 查询游戏名（实时 API，不读不写名称缓存——显示名处与缓存解耦）
     /// </summary>
     public async Task LoadGameNameAsync()
     {
@@ -47,24 +44,10 @@ public partial class OnlineViewModel : ObservableObject
             return;
         }
 
-        if (_nameCache.TryGet(appId, out var cached))
-        {
-            GameName = cached;
-            return;
-        }
-
         try
         {
             var info = await _gameInfoService.GetGameDetailsFromSteamAsync(appId);
-            if (info != null && !string.IsNullOrEmpty(info.Name))
-            {
-                GameName = info.Name;
-                _nameCache.Set(appId, info.Name);
-            }
-            else
-            {
-                GameName = "";
-            }
+            GameName = string.IsNullOrEmpty(info?.Name) ? "" : info.Name;
         }
         catch
         {
