@@ -51,35 +51,30 @@ if not "%EC%"=="0" (
     exit /b %EC%
 )
 
-set "APPEXE=%~dp0%OUTDIR%\OSTGUI.exe"
-
-REM Known quirk: managed outputs (exe/dll) may land in a drive-stripped
-REM copy of BaseOutputPath resolved against the project dir
-REM (main\.build\...) while XBF/PRI go to the canonical repo-root .build.
-REM If the canonical exe is missing, mirror from the project-local copy.
-if exist "%APPEXE%" goto :verify_ok
-
-set "ALTDIR=%~dp0main\.build\OSTGUI\bin\Debug\net10.0-windows10.0.19041.0\win-x64"
-if not exist "%ALTDIR%\OSTGUI.exe" goto :verify_fail
-
-echo [sync] canonical output missing, mirroring project-local build output
-robocopy "%ALTDIR%" "%~dp0%OUTDIR%" /MIR /NFL /NDL /NJH /NJS >nul
+REM WindowsAppSDK quirk: every Debug build puts the fresh managed outputs in
+REM a nested copy (main\.build\... & NoSteamLauncher\.build\...) while the
+REM canonical repo-root .build may keep stale files. So BUILD OK on a stale
+REM canonical exe was silently shipping old builds. Sync anything fresher from
+REM the nested copies back to canonical BEFORE verifying. Idempotent: /E /XO
+REM overwrites only when the source file is newer; never deletes.
+set "CANON=%~dp0%OUTDIR%"
+set "ALTMAIN=%~dp0main\.build\OSTGUI\bin\Debug\net10.0-windows10.0.19041.0\win-x64"
+set "ALTNS=%~dp0NoSteamLauncher\.build\NoSteamLauncher\bin\Debug\net8.0"
+if exist "%ALTMAIN%\OSTGUI.exe" robocopy "%ALTMAIN%" "%CANON%" /E /XO /NFL /NDL /NJH /NJS >nul
+if exist "%ALTNS%\NoSteamLauncher.dll" robocopy "%ALTNS%" "%~dp0.build\NoSteamLauncher\bin\Debug\net8.0" /E /XO /NFL /NDL /NJH /NJS >nul
 if errorlevel 8 (
-    echo [BUILD ERROR] robocopy failed syncing %ALTDIR%
+    echo [BUILD ERROR] robocopy sync failed
     exit /b 1
 )
-goto :verify_ok
 
-:verify_fail
-echo [BUILD ERROR] output exe not found: %APPEXE%
-echo If this persists, wipe .build\ and main\.build\ and retry once.
-exit /b 1
+set "APPEXE=%CANON%\OSTGUI.exe"
+if not exist "%APPEXE%" (
+    echo [BUILD ERROR] output exe not found: %APPEXE%
+    echo If this persists, wipe .build\ and main\.build\ and retry once.
+    exit /b 1
+)
 
-:verify_ok
-REM The WindowsAppSDK quirk also plants a duplicate managed-output copy at
-REM main\.build\ and NoSteamLauncher\.build\ (drive-stripped BaseOutputPath
-REM resolved against the project dir) on every build. Canonical output here
-REM is authoritative -- drop the duplicates so they never linger/confuse.
+REM Nested copies are redundant now -- drop them so they never linger.
 rd /s /q "%~dp0main\.build" 2>nul
 rd /s /q "%~dp0NoSteamLauncher\.build" 2>nul
 echo [2/2] [BUILD OK] %APPEXE%
