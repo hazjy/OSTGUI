@@ -77,15 +77,34 @@ public sealed partial class SettingsPage : Page
     }
 
     /// <summary>
-    /// API Key / Token 密码框失焦时记录"上次更新"（一次，语义=改完；避免逐键重建）
+    /// API Key / Token 密码框：仅在实际值变化时记录"上次更新"（聚焦记旧值，失焦比对）
     /// </summary>
-    private void OnTokenLostFocus(object sender, RoutedEventArgs e)
+    private ManifestSource? _tokenFocusSource;
+    private string? _tokenFocusOldValue;
+
+    private void OnTokenGotFocus(object sender, RoutedEventArgs e)
     {
         if (sender is PasswordBox { DataContext: ManifestSource ms } && ms.RequiresToken)
         {
-            VM.MarkManifestKeyUpdated(ms);
-            VM.SaveAllToConfig();
+            _tokenFocusSource = ms;
+            _tokenFocusOldValue = ms.ApiKey;
         }
+    }
+
+    private void OnTokenLostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is PasswordBox pb && _tokenFocusSource != null && ReferenceEquals(pb.DataContext, _tokenFocusSource))
+        {
+            var newValue = pb.Password;
+            if (newValue != _tokenFocusOldValue)
+            {
+                _tokenFocusSource.ApiKey = newValue;
+                VM.MarkManifestKeyUpdated(_tokenFocusSource);
+                VM.SaveAllToConfig();
+            }
+        }
+        _tokenFocusSource = null;
+        _tokenFocusOldValue = null;
     }
 
     private void DetectSteam_Click(object sender, RoutedEventArgs e)
