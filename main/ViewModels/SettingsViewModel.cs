@@ -172,12 +172,14 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 记录某需 token 源的 API Key 上次设置时间，并触发该行重绑定显示
+    /// 记录某需 token 源的 API Key 上次设置时间，并触发该行重绑定显示（仅变化才重建）
     /// </summary>
     public void MarkManifestKeyUpdated(ManifestSource source)
     {
         if (!source.RequiresToken) return;
-        source.ApiKeyUpdatedAtText = "上次更新：" + DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+        var text = "上次更新：" + DateTime.Now.ToString("yyyy-MM-dd HH:mm");
+        if (source.ApiKeyUpdatedAtText == text) return;
+        source.ApiKeyUpdatedAtText = text;
         var i = VisibleSources.IndexOf(source);
         if (i >= 0) VisibleSources[i] = VisibleSources[i];
     }

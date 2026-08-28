@@ -30,7 +30,6 @@ public sealed partial class SettingsPage : Page
         // OnNavigatedTo 不会）同步一次当前日志：仅在无新日志事件时，日志栏不依赖事件也有内容
         Loaded += (s, e) =>
         {
-            _settingsReady = true;
             VM.LogsText = string.Join("\n", LogService.Logs);
             VM.RefreshSudamaCacheAge();
         };
@@ -71,17 +70,22 @@ public sealed partial class SettingsPage : Page
         }
     }
 
-    private bool _settingsReady;
-
     private void OnSettingChanged(object sender, RoutedEventArgs e)
     {
-        // 需 token 源的 API Key 密码框：用户键入时记录"上次更新"时间。
-        // _settingsReady 门卫：页面加载时绑定初始化也会触发一次，不算用户操作
-        if (_settingsReady && sender is PasswordBox { DataContext: ManifestSource ms } && ms.RequiresToken)
-            VM.MarkManifestKeyUpdated(ms);
-
         // 所有设置实时保存
         VM.SaveAllToConfig();
+    }
+
+    /// <summary>
+    /// API Key / Token 密码框失焦时记录"上次更新"（一次，语义=改完；避免逐键重建）
+    /// </summary>
+    private void OnTokenLostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is PasswordBox { DataContext: ManifestSource ms } && ms.RequiresToken)
+        {
+            VM.MarkManifestKeyUpdated(ms);
+            VM.SaveAllToConfig();
+        }
     }
 
     private void DetectSteam_Click(object sender, RoutedEventArgs e)

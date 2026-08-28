@@ -117,7 +117,7 @@
                                                         </Grid.ColumnDefinitions>
                                                         <PasswordBox Grid.Column="0" Password="{Binding ApiKey, Mode=TwoWay}"
                                                                      PlaceholderText="可选，留空则不使用"
-                                                                     PasswordChanged="OnSettingChanged" />
+                                                                     LostFocus="OnTokenLostFocus" />
                                                         <Button Grid.Column="1" Content="获取" Tag="{Binding}"
                                                                 Click="OpenTokenPage_Click" VerticalAlignment="Center" />
                                                     </Grid>
