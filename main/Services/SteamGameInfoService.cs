@@ -265,20 +265,35 @@ public class SteamGameInfoService
     }
 
     /// <summary>
-    /// 轻量获取 AppID 的游戏名（只读 steamcmd 响应的 name，不要求 depots，不做官方兜底）。
-    /// 供 DLC 名单取名用——DLC 多无 depots，走完整解析会被判 null 再跌进官方 30s 超时。
+    /// 获取 AppID 的游戏名：steamcmd 不提供 DLC 名字（实测对 DLC 返回空壳），
+    /// 取不到时兜底官方 appdetails（可达时带名，8s 截断防拖慢）。
     /// </summary>
     private async Task<string?> GetNameFromSteamCmdAsync(string appId)
     {
         try
         {
             var response = await _http.GetAsync($"https://api.steamcmd.net/v1/info/{appId}");
-            if (!response.IsSuccessStatusCode) return null;
-            var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-            if (doc.RootElement.TryGetProperty("data", out var data) &&
-                data.TryGetProperty(appId, out var appData) &&
-                appData.TryGetProperty("name", out var nameElem))
-                return nameElem.GetString();
+            if (response.IsSuccessStatusCode)
+            {
+                var doc = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                if (doc.RootElement.TryGetProperty("data", out var data) &&
+                    data.TryGetProperty(appId, out var appData) &&
+                    appData.TryGetProperty("name", out var nameElem))
+                    return nameElem.GetString();
+            }
+        }
+        catch { }
+
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+            var resp = await _http.GetAsync($"https://store.steampowered.com/api/appdetails?appids={appId}&cc=us", cts.Token);
+            if (!resp.IsSuccessStatusCode) return null;
+            var doc = JsonDocument.Parse(await resp.Content.ReadAsStringAsync());
+            if (doc.RootElement.TryGetProperty(appId, out var apd) &&
+                apd.TryGetProperty("data", out var d) &&
+                d.TryGetProperty("name", out var ne))
+                return ne.GetString();
         }
         catch { }
         return null;
