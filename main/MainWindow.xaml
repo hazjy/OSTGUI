@@ -38,7 +38,7 @@
             IsSettingsVisible="False"
             PaneDisplayMode="Left"
             IsPaneToggleButtonVisible="True"
-            OpenPaneLength="360"
+            OpenPaneLength="200"
             SelectionChanged="NavView_SelectionChanged"
             ItemInvoked="MainNavView_ItemInvoked"
             PaneOpening="MainNavView_PaneOpening"

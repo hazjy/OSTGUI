@@ -73,8 +73,8 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
             var config = _mainVM.ConfigService.Config;
 
             MainNavView.IsPaneOpen = config.IsNavigationPaneOpen;
-            // 侧边栏宽度可配置（配置文件 NavigationPaneWidth，默认 300）
-            if (config.NavigationPaneWidth >= 200 && config.NavigationPaneWidth <= 600)
+            // 侧边栏宽度可配置（配置文件 NavigationPaneWidth，默认 360）
+            if (config.NavigationPaneWidth >= 150 && config.NavigationPaneWidth <= 600)
                 MainNavView.OpenPaneLength = config.NavigationPaneWidth;
 
             var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);

@@ -58,7 +58,7 @@ public class AppConfig
     // === 界面状态记忆 ===
     public string DefaultPage { get; set; } = "home";
     public bool IsNavigationPaneOpen { get; set; } = true;
-    public double NavigationPaneWidth { get; set; } = 360;
+    public double NavigationPaneWidth { get; set; } = 200;
 
     // === 应用程序设置 ===
     public bool DebugMode { get; set; }
@@ -100,7 +100,7 @@ public class AppConfig
         IsWindowMaximized = false,
         DefaultPage = "home",
         IsNavigationPaneOpen = true,
-        NavigationPaneWidth = 360,
+        NavigationPaneWidth = 200,
         DebugMode = false,
         LogMaxLines = 1000,
         CheckUpdateOnStart = true,
