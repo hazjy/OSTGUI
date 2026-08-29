@@ -89,7 +89,14 @@ public class LuaBuilder
                 lines.Add("");
                 lines.Add("-- 所有 DLC");
                 foreach (var dlcId in newDlcs)
-                    lines.Add($"addappid({dlcId})");
+                {
+                    // DLC 自身 AppID 也可能作为独立 depot ID 在 Sudama 收录；查到 key 就带 key
+                    var hasDlcKey = keys.TryGetValue(dlcId, out var dlcKey) && dlcKey.Length == 64;
+                    if (hasDlcKey)
+                        lines.Add($"addappid({dlcId}, 1, \"{dlcKey}\")");
+                    else
+                        lines.Add($"addappid({dlcId})");
+                }
 
                 // 为缓存中有 token 的 DLC 补充 addtoken（受限 DLC 获取 appinfo 需要）
                 var dlcTokenLines = newDlcs

@@ -60,15 +60,16 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
 ## 5. 搜索与入库链路
 
 - 搜索全部走 `cc=us`（AppID 详情、storesearch 主源、HTML 备源、关键词源均已统一），成人内容不再被 cn 区过滤，名称搜索可直接命中；能搜到 ≠ 能入库（还需密钥存在）
-- 清单源与密钥源分离：MHub = 清单源（仅最新版），Sudama = 仅密钥源；SteamAutoCracks/ManifestHub 的分支式 GitHub 源已失效（404），GitHub(Auiowu) 分支源仍实现着
-- 入库勾选"下载 Manifest"（默认开）：MHub → GitHub → Sudama(仅密钥) 级联；不勾则跳过清单直接生成 Lua，由内核运行时兜底取清单，成功提示注明兜底
-- `LuaBuilder`：Sudama 密钥/令牌 → `MergeAllDepotsAsync` 用全量 depot 列表补全（防止只写有 manifest 的 depot 漏密钥）→ 缺密钥收集并通知
+- 清单源与密钥源分离：MHub = 清单源（仅最新版），Sudama = 仅密钥源
+- **GitHub (Auiowu) 源已废弃**（v1.3.x）：上游仓库 `SteamAutoCracks/ManifestHub` 自 2025-07-24 停更，本机实测 CS2 (730) / Palworld (1623730) / Deadlock (892970) / 黑神话悟空 (2358720) 四个分支全部 404，社区生态已迁移到 MHub API（Hubcap / ManifestHub3 / SteaMidra 等主流工具均不再走 GitHub 分支模式）。`DownloadFromGithubAsync` 方法、`GetSourceApiKey` / `GetSourceBaseUrl` 辅助方法、`ManifestSourceType.GitHub` / `GitHubSearch` 枚举值、`CustomGithubRepos` / `CustomZipUrls` / `CustomManifestSources` 字段、`AppConfig.GithubToken` 字段均已删除；同时清理其他 5 个从未接入的清单源预设（`sac` / `walftech` / `steamautocracks_v2` / `buqiuren` / `auto_github`）及对应枚举值（`SAC` / `Walftech` / `ManifestOnly`）。`IsImplementedSource` 仅认 `mhub` / `sudama`
+- 入库勾选"下载 Manifest"（默认开）：MHub → Sudama(仅密钥) 级联；不勾则跳过清单直接生成 Lua，由内核运行时兜底取清单，成功提示注明兜底
+- `LuaBuilder`：Sudama 密钥/令牌 → `MergeAllDepotsAsync` 用全量 depot 列表补全（防止只写有 manifest 的 depot 漏密钥）→ 缺密钥收集并通知。DLC 段也对每个 DLC AppID 查 `keys[dlcId]`，Sudama 收录的独立 DLC depot key 会自动写入 `addappid(dlcId, 1, "<key>")`
 - 缺解密密钥警告在两种模式下都保留（无 key 无法解密下载加密内容）
 
 ## 6. Sudama 缓存（v1.3.0 现状）
 
 - 缓存文件：`%LOCALAPPDATA%\OSTGUI\sudama_cache.json`（约 22 万条 / 16.5MB）、`token_cache.json`
-- 24h TTL；失败回退任意旧缓存；设置页可强制刷新，也支持**手动导入本地文件**（浏览器直连快于应用内时使用，按文件名/内容自动识别类型）
+- 缓存**不过期自动刷新**（已去掉 24h TTL，08-28 起：缓存存在即用）；失败回退任意旧缓存；设置页可强制刷新，也支持**手动导入本地文件**（浏览器直连快于应用内时使用，按文件名/内容自动识别类型）
 - 下载策略：密钥与令牌并行；流式接收；单次超时 max(120, 设置值)；重试间隔 1.5s；成功日志带条数/体积/耗时
 - Sudama 无按需查询接口，只有全量端点；勿每次入库实时拉全量
 - 隐藏调优参数 `DownloadTimeout`（config.json，默认 120，无 UI）：同时影响清单文件下载（max(60,·)）与 Sudama 缓存下载（max(120,·)）的超时；早期版本曾有设置控件，08-14 起移除仅留字段
@@ -120,7 +121,7 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
 | `SteamGameInfoService` | 统一查询：depot + manifest gid + DLC 列表与名称（优先走社区非官方 API `api.steamcmd.net`——注意并非 Valve 官方，由 github.com/steamcmd/api 项目运营；失败回退官方 `store.steampowered.com/api/appdetails`，大陆网络下通常不可达）|
 | `ManifestDownloadService` | 多源清单下载 + 生成 Lua（门面已移除）|
 | `LuaBuilder` / `LuaConfigService` | Lua 生成（补全 depot/key/token/DLC/固定版本）；Lua 读写与版本模式切换 |
-| `SudamaKeyCache` | 密钥/令牌缓存（并行下载、24h TTL、手动刷新与本地导入）|
+| `SudamaKeyCache` | 密钥/令牌缓存（并行下载、不过期自动刷新、手动刷新与本地导入）|
 | `LibraryScanner` | 扫描 Lua 目录、检测错误 |
 | `NoSteamLauncherService` / `NoSteamLaunchOrchestrator` | 免 Steam 部署封装 / 编排（Steamless + GBE + Bypass）|
 | `OnlineFixService` | 480 联机（`steam.exe -applaunch 480 -onlinefix`，PEB 读命令行检测）|
@@ -131,7 +132,7 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
 
 - MHub 只支持最新清单
 - 补齐版本配置写入的是当前 GID
-- 名称缓存 30 天 TTL，游戏改名后会显示旧名
+- 名称缓存 30 天 TTL，游戏改名后会显示旧名（08-28 起机制：仅主游戏入缓存；库页显示纯缓存读 + 后台静默补名；联机/DLC 等显示名处实时查询不参与缓存）
 - DLC token 无按需查询渠道：生成 Lua 时会逐个查 Sudama 全量缓存并写入命中的 `addtoken`，但 dump 未收录的受限 DLC 没有补充途径
 - 480 联机同一时间只能运行一个
 - Sudama 大文件下载速度取决于服务器线路，慢时走浏览器下载 + 手动导入

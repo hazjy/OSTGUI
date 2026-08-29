@@ -111,9 +111,6 @@ public class ConfigService
                 if (preset != null) { src.Name = preset.Name; src.Description = preset.Description; }
             }
         }
-        config.CustomManifestSources ??= defaults.CustomManifestSources;
-        config.CustomGithubRepos ??= defaults.CustomGithubRepos;
-        config.CustomZipUrls ??= defaults.CustomZipUrls;
         config.Extensions ??= defaults.Extensions;
         if (config.WindowWidth <= 0) config.WindowWidth = defaults.WindowWidth;
         if (config.WindowHeight <= 0) config.WindowHeight = defaults.WindowHeight;

@@ -230,7 +230,7 @@ public partial class SearchViewModel : ObservableObject
 
             if (DownloadManifest)
             {
-                // 多源级联：MHub（配了 key 时）→ GitHub → Sudama，任一成功即完成
+                // 多源级联：MHub（配了 key 时）→ Sudama 兜底，任一成功即完成
                 var mhubKey = _configService.Config.ManifestSources?
                     .FirstOrDefault(s => s.Id == "mhub")?.ApiKey
                     ?? _configService.Config.ManifestHubApiKey;
@@ -242,14 +242,7 @@ public partial class SearchViewModel : ObservableObject
                         appId, FixedVersion, AddAllDlc, progress);
                 }
 
-                if (!success)
-                {
-                    LogService.AddLog("使用 GitHub 下载清单...");
-                    (success, message, missingKeys) = await _manifestService.DownloadFromGithubAsync(
-                        appId, FixedVersion, AddAllDlc, progress);
-                }
-
-                // GitHub 失败时兜底走 Sudama：仅作为密钥源生成 Lua（不下载清单），清单需由清单源获取
+                // MHub 失败时兜底走 Sudama：仅作为密钥源生成 Lua（不下载清单），清单需由清单源获取
                 if (!success)
                 {
                     LogService.AddLog("尝试 Sudama 兜底...");

@@ -8,7 +8,6 @@ public class AppConfig
 {
     // === 基本设置 ===
     public string SteamPath { get; set; } = string.Empty; // 留空则自动检测
-    public string GithubToken { get; set; } = string.Empty;
     public string ManifestHubApiKey { get; set; } = string.Empty;
     public bool ShowSystemNotifications { get; set; } = true;
     public bool ShowVersionChangeNotifications { get; set; } = true;
@@ -67,9 +66,6 @@ public class AppConfig
     public bool CheckUpdateOnStart { get; set; } = true;
 
     // === 自定义清单源 ===
-    public List<string> CustomGithubRepos { get; set; } = new();
-    public List<string> CustomZipUrls { get; set; } = new();
-    public List<ManifestSource> CustomManifestSources { get; set; } = new();
     public Dictionary<string, bool> ManifestSourceEnabled { get; set; } = new();
 
     // === 完整清单源配置（内置 + 自定义，通用格式） ===
@@ -84,7 +80,6 @@ public class AppConfig
     public static AppConfig GetDefault() => new()
     {
         SteamPath = string.Empty,
-        GithubToken = string.Empty,
         DefaultManifestSource = "auto",
         UnlockerType = "ost",
         DefaultAddAllDlc = true,
@@ -112,9 +107,6 @@ public class AppConfig
         ManifestSourceEnabled = ManifestSource.GetPresetSources()
             .ToDictionary(s => s.Id, s => s.IsEnabled),
         ManifestSources = ManifestSource.GetPresetSources(),
-        CustomGithubRepos = new(),
-        CustomZipUrls = new(),
-        CustomManifestSources = new(),
         Extensions = new(),
         // NoSteam options
         DefaultBackupOriginalExe = true,

@@ -69,7 +69,7 @@ public class ManifestSource
     /// </summary>
     public static bool IsImplementedSource(string sourceId) => sourceId switch
     {
-        "mhub" or "sudama" or "github_auiowu" => true,
+        "mhub" or "sudama" => true,
         _ => false
     };
 
@@ -91,41 +91,29 @@ public class ManifestSource
     }
 
     /// <summary>
-    /// 预置清单源列表（兼容流畅入库）
-    /// 只有适合 URL 模板的源提供默认 BaseUrl，其余由专用逻辑处理
+    /// 预置清单源列表
     /// </summary>
     public static List<ManifestSource> GetPresetSources() => new()
     {
-        new() { Id = "sac", Name = "SAC 分流", Description = "SAC 清单分流源", BaseUrl = "", Type = ManifestSourceType.SAC, Priority = 1 },
-        new() { Id = "walftech", Name = "Walftech", Description = "Walftech 清单源", BaseUrl = "", Type = ManifestSourceType.Walftech, Priority = 2 },
         new()
         {
             Id = "mhub", Name = "MHub", Description = "MHub 清单源",
             BaseUrl = "https://api.manifesthub2.filegear-sg.me/manifest?apikey={key}&depotid={depotid}&manifestid={manifestid}",
-            Type = ManifestSourceType.MHub, RequiresToken = true, Priority = 3
+            Type = ManifestSourceType.MHub, RequiresToken = true, Priority = 1
         },
-        new() { Id = "steamautocracks_v2", Name = "SteamAutoCracks V2", Description = "仅提供密钥", BaseUrl = "", Type = ManifestSourceType.KeyOnly, Priority = 4 },
         new()
         {
             Id = "sudama", Name = "Sudama 库", Description = "仅提供密钥",
             BaseUrl = "https://api.993499094.xyz/depotkeys.json",
-            Type = ManifestSourceType.KeyOnly, Priority = 5
+            Type = ManifestSourceType.KeyOnly, Priority = 2
         },
-        new() { Id = "buqiuren", Name = "清单不求人", Description = "仅提供清单", BaseUrl = "", Type = ManifestSourceType.ManifestOnly, Priority = 6 },
-        new() { Id = "github_auiowu", Name = "GitHub (Auiowu)", Description = "GitHub 仓库清单（专用逻辑）", BaseUrl = "", Type = ManifestSourceType.GitHub, RequiresToken = true, Priority = 7 },
-        new() { Id = "auto_github", Name = "自动搜索 GitHub", Description = "自动在 GitHub 上搜索清单（专用逻辑）", BaseUrl = "", Type = ManifestSourceType.GitHubSearch, Priority = 8 },
     };
 }
 
 public enum ManifestSourceType
 {
-    SAC,
-    Walftech,
     MHub,
     KeyOnly,
-    ManifestOnly,
-    GitHub,
-    GitHubSearch,
     OpenSteamTool,
     Custom
 }

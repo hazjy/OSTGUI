@@ -265,14 +265,6 @@ public partial class SettingsViewModel : ObservableObject
         {
             sources = ManifestSource.GetPresetSources();
 
-            // 迁移旧全局 GitHub Token 到 GitHub 源
-            if (!string.IsNullOrEmpty(c.GithubToken))
-            {
-                var gh = sources.FirstOrDefault(s => s.Id == "github_auiowu");
-                if (gh != null && string.IsNullOrEmpty(gh.ApiKey))
-                    gh.ApiKey = c.GithubToken;
-            }
-
             // 迁移旧全局 ManifestHub Key 到 MHub 源
             if (!string.IsNullOrEmpty(c.ManifestHubApiKey))
             {

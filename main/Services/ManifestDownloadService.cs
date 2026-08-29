@@ -6,7 +6,7 @@ using OSTGUI.Models;
 
 namespace OSTGUI.Services;
 /// <summary>
-/// 清单下载服务 - 从 GitHub / ManifestHub 下载 manifest，Sudama 仅作密钥源，统一生成 Lua 配置
+/// 清单下载服务 - 从 ManifestHub 下载 manifest，Sudama 仅作密钥源，统一生成 Lua 配置
 /// </summary>
 public class ManifestDownloadService
 {
@@ -17,10 +17,6 @@ public class ManifestDownloadService
     private readonly LuaBuilder _luaBuilder;
     private readonly SudamaKeyCache _sudamaCache;
     private readonly ManifestFileService _manifestFile;
-
-    private const string GithubRepo = "SteamAutoCracks/ManifestHub";
-    private const string GithubApiBase = "https://api.github.com/repos/" + GithubRepo;
-    private const string GithubRawBase = "https://raw.githubusercontent.com/" + GithubRepo;
 
     public ManifestDownloadService(HttpClient http, SteamService steamService, ConfigService configService,
         SteamGameInfoService gameInfoService, LuaBuilder luaBuilder, SudamaKeyCache sudamaCache,
@@ -40,120 +36,6 @@ public class ManifestDownloadService
         LogService.AddLog(message);
         System.Diagnostics.Debug.WriteLine($"[ManifestDownload] {message}");
     }
-    public async Task<(bool success, string message, List<string> missingKeys)> DownloadFromGithubAsync(
-        string appId,
-        bool fixedVersion,
-        bool addAllDlc,
-        IProgress<string>? progress)
-    {
-        var tempDir = Path.Combine(Path.GetTempPath(), "ostgui_" + appId);
-        var extractPath = Path.Combine(tempDir, "extract");
-
-        try
-        {
-            var config = _configService.Config;
-            var githubToken = GetSourceApiKey("github_auiowu", config.GithubToken);
-            var headers = new Dictionary<string, string>
-            {
-                ["User-Agent"] = "OSTGUI",
-                ["Accept"] = "application/vnd.github.v3+json"
-            };
-            if (!string.IsNullOrEmpty(githubToken))
-                headers["Authorization"] = $"Bearer {githubToken}";
-
-            // 1. 检查分支是否存在
-            Log("检查分支是否存在: " + $"{GithubApiBase}/branches/{appId}");
-            var branchRequest = new HttpRequestMessage(HttpMethod.Get, $"{GithubApiBase}/branches/{appId}");
-            foreach (var h in headers)
-                branchRequest.Headers.TryAddWithoutValidation(h.Key, h.Value);
-            var branchResponse = await _http.SendAsync(branchRequest);
-            Log($"分支检查响应: {(int)branchResponse.StatusCode}");
-
-            if (branchResponse.StatusCode == System.Net.HttpStatusCode.NotFound)
-                return (false, "未在 GitHub 仓库中找到该游戏的清单 (404)", new List<string>());
-            if (!branchResponse.IsSuccessStatusCode)
-                return (false, $"GitHub API 错误: {(int)branchResponse.StatusCode}", new List<string>());
-
-            var branchData = await branchResponse.Content.ReadFromJsonAsync<JsonElement>();
-            var commitSha = branchData.GetProperty("commit").GetProperty("sha").GetString()!;
-            Log($"获取到 commit SHA: {commitSha}");
-
-            // 2. 获取文件树
-            Log("正在获取文件列表...");
-            var treeRequest = new HttpRequestMessage(HttpMethod.Get, $"{GithubApiBase}/git/trees/{commitSha}?recursive=1");
-            foreach (var h in headers)
-                treeRequest.Headers.TryAddWithoutValidation(h.Key, h.Value);
-            var treeResponse = await _http.SendAsync(treeRequest);
-            if (!treeResponse.IsSuccessStatusCode)
-                return (false, "无法获取文件树", new List<string>());
-
-            var treeData = await treeResponse.Content.ReadFromJsonAsync<JsonElement>();
-            var files = treeData.GetProperty("tree").EnumerateArray()
-                .Where(f => f.GetProperty("type").GetString() == "blob")
-                .ToList();
-
-            if (files.Count == 0)
-                return (false, "仓库中没有文件", new List<string>());
-
-            Log($"找到 {files.Count} 个文件，开始下载...");
-
-            // 3. 下载分支下的 manifest 文件
-            Directory.CreateDirectory(extractPath);
-            var downloaded = 0;
-            foreach (var file in files)
-            {
-                var filePath = file.GetProperty("path").GetString()!;
-                if (!filePath.EndsWith(".manifest", StringComparison.OrdinalIgnoreCase))
-                    continue;
-
-                var fileUrl = $"{GithubRawBase}/{appId}/{filePath}";
-                try
-                {
-                    var fileRequest = new HttpRequestMessage(HttpMethod.Get, fileUrl);
-                    foreach (var h in headers)
-                        fileRequest.Headers.TryAddWithoutValidation(h.Key, h.Value);
-                    var fileResponse = await _http.SendAsync(fileRequest);
-                    if (fileResponse.IsSuccessStatusCode)
-                    {
-                        var targetPath = Path.Combine(extractPath, Path.GetFileName(filePath));
-                        var content = await fileResponse.Content.ReadAsByteArrayAsync();
-                        await File.WriteAllBytesAsync(targetPath, content);
-                        downloaded++;
-                        Log($"已下载: {Path.GetFileName(filePath)}");
-                    }
-                }
-                catch (Exception ex)
-                {
-                    Log($"下载异常: {filePath} - {ex.Message}");
-                }
-            }
-
-            if (downloaded == 0)
-                return (false, "未能下载任何 manifest 文件", new List<string>());
-
-            var manifestFiles = Directory.GetFiles(extractPath, "*.manifest", SearchOption.AllDirectories).ToList();
-            var manifestCount = _manifestFile.CopyToDepotCache(manifestFiles);
-
-            // 4. 从文件名解析 depot 信息
-            var depots = ManifestFileService.ParseDepotsFromFiles(manifestFiles);
-            Log($"解析到 {depots.Count} 个 depot");
-
-            // 5. 生成完整 Lua（自动补 depot key / access token / DLC）
-            var (lua, missingKeys) = await _luaBuilder.BuildLuaAsync(appId, "GitHub", depots, fixedVersion, addAllDlc);
-            var luaOk = await _luaBuilder.WriteLuaAsync(appId, lua);
-
-            Log("入库完成!");
-            return (true, $"成功入库 AppID {appId}，复制了 {manifestCount} 个清单，Lua {(luaOk ? "已生成" : "生成失败")}", missingKeys);
-        }
-        catch (Exception ex)
-        {
-            return (false, $"GitHub 入库失败: {ex.Message}", new List<string>());
-        }
-        finally
-        {
-            ManifestFileService.TryDeleteDir(tempDir);
-        }
-    }
 
     /// <summary>
     /// 从 ManifestHub API 下载清单
@@ -169,7 +51,10 @@ public class ManifestDownloadService
 
         try
         {
-            var apiKey = GetSourceApiKey("mhub", _configService.Config.ManifestHubApiKey);
+            var mhubSource = GetSource("mhub");
+            var apiKey = !string.IsNullOrEmpty(mhubSource?.ApiKey)
+                ? mhubSource.ApiKey
+                : _configService.Config.ManifestHubApiKey;
             if (string.IsNullOrEmpty(apiKey))
                 return (false, "未配置 ManifestHub API Key", new List<string>());
 
@@ -193,7 +78,6 @@ public class ManifestDownloadService
 
             // 2. 下载每个 manifest
             Directory.CreateDirectory(tempDir);
-            var mhubSource = GetSource("mhub");
             var mhubUrlTemplate = !string.IsNullOrEmpty(mhubSource?.BaseUrl) ? mhubSource.BaseUrl : "";
             var downloaded = new List<(string depotId, string manifestGid, long size)>();
 
@@ -312,30 +196,5 @@ public class ManifestDownloadService
         var config = _configService.Config;
         return config.ManifestSources?.FirstOrDefault(s => s.Id == id);
     }
-
-    /// <summary>
-    /// 获取源配置的 API Key，未配置时回退旧全局字段
-    /// </summary>
-
-    private string GetSourceApiKey(string sourceId, string legacyFallback)
-    {
-        var source = GetSource(sourceId);
-        return !string.IsNullOrEmpty(source?.ApiKey) ? source.ApiKey : legacyFallback;
-    }
-
-    /// <summary>
-    /// 获取源配置的 URL 模板，未配置时回退默认 URL
-    /// </summary>
-
-    private string GetSourceBaseUrl(string sourceId, string defaultUrl)
-    {
-        var source = GetSource(sourceId);
-        return !string.IsNullOrEmpty(source?.BaseUrl) ? source.BaseUrl : defaultUrl;
-    }
-
-    /// <summary>
-    /// 从 GitHub 下载清单并生成 Lua 配置
-    /// </summary>
-
 
 }
