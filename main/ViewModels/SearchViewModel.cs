@@ -225,8 +225,7 @@ public partial class SearchViewModel : ObservableObject
             LogService.AddLog($"Steam 路径: {steamPath}");
 
             var progress = new Progress<string>(msg => LogService.AddLog(msg));
-            var (success, message) = (false, "");
-            var missingKeys = new List<string>();
+            AddGameResult res;
 
             if (DownloadManifest)
             {
@@ -238,15 +237,19 @@ public partial class SearchViewModel : ObservableObject
                 if (!string.IsNullOrEmpty(mhubKey))
                 {
                     LogService.AddLog("使用 ManifestHub 下载清单...");
-                    (success, message, missingKeys) = await _manifestService.DownloadFromManifestHubAsync(
+                    res = await _manifestService.DownloadFromManifestHubAsync(
                         appId, FixedVersion, AddAllDlc, progress);
                 }
+                else
+                {
+                    res = new AddGameResult();
+                }
 
-                // MHub 失败时兜底走 Sudama：仅作为密钥源生成 Lua（不下载清单），清单需由清单源获取
-                if (!success)
+                // MHub 失败（含未配 key）时兜底走 Sudama：仅作为密钥源生成 Lua（不下载清单），清单需由清单源获取
+                if (!res.Success)
                 {
                     LogService.AddLog("尝试 Sudama 兜底...");
-                    (success, message, missingKeys) = await _manifestService.DownloadFromSudamaAsync(
+                    res = await _manifestService.DownloadFromSudamaAsync(
                         appId, FixedVersion, AddAllDlc, progress);
                 }
             }
@@ -254,49 +257,51 @@ public partial class SearchViewModel : ObservableObject
             {
                 // 关闭清单下载：跳过清单源，直接用密钥源生成 Lua，清单由内核运行时兜底获取
                 LogService.AddLog("已关闭清单下载，跳过清单源，清单由内核运行时兜底获取...");
-                (success, message, missingKeys) = await _manifestService.DownloadFromSudamaAsync(
+                res = await _manifestService.DownloadFromSudamaAsync(
                     appId, FixedVersion, AddAllDlc, progress);
             }
 
             ProgressValue = 100;
-            LogService.AddLog(message);
+            LogService.AddLog(res.Message);
 
-            if (success)
+            if (res.Success)
             {
-                // 清单文件未获取到 → 入库异常（系统通知警告）
-                if (DownloadManifest && message.Contains("未下载到清单文件"))
+                // 异常 = 成功入库但有缺漏：缺失哪个清单 / 缺失哪个密钥
+                var warnings = new List<string>();
+                if (DownloadManifest && res.MissingManifests.Count > 0)
+                    warnings.Add($"缺失清单: {string.Join(", ", res.MissingManifests)}");
+                if (res.MissingKeys.Count > 0)
+                    warnings.Add($"缺失密钥: {string.Join(", ", res.MissingKeys)}");
+
+                if (warnings.Count > 0)
                 {
-                    var abnormalMsg = $"入库异常: {message}";
-                    LogService.AddLog(abnormalMsg);
-                    if (_configService.Config.ShowSystemNotifications)
-                        Services.ToastService.ShowWarning("入库异常", $"{target.Name} (AppID {appId}) 未能获取到清单文件，可能无法正常解锁");
-                    SetStatus(abnormalMsg, "Warning");
-                }
-                else if (missingKeys.Count > 0)
-                {
-                    var abnormalMsg = $"入库异常: 缺少解密密钥: {string.Join(", ", missingKeys)}";
+                    var abnormalMsg = $"入库异常: {string.Join("；", warnings)}";
                     LogService.AddLog(abnormalMsg);
                     if (_configService.Config.ShowSystemNotifications)
                         Services.ToastService.ShowWarning("入库异常",
-                            $"{target.Name} (AppID {appId}) 缺少解密密钥: {string.Join(", ", missingKeys)}，Steam 内容均为 AES-256 加密，缺少密钥将无法正常下载");
+                            $"{target.Name} (AppID {appId}) {string.Join("；", warnings)}");
                     SetStatus(abnormalMsg, "Warning");
                 }
                 else
                 {
-                    var successMsg = DownloadManifest
-                        ? message
-                        : $"{target.Name} (AppID {appId}) 已入库（未下载清单，由内核运行时兜底）";
+                    var parts = new List<string>();
+                    if (res.DlcCount > 0) parts.Add($"{res.DlcCount} 个 DLC");
+                    if (res.ManifestCount > 0) parts.Add($"{res.ManifestCount} 个清单");
+                    if (res.KeyCount > 0) parts.Add($"{res.KeyCount} 个密钥");
+                    var detail = parts.Count > 0 ? string.Join("，", parts) : "（无清单/密钥）";
+                    var successMsg = $"{target.Name} (AppID {appId}) 已入库，添加了 {detail}";
                     if (_configService.Config.ShowSystemNotifications)
                         Services.ToastService.ShowSuccess("入库成功", successMsg);
-                    SetStatus(message, "Success");
+                    SetStatus(successMsg, "Success");
                 }
                 SaveOptionsToConfig();
             }
             else
             {
+                // 入库失败：用户发起的操作未完成，保留错误提示，避免静默失败
                 if (_configService.Config.ShowSystemNotifications)
-                    Services.ToastService.ShowError("入库失败", message);
-                SetStatus(message, "Error");
+                    Services.ToastService.ShowError("入库失败", res.Message);
+                SetStatus(res.Message, "Error");
             }
         }
         catch (Exception ex)

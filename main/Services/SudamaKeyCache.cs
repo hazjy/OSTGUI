@@ -98,7 +98,7 @@ public class SudamaKeyCache
     }
 
     /// <summary>
-    /// 从 Sudama API 获取全量 App 访问令牌（缓存不自动过期，手动刷新更新）
+    /// 从 Sudama API 获取全量 App 访问令牌（缓存存在即用、不自动过期；仅手动刷新或导入时更新）
     /// </summary>
 
     public async Task<Dictionary<string, string>> GetAccessTokensAsync()
@@ -180,7 +180,7 @@ public class SudamaKeyCache
     }
 
     /// <summary>
-    /// 手动强制刷新缓存：密钥与令牌并行下载（互不阻塞），忽略 24h TTL
+    /// 手动强制刷新缓存：密钥与令牌并行下载（互不阻塞），无论缓存新旧一律覆盖
     /// </summary>
     public async Task<(bool ok, string message)> RefreshAsync()
     {
@@ -236,7 +236,7 @@ public class SudamaKeyCache
     }
 
     /// <summary>
-    /// 通用缓存 JSON 下载（缓存不过期自动刷新；无缓存时才下载，手动刷新见 RefreshAsync）
+    /// 通用缓存 JSON 下载（缓存存在即用、不自动过期——仅在无缓存或缓存为空时才下载；手动刷新见 RefreshAsync）
     /// </summary>
 
     private async Task<Dictionary<string, string>> GetCachedJsonAsync(string cacheFileName, string url, string label)

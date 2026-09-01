@@ -276,42 +276,4 @@ public class SteamService
             return null;
         }
     }
-
-    /// <summary>
-    /// 获取游戏的 Depot ID 列表
-    /// </summary>
-    public async Task<List<string>> GetDepotIdsAsync(string appId)
-    {
-        try
-        {
-            using var http = new System.Net.Http.HttpClient();
-            http.Timeout = TimeSpan.FromSeconds(15);
-            var url = $"https://store.steampowered.com/api/appdetails?appids={appId}&cc=us";
-            var response = await http.GetAsync(url);
-            if (!response.IsSuccessStatusCode)
-                return new();
-
-            var json = await response.Content.ReadAsStringAsync();
-            var doc = System.Text.Json.JsonDocument.Parse(json);
-            if (!doc.RootElement.TryGetProperty(appId, out var appData) ||
-                !appData.TryGetProperty("success", out var success) || !success.GetBoolean() ||
-                !appData.TryGetProperty("data", out var data))
-                return new();
-
-            var depots = new List<string>();
-            if (data.TryGetProperty("depots", out var depotsObj))
-            {
-                foreach (var prop in depotsObj.EnumerateObject())
-                {
-                    if (prop.Name.All(char.IsDigit))
-                        depots.Add(prop.Name);
-                }
-            }
-            return depots;
-        }
-        catch
-        {
-            return new();
-        }
-    }
 }

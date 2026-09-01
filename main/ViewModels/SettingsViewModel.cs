@@ -23,7 +23,6 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private bool _showSystemNotifications = true;
     [ObservableProperty] private bool _showVersionChangeNotifications = true;
     [ObservableProperty] private string _defaultSource = "auto";
-    [ObservableProperty] private string _unlockerType = "ost";
 
     // === 入库设置 ===
     [ObservableProperty] private bool _defaultAddAllDlc = true;
@@ -223,7 +222,6 @@ public partial class SettingsViewModel : ObservableObject
             var c = _configService.Config;
             SteamPath = c.SteamPath;
             DefaultSource = c.DefaultManifestSource;
-            UnlockerType = c.UnlockerType;
             DefaultAddAllDlc = c.DefaultAddAllDlc;
             DefaultPatchManifest = c.DefaultPatchManifest;
             StFixedVersionDefault = c.StFixedVersionDefault;
@@ -342,7 +340,6 @@ public partial class SettingsViewModel : ObservableObject
             {
                 c.SteamPath = SteamPath;
                 c.DefaultManifestSource = DefaultSource;
-                c.UnlockerType = UnlockerType;
                 c.DefaultAddAllDlc = DefaultAddAllDlc;
                 c.DefaultPatchManifest = DefaultPatchManifest;
                 c.StFixedVersionDefault = StFixedVersionDefault;

@@ -25,7 +25,7 @@ public class LuaBuilder
         LogService.AddLog(message);
         System.Diagnostics.Debug.WriteLine($"[LuaBuilder] {message}");
     }
-    public async Task<(string lua, List<string> missingKeyDepots)> BuildLuaAsync(
+    public async Task<(string lua, List<string> missingKeyDepots, int dlcCount, int keyCount)> BuildLuaAsync(
         string appId,
         string sourceName,
         List<(string depotId, string manifestGid, long manifestSize)> depots,
@@ -36,6 +36,8 @@ public class LuaBuilder
         var keys = await _sudamaCache.GetSudamaKeysAsync();
         var tokens = await _sudamaCache.GetAccessTokensAsync();
         var missingKeyDepots = new List<string>();
+        var dlcCount = 0;
+        var keyCount = 0;
 
         // 补全全部 depot（SteamCMD 列表），避免缺失 depot 下载时无密钥报"内容加密"
         var allDepots = await MergeAllDepotsAsync(appId, depots);
@@ -51,6 +53,7 @@ public class LuaBuilder
         // 主游戏行带上它——Steam 客户端下载创意工坊内容时按 depot=AppID 读取解密密钥，
         // 缺此 key 会报"内容仍处于加密"（详见 docs/dev/DEV-NOTES.md 创意工坊章节）
         var appKey = keys.TryGetValue(appId, out var k) ? k : "";
+        if (appKey.Length == 64) keyCount++;
         lines.Add(appKey.Length == 64
             ? $"addappid({appId}, 1, \"{appKey}\")"
             : $"addappid({appId})");
@@ -67,6 +70,7 @@ public class LuaBuilder
             if (requiresKey && !hasKey)
                 missingKeyDepots.Add(depotId);
 
+            if (hasKey) keyCount++;
             lines.Add(hasKey ? $"addappid({depotId}, 1, \"{key}\")" : $"addappid({depotId})");
         }
         if (missingKeyDepots.Count > 0)
@@ -84,6 +88,7 @@ public class LuaBuilder
 
             var dlcIds = await _gameInfoService.GetDlcIdsAsync(appId);
             var newDlcs = dlcIds.Where(d => !existingIds.Contains(d)).ToList();
+            dlcCount = newDlcs.Count;
             if (newDlcs.Count > 0)
             {
                 lines.Add("");
@@ -93,7 +98,10 @@ public class LuaBuilder
                     // DLC 自身 AppID 也可能作为独立 depot ID 在 Sudama 收录；查到 key 就带 key
                     var hasDlcKey = keys.TryGetValue(dlcId, out var dlcKey) && dlcKey.Length == 64;
                     if (hasDlcKey)
+                    {
+                        keyCount++;
                         lines.Add($"addappid({dlcId}, 1, \"{dlcKey}\")");
+                    }
                     else
                         lines.Add($"addappid({dlcId})");
                 }
@@ -139,7 +147,7 @@ public class LuaBuilder
             lines.Add($"addtoken({appId}, \"{token}\")");
         }
 
-        return (string.Join("\n", lines) + "\n", missingKeyDepots);
+        return (string.Join("\n", lines) + "\n", missingKeyDepots, dlcCount, keyCount);
     }
 
     /// <summary>

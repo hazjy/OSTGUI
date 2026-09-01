@@ -41,7 +41,7 @@ public class ManifestDownloadService
     /// 从 ManifestHub API 下载清单
     /// </summary>
 
-    public async Task<(bool success, string message, List<string> missingKeys)> DownloadFromManifestHubAsync(
+    public async Task<AddGameResult> DownloadFromManifestHubAsync(
         string appId,
         bool fixedVersion,
         bool addAllDlc,
@@ -56,13 +56,13 @@ public class ManifestDownloadService
                 ? mhubSource.ApiKey
                 : _configService.Config.ManifestHubApiKey;
             if (string.IsNullOrEmpty(apiKey))
-                return (false, "未配置 ManifestHub API Key", new List<string>());
+                return new AddGameResult { Success = false, Message = "未配置 ManifestHub API Key" };
 
             // 1. 从 Steam 官方 API 获取 depot + manifest gid（不依赖 GitHub）
             Log("正在从 Steam API 获取 depot/manifest 信息...");
             var gameDetails = await _gameInfoService.GetGameDetailsFromSteamAsync(appId);
             if (gameDetails == null || gameDetails.Depots.Count == 0)
-                return (false, "无法获取游戏 Depot 信息", new List<string>());
+                return new AddGameResult { Success = false, Message = "无法获取游戏 Depot 信息" };
 
             var manifestFiles = new List<(string depotId, string manifestGid)>();
             foreach (var depot in gameDetails.Depots.Values)
@@ -72,7 +72,7 @@ public class ManifestDownloadService
             }
 
             if (manifestFiles.Count == 0)
-                return (false, "Steam API 未返回任何 manifest 信息，无法下载清单", new List<string>());
+                return new AddGameResult { Success = false, Message = "Steam API 未返回任何 manifest 信息，无法下载清单" };
 
             Log($"找到 {manifestFiles.Count} 个清单文件, 开始下载...");
 
@@ -80,6 +80,7 @@ public class ManifestDownloadService
             Directory.CreateDirectory(tempDir);
             var mhubUrlTemplate = !string.IsNullOrEmpty(mhubSource?.BaseUrl) ? mhubSource.BaseUrl : "";
             var downloaded = new List<(string depotId, string manifestGid, long size)>();
+            var failedDepots = new List<string>();
 
             // manifest 文件可能较大，用独立 HttpClient 设置更长超时（默认 120 秒），
             // 避免受全局 HttpClient.Timeout(30 秒) 限制
@@ -107,17 +108,26 @@ public class ManifestDownloadService
                     }
                     else
                     {
+                        failedDepots.Add(depotId);
                         Log($"下载失败 ({(int)response.StatusCode}): Depot {depotId}");
                     }
                 }
                 catch (Exception ex)
                 {
+                    failedDepots.Add(depotId);
                     Log($"下载异常: Depot {depotId} - {ex.Message}");
                 }
             }
 
+            // 仅在实际内容 depot（appinfo 中有 manifest GID）的清单未下载（HTTP 失败/异常）时才警告；
+            // 壳型/共享 depot（无 GID）本就不预下载，属正常，不提示。
+            if (failedDepots.Count > 0)
+            {
+                Log($"警告: 以下实际 depot 的清单未能下载，未预下载，将由内核运行时获取: {string.Join(", ", failedDepots)}");
+            }
+
             if (downloaded.Count == 0)
-                return (false, "未能下载任何清单文件", new List<string>());
+                return new AddGameResult { Success = false, Message = "未能下载任何清单文件" };
 
             var manifestCount = _manifestFile.CopyToDepotCache(
                 downloaded.Select(d => Path.Combine(tempDir, $"{d.depotId}_{d.manifestGid}.manifest")).ToList());
@@ -126,15 +136,24 @@ public class ManifestDownloadService
             var depots = downloaded
                 .Select(d => (depotId: d.depotId, manifestGid: d.manifestGid, manifestSize: d.size))
                 .ToList();
-            var (lua, missingKeys) = await _luaBuilder.BuildLuaAsync(appId, "ManifestHub", depots, fixedVersion, addAllDlc);
+            var (lua, missingKeys, dlcCount, keyCount) = await _luaBuilder.BuildLuaAsync(appId, "ManifestHub", depots, fixedVersion, addAllDlc);
             var luaOk = await _luaBuilder.WriteLuaAsync(appId, lua);
 
             Log("入库完成!");
-            return (true, $"成功入库 AppID {appId}，下载了 {manifestCount} 个清单，Lua {(luaOk ? "已生成" : "生成失败")}", missingKeys);
+            return new AddGameResult
+            {
+                Success = true,
+                Message = $"成功入库 AppID {appId}，下载了 {manifestCount} 个清单，Lua {(luaOk ? "已生成" : "生成失败")}",
+                MissingKeys = missingKeys,
+                MissingManifests = failedDepots,
+                ManifestCount = manifestCount,
+                DlcCount = dlcCount,
+                KeyCount = keyCount,
+            };
         }
         catch (Exception ex)
         {
-            return (false, $"ManifestHub 入库失败: {ex.Message}", new List<string>());
+            return new AddGameResult { Success = false, Message = $"ManifestHub 入库失败: {ex.Message}" };
         }
         finally
         {
@@ -147,7 +166,7 @@ public class ManifestDownloadService
     /// 不下载清单文件——清单由清单源（MHub / GitHub）负责，Sudama 只作为密钥源。
     /// </summary>
 
-    public async Task<(bool success, string message, List<string> missingKeys)> DownloadFromSudamaAsync(
+    public async Task<AddGameResult> DownloadFromSudamaAsync(
         string appId,
         bool fixedVersion,
         bool addAllDlc,
@@ -159,7 +178,7 @@ public class ManifestDownloadService
             Log("正在获取 Depot 信息...");
             var gameDetails = await _gameInfoService.GetGameDetailsFromSteamAsync(appId);
             if (gameDetails == null || gameDetails.Depots.Count == 0)
-                return (false, "无法获取游戏 Depot 信息", new List<string>());
+                return new AddGameResult { Success = false, Message = "无法获取游戏 Depot 信息" };
 
             var depotList = gameDetails.Depots.Values.ToList();
             Log($"找到 {depotList.Count} 个 Depot");
@@ -170,26 +189,31 @@ public class ManifestDownloadService
                 .ToList();
 
             // 3. 生成完整 Lua（自动补 Sudama depot key / access token）
-            var (lua, missingKeys) = await _luaBuilder.BuildLuaAsync(appId, "Sudama", depots, fixedVersion, addAllDlc);
+            var (lua, missingKeys, dlcCount, keyCount) = await _luaBuilder.BuildLuaAsync(appId, "Sudama", depots, fixedVersion, addAllDlc);
             var luaOk = await _luaBuilder.WriteLuaAsync(appId, lua);
 
             Log("入库完成!");
-            return (true, $"成功入库 AppID {appId} (Sudama 密钥源模式)（未下载到清单文件，清单需由清单源获取）Lua {(luaOk ? "已生成" : "生成失败")}", missingKeys);
+            // Sudama 不下清单：把本身带 manifest GID 的 depot 记入缺失清单，由调用方决定是否提示
+            var missingManifests = depots
+                .Where(d => !string.IsNullOrEmpty(d.manifestGid))
+                .Select(d => d.depotId)
+                .ToList();
+            return new AddGameResult
+            {
+                Success = true,
+                Message = $"成功入库 AppID {appId} (Sudama 密钥源模式)（未下载到清单文件，清单需由清单源获取）Lua {(luaOk ? "已生成" : "生成失败")}",
+                MissingKeys = missingKeys,
+                MissingManifests = missingManifests,
+                ManifestCount = 0,
+                DlcCount = dlcCount,
+                KeyCount = keyCount,
+            };
         }
         catch (Exception ex)
         {
-            return (false, $"Sudama 入库失败: {ex.Message}", new List<string>());
+            return new AddGameResult { Success = false, Message = $"Sudama 入库失败: {ex.Message}" };
         }
     }
-
-    /// <summary>
-    /// 从 Sudama API 获取全量 depot 密钥（24h 缓存）
-    /// </summary>
-
-    /// <summary>
-    /// 获取游戏详情（含 depot 和 manifest gid）
-    /// 优先 SteamCMD API（信息更全），回退 Steam 官方 Store API
-    /// </summary>
 
     private ManifestSource? GetSource(string id)
     {
@@ -197,4 +221,16 @@ public class ManifestDownloadService
         return config.ManifestSources?.FirstOrDefault(s => s.Id == id);
     }
 
+}
+
+/// <summary>入库结果汇总：成功标记、详细日志、缺失清单/密钥、各类计数（供通知展示）</summary>
+public class AddGameResult
+{
+    public bool Success { get; set; }
+    public string Message { get; set; } = "";
+    public List<string> MissingKeys { get; set; } = new();
+    public List<string> MissingManifests { get; set; } = new();
+    public int DlcCount { get; set; }
+    public int ManifestCount { get; set; }
+    public int KeyCount { get; set; }
 }

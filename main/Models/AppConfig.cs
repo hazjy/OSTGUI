@@ -12,7 +12,6 @@ public class AppConfig
     public bool ShowSystemNotifications { get; set; } = true;
     public bool ShowVersionChangeNotifications { get; set; } = true;
     public string DefaultManifestSource { get; set; } = "auto";
-    public string UnlockerType { get; set; } = "ost"; // ost, steamtools, greenluma
 
     // === 入库设置 ===
     public bool DefaultAddAllDlc { get; set; } = true;
@@ -81,7 +80,6 @@ public class AppConfig
     {
         SteamPath = string.Empty,
         DefaultManifestSource = "auto",
-        UnlockerType = "ost",
         DefaultAddAllDlc = true,
         DefaultPatchManifest = true,
         DownloadTimeout = 120,

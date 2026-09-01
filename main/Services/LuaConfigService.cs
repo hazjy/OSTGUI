@@ -299,11 +299,12 @@ else
 
     /// <summary>
     /// 原子写入文件（先写临时文件再覆盖），避免 OpenSteamTool 监视器读到半截内容；
+    /// 与 LuaBuilder 一致使用唯一 GUID 临时名，防止并发写入同一 tmp 交错损坏；
     /// 统一使用无 BOM UTF-8
     /// </summary>
     private static async Task WriteFileAtomicallyAsync(string path, string content)
     {
-        var tmpPath = path + ".tmp";
+        var tmpPath = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
         await File.WriteAllTextAsync(tmpPath, content, new System.Text.UTF8Encoding(false));
         File.Move(tmpPath, path, true);
     }
