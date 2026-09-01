@@ -69,7 +69,7 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
 ## 6. Sudama 缓存（v1.3.0 现状）
 
 - 缓存文件：`%LOCALAPPDATA%\OSTGUI\sudama_cache.json`（约 22 万条 / 16.5MB）、`token_cache.json`
-- 缓存**不过期自动刷新**（已去掉 24h TTL，08-28 起：缓存存在即用）；失败回退任意旧缓存；设置页可强制刷新，也支持**手动导入本地文件**（浏览器直连快于应用内时使用，按文件名/内容自动识别类型）
+- 缓存**存在即用、不自动过期**（已去掉 24h TTL，08-28 起：缓存存在即用，不再自动刷新）；仅当无缓存文件时才会自动下载；新密钥/令牌靠设置页**手动刷新**或**手动导入本地文件**（浏览器直连快于应用内时使用，按文件名/内容自动识别类型）才能拿到
 - 下载策略：密钥与令牌并行；流式接收；单次超时 max(120, 设置值)；重试间隔 1.5s；成功日志带条数/体积/耗时
 - Sudama 无按需查询接口，只有全量端点；勿每次入库实时拉全量
 - 隐藏调优参数 `DownloadTimeout`（config.json，默认 120，无 UI）：同时影响清单文件下载（max(60,·)）与 Sudama 缓存下载（max(120,·)）的超时；早期版本曾有设置控件，08-14 起移除仅留字段
@@ -121,7 +121,7 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
 | `SteamGameInfoService` | 统一查询：depot + manifest gid + DLC 列表与名称（优先走社区非官方 API `api.steamcmd.net`——注意并非 Valve 官方，由 github.com/steamcmd/api 项目运营；失败回退官方 `store.steampowered.com/api/appdetails`，大陆网络下通常不可达）|
 | `ManifestDownloadService` | 多源清单下载 + 生成 Lua（门面已移除）|
 | `LuaBuilder` / `LuaConfigService` | Lua 生成（补全 depot/key/token/DLC/固定版本）；Lua 读写与版本模式切换 |
-| `SudamaKeyCache` | 密钥/令牌缓存（并行下载、不过期自动刷新、手动刷新与本地导入）|
+| `SudamaKeyCache` | 密钥/令牌缓存（存在即用不自动过期、并行下载、手动刷新与本地导入）|
 | `LibraryScanner` | 扫描 Lua 目录、检测错误 |
 | `NoSteamLauncherService` / `NoSteamLaunchOrchestrator` | 免 Steam 部署封装 / 编排（Steamless + GBE + Bypass）|
 | `OnlineFixService` | 480 联机（`steam.exe -applaunch 480 -onlinefix`，PEB 读命令行检测）|
