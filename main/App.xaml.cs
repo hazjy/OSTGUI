@@ -73,7 +73,6 @@ public partial class App : Application
         services.AddSingleton<ManifestDownloadService>();
         services.AddSingleton<TicketService>();
         services.AddSingleton<OstFileService>();
-        services.AddSingleton<SteamTicketExtractor>();
         services.AddSingleton<OnlineFixService>();
         services.AddSingleton<NoSteamLauncherService>();
         services.AddSingleton<SteamlessService>();

@@ -17,7 +17,6 @@ public partial class MainViewModel : ObservableObject
     public GameSearchService SearchService { get; }
     public LuaConfigService LuaService { get; }
     public ManifestDownloadService ManifestService { get; }
-    public TicketService TicketService { get; }
 
     [ObservableProperty] private string _statusMessage = "就绪";
     private bool _isSteamRunning;
@@ -87,7 +86,6 @@ public partial class MainViewModel : ObservableObject
         TicketService ticketService,
         OstFileService ostFileService,
         SteamGameInfoService steamGameInfoService,
-        SteamTicketExtractor ticketExtractor,
         SteamDllService steamDllService,
         SudamaKeyCache sudamaCache)
     {
@@ -96,14 +94,14 @@ public partial class MainViewModel : ObservableObject
         SearchService = searchService;
         LuaService = luaService;
         ManifestService = manifestService;
-        TicketService = ticketService;        _steamDllService = steamDllService;
+        _steamDllService = steamDllService;
 
         // 初始化子 ViewModel
         SearchVM = new SearchViewModel(searchService, manifestService, steamService, configService);
         LibraryVM = new LibraryViewModel(luaService, searchService, gameInfoService, steamService, configService, gameNameCacheService);
         DenuvoVM = new DenuvoViewModel(
-            ticketService, luaService, searchService, ostFileService,
-            steamGameInfoService, steamService, ticketExtractor);
+            ticketService, luaService, ostFileService,
+            steamGameInfoService, steamService);
         SettingsVM = new SettingsViewModel(configService, steamService, _steamDllService, sudamaCache);
         OnlineVM = new OnlineViewModel(onlineFixService, searchService, gameInfoService);
     }
