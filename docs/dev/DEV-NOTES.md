@@ -106,7 +106,12 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
 - 附加属性 C# 侧用 `ToolTipService.SetToolTip()`，对象初始化器赋值编译不过
 - ContentDialog 必须设 `XamlRoot`（Page 用 `this.XamlRoot`，Window 用 `RootGrid.XamlRoot`）
 - 纯图标透明按钮：`Background=Transparent` + `BorderThickness=0` + `Padding=8,4`
-- 输入框失焦方案（PointerPressed/Tapped/handledEventsToo/页面级）全部无效，已回退——别再浪费时间
+- **点击空白取消输入框激活（09-02 起有解，此前结论作废）**：两个 WinUI 已知 bug 叠加——① [#4364](https://github.com/microsoft/microsoft-ui-xaml/issues/4364) 点击空白把焦点投给 ScrollViewer 内第一个可聚焦控件（→ 误激活首个输入框）；② [#10051](https://github.com/microsoft/microsoft-ui-xaml/issues/10051) 输入框已聚焦时点空白不转移焦点（→ 无法取消激活）。**方案=两层兜底**：
+  - **页面锚点**：每个含输入框页面的 ScrollViewer 内容首位放 1×1 透明可聚焦 Grid（`IsTabStop=True, TabIndex=0, Opacity=0`）→ 拦截 #4364 的 fallback（目标变成隐形锚点而非输入框）。已覆盖：设置页、联机页、D加密页(Transfer 面板)、S.A.C 页。
+  - **全局回收**：`MainWindow.RootGrid` 挂 `PointerPressed`（`handledEventsToo:true`），点击处不在交互控件内时 `DispatcherQueue.TryEnqueue` 把焦点拉回全局锚点 `GlobalFocusAnchor`——**排队保证晚于框架指针处理**，从而覆盖 #10051（已聚焦也生效）与 #4364（即便 fallback 先触发也被覆盖）。
+  - **交互判定** `IsInteractive` 白名单：输入控件 + ComboBox/Slider/ToggleSwitch/ListViewBase/ScrollBar/ButtonBase；`ponytail:` 注释标注——未来新增交互控件类型需补清单，否则点击它们会被当空白抢焦点。
+  - **已知副作用**：点交互控件后键盘焦点回全局锚点（键盘 Tab 从头开始，鼠标无感）；锚点是隐形 Tab 停靠点；ContentDialog 等弹层不冒泡到 RootGrid 故不生效；仅指针（鼠标/触摸/笔）触发，键盘操作不受影响。
+  - ⚠️ 历史记录"PointerPressed/Tapped 失焦方案全部无效"**作废**：当年失败根因是**没有可聚焦的焦点目标**（`Focus()` 到 TextBlock 无效）；引入"可聚焦锚点"后主动拉焦成立。
 - 浅色主题下按钮图标/文字需适配 `TextFillColorPrimaryBrush` 等 ThemeResource
 - ⚠️ 强调色的主题陷阱：`SystemAccentColor` 基础色**不随应用深浅主题翻转**；深色模式下需要"提亮版强调填充"的场景应使用 `AccentFillColorDefaultBrush` 等画刷（自动按主题选择正确变体），手写浅色主题的色值在深色模式下会显得突兀
 - **ContentDialog 恒为深色是刻意行为**：弹窗位于弹出层，不继承应用 `RequestedTheme`，浅色模式下也渲染成深色。曾尝试显式同步主题，但 WinUI 浅色弹窗对比度差、观感不佳，遂回退保留深色——勿当 bug 修复

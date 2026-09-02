@@ -1,5 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.Extensions.DependencyInjection;
 using OSTGUI.Pages;
 using OSTGUI.Services;
@@ -19,6 +21,11 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
         this.InitializeComponent();
 
         _mainVM = App.Services.GetRequiredService<MainViewModel>();
+
+        // 点击空白（非输入控件区域）时把焦点收回到全局锚点，统一取消各页面输入框激活。
+        // WinUI 在"已有焦点"时不会自行转移焦点（microsoft-ui-xaml #10051），需主动拉取；
+        // TryEnqueue 保证在本轮指针事件的框架焦点处理之后执行，同时覆盖 #4364 的空点击误聚焦。
+        RootGrid.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(Root_PointerPressed), true);
 
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
@@ -214,6 +221,29 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
             _mainVM.ConfigService.SaveAsync().GetAwaiter().GetResult();
         }
         catch { }
+    }
+
+    private void Root_PointerPressed(object sender, PointerRoutedEventArgs e)
+    {
+        if (IsInteractive(e.OriginalSource as DependencyObject)) return;
+        _ = DispatcherQueue?.TryEnqueue(() => GlobalFocusAnchor.Focus(FocusState.Programmatic));
+    }
+
+    /// <summary>交互控件（及模板内部）不干预；仅空白点击才回收焦点。
+    /// ponytail: 白名单按页面现有控件类型枚举；未来新增交互控件（如 Pivot/TabView/FlipView）时需补类型，否则点击它们会被当作空白抢焦点
+    /// </summary>
+    private static bool IsInteractive(DependencyObject? el)
+    {
+        while (el != null)
+        {
+            if (el is TextBox or PasswordBox or NumberBox or AutoSuggestBox
+                or ComboBox or Slider or ToggleSwitch or ListViewBase
+                or Microsoft.UI.Xaml.Controls.Primitives.ScrollBar
+                or Microsoft.UI.Xaml.Controls.Primitives.ButtonBase)
+                return true;
+            el = VisualTreeHelper.GetParent(el);
+        }
+        return false;
     }
 
     public NavigationView NavView => MainNavView;

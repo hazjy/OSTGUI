@@ -24,6 +24,10 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
+        <!-- 全局焦点锚点：点击任意页面空白时收回焦点（取消输入框激活）；1×1 透明不可见 -->
+        <Grid x:Name="GlobalFocusAnchor" IsTabStop="True" TabIndex="0" Width="1" Height="1"
+              HorizontalAlignment="Left" VerticalAlignment="Top" Opacity="0" />
+
         <Grid x:Name="AppTitleBar" Grid.Row="0" Height="48"
               Background="Transparent" VerticalAlignment="Top">
             <TextBlock x:Name="AppTitleBarText" Text="OSTGUI" VerticalAlignment="Center" Margin="16,0,0,0"
