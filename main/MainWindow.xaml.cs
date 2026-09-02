@@ -98,6 +98,15 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
         catch { }
     }
 
+    /// <summary>
+    /// 运行时应用侧边栏宽度（立即生效，不动窗口尺寸；重启后由 ApplyWindowStateFromConfig 复用同一值）
+    /// </summary>
+    public void ApplyNavigationPaneWidth(double width)
+    {
+        if (width >= 150 && width <= 600)
+            MainNavView.OpenPaneLength = width;
+    }
+
     private const int MinWindowWidth = 800;
     private const int MinWindowHeight = 560;
     private const int GwlWndProc = -4;

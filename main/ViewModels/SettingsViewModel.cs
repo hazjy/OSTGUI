@@ -35,6 +35,15 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty] private string _themeColor = "#0078d4";
     [ObservableProperty] private string _windowEffect = "mica";
     [ObservableProperty] private string _language = "zh_CN";
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanApplyNavigationPaneWidth))]
+    private string _navigationPaneWidthInput = "200";
+
+    /// <summary>输入为 150–600 内整数且与当前已存值不同才可应用（按钮激活条件）</summary>
+    public bool CanApplyNavigationPaneWidth =>
+        int.TryParse(NavigationPaneWidthInput.Trim(), out var v)
+        && v is >= 150 and <= 600
+        && v != (int)_configService.Config.NavigationPaneWidth;
 
     // === 日志显示 ===
     [ObservableProperty] private string _logsText = "";
@@ -111,6 +120,14 @@ public partial class SettingsViewModel : ObservableObject
 
         // 设置变化即自动保存（实时生效）；加载期间由 _isLoading 抑制
         PropertyChanged += (s, e) => SaveAllToConfig();
+    }
+
+    [RelayCommand]
+    private void ApplyNavigationPaneWidth()
+    {
+        if (!CanApplyNavigationPaneWidth) return;
+        if (int.TryParse(NavigationPaneWidthInput.Trim(), out var v) && v is >= 150 and <= 600)
+            _configService.UpdateAndSaveAsync(c => c.NavigationPaneWidth = v).GetAwaiter().GetResult();
     }
 
     /// <summary>
@@ -226,6 +243,7 @@ public partial class SettingsViewModel : ObservableObject
             DefaultPatchManifest = c.DefaultPatchManifest;
             StFixedVersionDefault = c.StFixedVersionDefault;
             StFixedManifestMode = c.StFixedManifestMode;
+            NavigationPaneWidthInput = ((int)c.NavigationPaneWidth).ToString();
             ThemeMode = c.ThemeMode;
             ThemeColor = c.ThemeColor;
             WindowEffect = c.WindowEffect;

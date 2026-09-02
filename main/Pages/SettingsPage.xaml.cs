@@ -70,6 +70,13 @@ public sealed partial class SettingsPage : Page
         }
     }
 
+    private void ApplyNavigationPaneWidth_Click(object sender, RoutedEventArgs e)
+    {
+        VM.ApplyNavigationPaneWidthCommand.Execute(null);
+        if (App.MainWindow is MainWindow mw && int.TryParse(VM.NavigationPaneWidthInput.Trim(), out var w))
+            mw.ApplyNavigationPaneWidth(w);
+    }
+
     private void OnSettingChanged(object sender, RoutedEventArgs e)
     {
         // 所有设置实时保存
