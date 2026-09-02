@@ -9,6 +9,7 @@ namespace OSTGUI.ViewModels;
 public partial class OnlineViewModel : ObservableObject
 {
     private readonly OnlineFixService _onlineFixService;
+    private readonly GameSearchService _searchService;
     private readonly SteamGameInfoService _gameInfoService;
 
     [ObservableProperty] private string _onlineAppId = "";
@@ -26,14 +27,17 @@ public partial class OnlineViewModel : ObservableObject
 
     public OnlineViewModel(
         OnlineFixService onlineFixService,
+        GameSearchService searchService,
         SteamGameInfoService gameInfoService)
     {
         _onlineFixService = onlineFixService;
+        _searchService = searchService;
         _gameInfoService = gameInfoService;
     }
 
     /// <summary>
-    /// 查询游戏名（实时 API，不读不写名称缓存——显示名处与缓存解耦）
+    /// 查询游戏名：与搜索/入库同源（GameSearchService：缓存优先 → Steam 官方 Store API → 写缓存）。
+    /// steamcmd（GetGameNameOnlineAsync）仅作兜底；官方接口即搜索页取名成功之路。
     /// </summary>
     public async Task LoadGameNameAsync()
     {
@@ -44,15 +48,13 @@ public partial class OnlineViewModel : ObservableObject
             return;
         }
 
-        try
+        var name = await _searchService.GetGameNameAsync(appId);
+        if (string.IsNullOrEmpty(name))
         {
-            var info = await _gameInfoService.GetGameDetailsFromSteamAsync(appId);
-            GameName = string.IsNullOrEmpty(info?.Name) ? "" : info.Name;
+            // 官方接口未果时补一层 steamcmd 兜底
+            name = await _gameInfoService.GetGameNameOnlineAsync(appId) ?? "";
         }
-        catch
-        {
-            GameName = "";
-        }
+        GameName = name;
     }
 
     /// <summary>

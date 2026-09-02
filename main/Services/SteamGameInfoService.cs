@@ -161,6 +161,9 @@ public class SteamGameInfoService
 
             var game = new GameInfo { AppId = appId };
 
+            if (data.TryGetProperty("name", out var nameElem))
+                game.Name = nameElem.GetString() ?? "";
+
             if (data.TryGetProperty("depots", out var depotsObj))
             {
                 var depotCount = 0;
@@ -179,11 +182,14 @@ public class SteamGameInfoService
                     if (depotData.TryGetProperty("manifests", out var manifestsObj) &&
                         manifestsObj.TryGetProperty("public", out var publicManifest))
                     {
-                        var gid = publicManifest.GetProperty("gid").GetString();
-                        if (gid != null)
+                        if (publicManifest.TryGetProperty("gid", out var gidElem))
                         {
-                            depot.Manifests.Add(gid);
-                            Log($"Depot {depotId}: Manifest GID = {gid}");
+                            var gid = gidElem.GetString();
+                            if (gid != null)
+                            {
+                                depot.Manifests.Add(gid);
+                                Log($"Depot {depotId}: Manifest GID = {gid}");
+                            }
                         }
                     }
                     else
@@ -265,10 +271,11 @@ public class SteamGameInfoService
     }
 
     /// <summary>
-    /// 获取 AppID 的游戏名：steamcmd 不提供 DLC 名字（实测对 DLC 返回空壳），
+    /// 获取 AppID 的在线游戏名：steamcmd 名优先（steamcmd 不提供 DLC 名字，实测对 DLC 返回空壳），
     /// 取不到时兜底官方 appdetails（可达时带名，8s 截断防拖慢）。
+    /// 轻量路径：只取名，不要求 depots 非空（区别于 GetGameDetailsFromSteamAsync 的入库级查询）。
     /// </summary>
-    private async Task<string?> GetNameFromSteamCmdAsync(string appId)
+    public async Task<string?> GetGameNameOnlineAsync(string appId)
     {
         try
         {
@@ -317,7 +324,7 @@ public class SteamGameInfoService
                 await gate.WaitAsync();
                 try
                 {
-                    return (id, name: await GetNameFromSteamCmdAsync(id) ?? "");
+                    return (id, name: await GetGameNameOnlineAsync(id) ?? "");
                 }
                 finally
                 {
