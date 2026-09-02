@@ -24,6 +24,9 @@ plan1.md
 plan2.md
 plan3.md
 
+# 智能体变更台账（本地留存，不随仓库分发/推送）
+docs/dev/agents-log/
+
 # 根级文档除 README 外暂不追踪（后续可能改写）
 /*.md
 !/README.md
