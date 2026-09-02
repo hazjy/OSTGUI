@@ -30,8 +30,6 @@ public partial class LibraryViewModel : ObservableObject
 
     public bool IsBusy => IsLoading;
 
-[ObservableProperty] private string _statusMessage = "准备加载库...";
-    [ObservableProperty] private string _statusType = "Info";
     [ObservableProperty] private string _searchFilter = "";
     [ObservableProperty] private int _totalCount;
     [ObservableProperty] private int _fixedCount;
@@ -66,7 +64,6 @@ public partial class LibraryViewModel : ObservableObject
         TotalCount = 0;
         FixedCount = 0;
         AutoCount = 0;
-        SetStatus("正在扫描入库游戏...", "Info");
         ProgressValue = 0;
 
         try
@@ -106,12 +103,8 @@ public partial class LibraryViewModel : ObservableObject
             RefreshView();
 
             ProgressValue = 100;
-            SetStatus($"共 {TotalCount} 个已入库游戏 | 固定版本 {FixedCount} | 自动更新 {AutoCount}", "Info");
         }
-        catch (Exception ex)
-        {
-            SetStatus($"加载失败: {ex.Message}", "Error");
-        }
+        catch { }
         finally
         {
             IsLoading = false;
@@ -185,14 +178,12 @@ item.DlcList = dlcInfo;
             var (success, message, newMode) = await _luaService.ToggleVersionModeAsync(target);
             if (success)
             {
-                SetStatus(message, "Success");
                 // 成功提示可在设置中开关
                 if (_configService.Config.ShowVersionChangeNotifications)
                     Services.ToastService.ShowSuccess("版本状态更改", message);
             }
             else
             {
-                SetStatus(message, "Error");
                 // 失败通知始终显示（重要错误信息）
                 Services.ToastService.ShowError("版本状态更改", message);
             }
@@ -209,14 +200,12 @@ item.DlcList = dlcInfo;
         if (item == null || item.AppId == "N/A") return;
 
         IsLoading = true;
-        SetStatus($"正在获取 AppID {item.AppId} 的 depot / GID...", "Info");
 
         try
         {
             var gameDetails = await _gameInfoService.GetGameDetailsFromSteamAsync(item.AppId);
             if (gameDetails == null || gameDetails.Depots.Count == 0)
             {
-                SetStatus("获取 depot 信息失败", "Error");
                 Services.ToastService.ShowError("补齐版本配置", "获取 depot 信息失败");
                 return;
             }
@@ -229,13 +218,11 @@ item.DlcList = dlcInfo;
             var (success, message) = await _luaService.RepairVersionConfigAsync(item.AppId, depots);
             if (success)
             {
-                SetStatus(message, "Success");
                 Services.ToastService.ShowSuccess("补齐版本配置", message);
                 await LoadLibraryAsync();
             }
             else
             {
-                SetStatus(message, "Error");
                 Services.ToastService.ShowError("补齐版本配置", message);
             }
         }
@@ -258,12 +245,10 @@ item.DlcList = dlcInfo;
         {
             var ids = string.Join("\n", SelectedItems.Select(i => i.AppId));
             CopyToClipboard(ids);
-            SetStatus($"已复制 {SelectedItems.Count} 个 AppID 到剪贴板", "Success");
         }
         else
         {
             CopyToClipboard(item.AppId);
-            SetStatus($"已复制 AppID {item.AppId} 到剪贴板", "Success");
         }
     }
 
@@ -286,7 +271,6 @@ item.DlcList = dlcInfo;
             filePath = Path.Combine(luaDir, $"{item.AppId}.lua");
             if (!File.Exists(filePath))
             {
-                SetStatus("Lua 文件不存在", "Error");
                 return;
             }
         }
@@ -299,12 +283,8 @@ item.DlcList = dlcInfo;
                 Arguments = $"\"{filePath}\"",
                 UseShellExecute = true
             });
-            SetStatus($"已打开 {Path.GetFileName(filePath)}", "Info");
         }
-        catch (Exception ex)
-        {
-            SetStatus($"打开记事本失败: {ex.Message}", "Error");
-        }
+        catch { }
     }
 
     /// <summary>
@@ -327,11 +307,9 @@ item.DlcList = dlcInfo;
             if (success)
             {
                 count++;
-                SetStatus(message, "Success");
             }
             else
             {
-                SetStatus(message, "Error");
             }
         }
 
@@ -404,9 +382,5 @@ item.DlcList = dlcInfo;
         Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(dataPackage);
     }
 
-    private void SetStatus(string message, string type)
-    {
-        StatusMessage = message;
-        StatusType = type;
-    }
+
 }

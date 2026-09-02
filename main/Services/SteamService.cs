@@ -115,18 +115,6 @@ public class SteamService
     }
 
     /// <summary>
-    /// 获取 OST 配置目录
-    /// </summary>
-    public string? GetOSTDir()
-    {
-        var steamPath = _steamPath;
-        if (string.IsNullOrEmpty(steamPath)) return null;
-        var dir = Path.Combine(steamPath, "opensteamtool");
-        Directory.CreateDirectory(dir);
-        return dir;
-    }
-
-    /// <summary>
     /// 检查 Steam 是否正在运行
     /// </summary>
     public bool IsSteamRunning()

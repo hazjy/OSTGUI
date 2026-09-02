@@ -51,23 +51,6 @@ public class ManifestFileService
     }
 
     /// <summary>
-    /// 从 manifest 文件名解析 depot 信息（格式: {depotId}_{manifestGid}.manifest）
-    /// </summary>
-    public static List<(string depotId, string manifestGid, long manifestSize)> ParseDepotsFromFiles(List<string> manifestFiles)
-    {
-        var depots = new List<(string, string, long)>();
-        foreach (var manifestFile in manifestFiles)
-        {
-            var fileName = Path.GetFileName(manifestFile);
-            var stem = Path.GetFileNameWithoutExtension(fileName);
-            var parts = stem.Split('_');
-            if (parts.Length >= 2 && parts[0].All(char.IsDigit) && parts[1].All(char.IsDigit))
-                depots.Add((parts[0], parts[1], new FileInfo(manifestFile).Length));
-        }
-        return depots;
-    }
-
-    /// <summary>
     /// 删除临时目录（失败忽略，不影响入库结果）
     /// </summary>
     public static void TryDeleteDir(string path)
