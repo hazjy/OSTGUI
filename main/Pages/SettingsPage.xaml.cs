@@ -74,7 +74,11 @@ public sealed partial class SettingsPage : Page
     {
         VM.ApplyNavigationPaneWidthCommand.Execute(null);
         if (App.MainWindow is MainWindow mw && int.TryParse(VM.NavigationPaneWidthInput.Trim(), out var w))
+        {
             mw.ApplyNavigationPaneWidth(w);
+            VM.NavigationPaneWidthInput = "";                    // 清空输入框
+            (sender as Button)?.Focus(FocusState.Programmatic);  // 焦点移出输入框（按钮状态随属性通知自动回灰）
+        }
     }
 
     private void OnSettingChanged(object sender, RoutedEventArgs e)
