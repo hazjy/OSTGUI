@@ -26,15 +26,10 @@ public partial class SettingsViewModel : ObservableObject
 
     // === 入库设置 ===
     [ObservableProperty] private bool _defaultAddAllDlc = true;
-    [ObservableProperty] private bool _defaultPatchManifest = true;
     [ObservableProperty] private bool _stFixedVersionDefault = true;
-    [ObservableProperty] private string _stFixedManifestMode = "ask";
 
     // === 外观设置 ===
     [ObservableProperty] private string _themeMode = "auto";
-    [ObservableProperty] private string _themeColor = "#0078d4";
-    [ObservableProperty] private string _windowEffect = "mica";
-    [ObservableProperty] private string _language = "zh_CN";
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanApplyNavigationPaneWidth))]
     private string _navigationPaneWidthInput = "200";
@@ -93,9 +88,7 @@ public partial class SettingsViewModel : ObservableObject
         };
     }
 
-    [ObservableProperty] private bool _debugMode;
     [ObservableProperty] private double _logMaxLines = 1000;
-    [ObservableProperty] private bool _checkUpdateOnStart = true;
 
     // === OST DLL 状态 ===
     [ObservableProperty] private bool _isOstInjected;
@@ -240,19 +233,12 @@ public partial class SettingsViewModel : ObservableObject
             SteamPath = c.SteamPath;
             DefaultSource = c.DefaultManifestSource;
             DefaultAddAllDlc = c.DefaultAddAllDlc;
-            DefaultPatchManifest = c.DefaultPatchManifest;
             StFixedVersionDefault = c.StFixedVersionDefault;
-            StFixedManifestMode = c.StFixedManifestMode;
             NavigationPaneWidthInput = ((int)c.NavigationPaneWidth).ToString();
             ThemeMode = c.ThemeMode;
-            ThemeColor = c.ThemeColor;
-            WindowEffect = c.WindowEffect;
-            Language = c.Language;
             ShowSystemNotifications = c.ShowSystemNotifications;
             ShowVersionChangeNotifications = c.ShowVersionChangeNotifications;
-            DebugMode = c.DebugMode;
             LogMaxLines = c.LogMaxLines;
-            CheckUpdateOnStart = c.CheckUpdateOnStart;
 
             LoadSourcesFromConfig(c);
 
@@ -359,18 +345,11 @@ public partial class SettingsViewModel : ObservableObject
                 c.SteamPath = SteamPath;
                 c.DefaultManifestSource = DefaultSource;
                 c.DefaultAddAllDlc = DefaultAddAllDlc;
-                c.DefaultPatchManifest = DefaultPatchManifest;
                 c.StFixedVersionDefault = StFixedVersionDefault;
-                c.StFixedManifestMode = StFixedManifestMode;
                 c.ThemeMode = ThemeMode;
-                c.ThemeColor = ThemeColor;
-                c.WindowEffect = WindowEffect;
-                c.Language = Language;
                 c.ShowSystemNotifications = ShowSystemNotifications;
                 c.ShowVersionChangeNotifications = ShowVersionChangeNotifications;
-                c.DebugMode = DebugMode;
                 c.LogMaxLines = (int)LogMaxLines;
-                c.CheckUpdateOnStart = CheckUpdateOnStart;
                 LogService.SetMaxLines((int)LogMaxLines);
 
                 // 保存完整源配置（内置 + 自定义，含 URL 模板与每源 Key）

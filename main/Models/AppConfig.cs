@@ -15,13 +15,11 @@ public class AppConfig
 
     // === 入库设置 ===
     public bool DefaultAddAllDlc { get; set; } = true;
-    public bool DefaultPatchManifest { get; set; } = true;
     // 隐藏调优参数：无 UI，仅手改 config.json 生效。消费点：
     //   ManifestDownloadService 清单文件下载 max(60, 此值)
     //   SudamaKeyCache 缓存下载 max(120, 此值)
     public int DownloadTimeout { get; set; } = 120;
     public bool StFixedVersionDefault { get; set; } = true;
-    public string StFixedManifestMode { get; set; } = "ask"; // always, never, ask
     public bool StDownloadManifestDefault { get; set; } = true;
 
     // === 免Steam运行设置 ===
@@ -43,9 +41,6 @@ public class AppConfig
 
     // === 外观设置 ===
     public string ThemeMode { get; set; } = "auto"; // light, dark, auto
-    public string ThemeColor { get; set; } = "#0078d4";
-    public string WindowEffect { get; set; } = "mica"; // none, mica, acrylic
-    public string Language { get; set; } = "zh_CN";
 
     // === 窗口状态记忆 ===
     public double WindowWidth { get; set; } = 1250;
@@ -60,9 +55,7 @@ public class AppConfig
     public double NavigationPaneWidth { get; set; } = 200;
 
     // === 应用程序设置 ===
-    public bool DebugMode { get; set; }
     public int LogMaxLines { get; set; } = 1000;
-    public bool CheckUpdateOnStart { get; set; } = true;
 
     // === 自定义清单源 ===
     public Dictionary<string, bool> ManifestSourceEnabled { get; set; } = new();
@@ -81,15 +74,10 @@ public class AppConfig
         SteamPath = string.Empty,
         DefaultManifestSource = "auto",
         DefaultAddAllDlc = true,
-        DefaultPatchManifest = true,
         DownloadTimeout = 120,
         StFixedVersionDefault = true,
-        StFixedManifestMode = "ask",
         StDownloadManifestDefault = true,
         ThemeMode = "auto",
-        ThemeColor = "#0078d4",
-        WindowEffect = "mica",
-        Language = "zh_CN",
         ManifestHubApiKey = "",
         WindowWidth = 1250,
         WindowHeight = 875,
@@ -99,9 +87,7 @@ public class AppConfig
         DefaultPage = "home",
         IsNavigationPaneOpen = true,
         NavigationPaneWidth = 200,
-        DebugMode = false,
         LogMaxLines = 1000,
-        CheckUpdateOnStart = true,
         ManifestSourceEnabled = ManifestSource.GetPresetSources()
             .ToDictionary(s => s.Id, s => s.IsEnabled),
         ManifestSources = ManifestSource.GetPresetSources(),
