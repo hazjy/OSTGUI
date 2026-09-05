@@ -1,4 +1,4 @@
-﻿# 育碧授权调研笔记（UBISOFT-NOTES）
+# 育碧授权调研笔记（UBISOFT-NOTES）
 
 > 状态：**线索与思路记录**，非定稿知识。信息来自公开资料与源码阅读，未经完整实测验证。
 > 目的：评估「入库工具是否值得/如何集成育碧游戏支持」。定稿验证后可将成熟结论并入 DEV-NOTES。
@@ -78,16 +78,33 @@
 1. **部署模式可完全照搬 GBE 部署架构**：检测游戏目录中的 `uplay_r2_loader64.dll` → 备份 → 替换为模拟器 DLL → 写 `uplay_r2.ini`。与现有 GBE 部署代码同构，工作量主要是 UI 与流程复用。
 2. **上游同源红利**：Goldberg_r2_extended 与 gbe_fork 同维护者，版本跟进与信任成本最低。
 3. **前提约束**：用户手里必须有该游戏的合法游戏文件（UC 客户端下载或解包产物）；工具本身只解决"无 UC 客户端运行"，不提供任何内容。
-4. **Denuvo 边界**：带 D 加密的育碧新作不在纯模拟器的覆盖范围内。可能的组合路线（均未验证）：Steam 正版票据供给（OST 内核/Denuvo Sanctuary 路线）+ UC 模拟，两层能否同时成立存疑。
+4. **Denuvo 边界（2026-09 定论）**："绕过启动器 + D 密正常" = **两个独立条件，分别由两层满足**：
+   - UC 层（免启动器）：**Goldberg_r2_extended**（替换 `uplay_r2_loader64.dll`，UPC 应答全接管）——唯一能做到彻底免 UC 客户端；
+   - Denuvo 层（D 密正常）：**与模拟器无关**——只能靠**本机真实激活一次**（正版号启动留 `cache\ownership\########` 激活缓存，绑定机器指纹）或破解补丁。无任何"绕过启动器"工具能替代 Denuvo 激活；
+   - **可行组合** = "正版激活一次（D 密层）+ Goldberg_r2 模拟器（UC 层）"，与 Steam 侧同构（Steam：dbdata 激活 + OST 内核喂票；育碧：ownership 激活缓存 + 模拟器答 UPC）。仅替换 loader 不碰主 EXE → Denuvo EXE 完整性校验不受影响，方案成立的前提；
+   - **硬边界**：未激活的 D 加密新作纯工具免不了；Denuvo 令牌有时效需在线续期 → 模拟环境无法续期，需定期回正版环境开一次（本机已有激活的旧作通常离线可启）。
 5. **待验证问题清单**：
    - Goldberg_r2_extended 对最新 UC 客户端与近年新游戏的兼容覆盖面？
    - 模拟环境下云存档/成就/好友等在线功能缺失对实际游玩的影响面？
    - Steam 版育碧游戏目录与 UC 版目录的结构差异（同一游戏两个发行渠道文件是否通用）？
    - `uplay_r2.ini` 各字段的完整语义（上游 README 只给了 fenyx 单例）？
    - 多人游戏（如 TC 的联机作品）在模拟下是否可用？
+   - 部署目标 DLL 命名差异：`uplay_r2_loader64.dll` vs `uplaypc_r2_loader64.dll`（不同游戏可能不同）？
+   - Goldberg_r2_extended 的版本跟进：与当前 UC 版本/2024+ 新游的兼容面随时间变化？
 
-## 6. 结论备忘
+## 6. 生态现状（2026-09 检索补充）
 
+- **Goldberg_r2_extended**（Detanup01）：仍维护（⭐78）——作者同时是 gbe_fork(GSE) 维护者，信任成本最低；
+- **UplayR2Unlocker**（acidicoala）：社区主流 DLC 解锁用法实锤——放同名 DLL 劫持 + 编辑 `UplayR2Unlocker.jsonc` 指定 DLC（r/PiratedGames Anno 1800 教程）；适合"合法本体 + 解锁 DLC"，**不是"免启动器"方案**；
+- **Batlez-DLC-Unlocker** / **CreamInstaller**（FroggMaster）：自动化参照——自动发现已装 Steam/Epic/Ubisoft 游戏并生成/维护解锁器配置，与 OSTGUI 自动化形态同构；
+- Irdeto 官方博客：厂商威胁模型 = "hook API 伪造应答 / 替换 API DLL"（侧面背书该路线）；
+- 检索环境说明：本会话 harness 网络受限（github 全文抓取/reddit 检索失败、exa 曾短暂 401），仓库细节建议在可联网环境核对；exa 已恢复可用。
+
+## 7. 结论备忘
+
+- **最佳方案（2026-09 定论）**：核心组件 = **Goldberg_r2_extended**（满足"免启动器"），D 密层靠**"正版激活一次"留本机缓存**——组合即"Steam 侧 dbdata+OST 的育碧同构"；部署骨架可完全复用 NoSteam（检测 `uplay*_r2_loader64.dll` → 备份 → 替换 → 写 `uplay_r2.ini`）；
+- **推荐起步路线（轻量）**：先做"无 D 加密游戏"的模拟器部署（干净、无 Denuvo 边界）；D 加密游戏作为后续（需用户正版激活配合，文档写明边界）；
+- UplayR2Unlocker（DLC 解锁）定位不同——只适合"已有 UC 的合法本体解锁 DLC"，不作为"免启动器"主路线，可作为附加功能；
 - 技术上与现有免 Steam 部署高度同构，集成的主要成本在**测试矩阵**（游戏×UC版本×渠道组合），而非代码；
 - 决策点在于产品定位：OSTGUI 目前是 Steam 生态专用工具，加入育碧支持会扩大定位但也引入跨平台测试负担；
 - 本文档仅记录公开技术资料与研究思路，不构成实施承诺。
