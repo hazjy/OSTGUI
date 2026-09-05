@@ -98,7 +98,14 @@
 - **UplayR2Unlocker**（acidicoala）：社区主流 DLC 解锁用法实锤——放同名 DLL 劫持 + 编辑 `UplayR2Unlocker.jsonc` 指定 DLC（r/PiratedGames Anno 1800 教程）；适合"合法本体 + 解锁 DLC"，**不是"免启动器"方案**；
 - **Batlez-DLC-Unlocker** / **CreamInstaller**（FroggMaster）：自动化参照——自动发现已装 Steam/Epic/Ubisoft 游戏并生成/维护解锁器配置，与 OSTGUI 自动化形态同构；
 - Irdeto 官方博客：厂商威胁模型 = "hook API 伪造应答 / 替换 API DLL"（侧面背书该路线）；
+- **ServerEmus 生态（2026-09 新增）**：UplayServer（Detanup01，已归档）拆分为多仓库——[Uplay.upc_r2](https://github.com/ServerEmus/Uplay.upc_r2)（**UPC R2 完整导出模拟**，C#/DllShared 框架 + 命名管道客户端 `UseNamePipeClient`，**有 GitHub Releases 持续发布** `download_releases.yml` 每日同步）、Uplay.dbdata / Uplay.upc_r1（同系列）、[Release.Uplay](https://github.com/ServerEmus/Release.Uplay)（发布物：`dbdata.dll` + `upc_r1.dll/r164/r2/r264`，UPX+NativeAOT 编译，杀软误报 `Program:Win32/Wacapew.A!ml`）。**体系 = 模拟 dbdata/upc 核心库 + 命名管道 + 本地 Server（LiteDB+认证，Server 无现成二进制需自建）**；
 - 检索环境说明：本会话 harness 网络受限（github 全文抓取/reddit 检索失败、exa 曾短暂 401），仓库细节建议在可联网环境核对；exa 已恢复可用。
+
+## 6.5 UNO 实机测试结论（2026-09-05，Steam AppID 470220）
+
+- **UNO = "多组件 UC 栈 + Steamworks 双栈"**：插件区含 `upc_r2_loader64.dll`（loader）+ `ubiservices.dll` + `uprofile.dll` + `dbdata.dll` + `Storm.dll` + `steam_api64.dll`/`uno_steam.dll`（Unity + Steamworks.NET）。**验证了 Goldberg R2 单 loader 模拟的边界**：只替换 `upc_r2_loader64.dll` 后，游戏仍弹"需要育碧客户端"（ubiservices/uprofile 向真实 UC 客户端要服务）；**流畅入库（同 Goldberg 核心）对 UNO 同样失败**——非实现缺陷，架构不兼容；
+- **loader 命名三档（服务 KnownLoaders）**：`upc_r2_loader64.dll`（Unity 育碧新作，如 UNO）/ `uplay_r2_loader64.dll` / `uplaypc_r2_loader64.dll`；布局：根目录 或 `*_Data\Plugins\x86_64\`（Unity）；`uplay_r2.ini` **必须与 loader 同目录**（emu.cpp `lib_path + "\\uplay_r2.ini"`）；
+- **结论**：免育碧可选**两条路线**——① Goldberg 单 loader（轻、已实现，兼容传统单 loader R2 游戏）；② ServerEmus 链路（DLL+命名管道+本地 Server，理论覆盖 UNO 类，**未实测 + Server 需自建 + 重架构**）。UNO 本身作为"不兼容样本"记录，需此类游戏支持则走路线②（spike 门槛高，暂不集成）。
 
 ## 7. 结论备忘
 

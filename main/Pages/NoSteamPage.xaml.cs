@@ -47,8 +47,8 @@ public sealed partial class NoSteamPage : Page
         UbisoftDirBox.Text = folder.Path;
         var loader = UbisoftSvc.DetectLoader(folder.Path);
         UbisoftLoaderStatus.Text = loader == null
-            ? "未在目录根部找到 uplay loader（uplay_r2_loader64.dll / uplaypc_r2_loader64.dll）"
-            : $"已检测到：{loader}";
+            ? "未找到 uplay/upc R2 loader（upc_r2_loader64.dll / uplay_r2_loader64.dll / uplaypc_r2_loader64.dll）"
+            : $"已检测到：{Path.GetFileName(loader)}（{Path.GetDirectoryName(loader)}）";
     }
 
     private void DeployUbisoft_Click(object sender, RoutedEventArgs e)
@@ -60,8 +60,13 @@ public sealed partial class NoSteamPage : Page
             return;
         }
 
-        var loader = UbisoftSvc.DetectLoader(dir) ?? "uplay_r2_loader64.dll";
-        var (ok, msg) = UbisoftSvc.Deploy(dir, loader);
+        var loader = UbisoftSvc.DetectLoader(dir);
+        if (loader == null)
+        {
+            UbisoftLogBox.Text = "未检测到 uplay/upc R2 loader，请确认游戏目录正确";
+            return;
+        }
+        var (ok, msg) = UbisoftSvc.Deploy(loader);
         UbisoftLogBox.Text = msg;
         if (ok)
             Services.ToastService.ShowSuccess("免育碧", msg);
@@ -85,7 +90,7 @@ public sealed partial class NoSteamPage : Page
             return;
         }
 
-        var (ok, msg) = UbisoftSvc.Restore(dir, loader);
+        var (ok, msg) = UbisoftSvc.Restore(loader);
         UbisoftLogBox.Text = msg;
         if (ok)
             Services.ToastService.ShowInfo("免育碧", msg);

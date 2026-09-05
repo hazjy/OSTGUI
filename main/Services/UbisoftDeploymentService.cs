@@ -3,16 +3,17 @@ using System.Reflection;
 namespace OSTGUI.Services;
 
 /// <summary>
-/// 免育碧部署：探测 uplay loader → 备份 → 替换为 Goldberg R2 模拟器 → 写 uplay_r2.ini。
+/// 免育碧部署：探测 uplay/upc loader → 备份 → 替换为 Goldberg R2 模拟器 → 写 uplay_r2.ini。
 /// 资源：upc_r2_loader64.dll（自编译自 RefProjects/Goldberg_r2_extended，LGPL-3.0，见 docs/dev/THIRD-PARTY-NOTICES.md）。
+/// 引擎证据：模拟器从自身 DLL 同目录读 uplay_r2.ini（emu.cpp UPC_Init: lib_path + "\\uplay_r2.ini"），故 ini 与 loader 同目录写入。
 /// </summary>
 public class UbisoftDeploymentService
 {
     private const string EmbeddedDll = "upc_r2_loader64.dll";
     private const string IniFileName = "uplay_r2.ini";
 
-    /// <summary>游戏加载的 uplay loader 固定名（按常见度排序探测）</summary>
-    public static readonly string[] KnownLoaders = { "uplay_r2_loader64.dll", "uplaypc_r2_loader64.dll" };
+    /// <summary>育碧 loader 固定名（按常见度排序）：upc_r2 为 Unity 育碧新作（如 UNO），uplay_r2/uplaypc_r2 为传统 R2</summary>
+    public static readonly string[] KnownLoaders = { "upc_r2_loader64.dll", "uplay_r2_loader64.dll", "uplaypc_r2_loader64.dll" };
 
     private readonly string _tempDir;
 
@@ -28,11 +29,25 @@ public class UbisoftDeploymentService
         System.Diagnostics.Debug.WriteLine($"[Ubisoft] {message}");
     }
 
-    /// <summary>探测游戏目录里的 uplay loader，返回文件名；未找到返回 null</summary>
+    /// <summary>在游戏目录（含常见 Unity 插件子目录 *_Data\Plugins\x86_64）探测 loader，返回 loader 完整路径；未找到返回 null</summary>
     public string? DetectLoader(string gameDir)
     {
         if (string.IsNullOrEmpty(gameDir) || !Directory.Exists(gameDir)) return null;
-        return KnownLoaders.FirstOrDefault(l => File.Exists(Path.Combine(gameDir, l)));
+
+        var candidates = new List<string> { gameDir };
+        foreach (var dataDir in Directory.EnumerateDirectories(gameDir, "*_Data", SearchOption.AllDirectories))
+            candidates.Add(Path.Combine(dataDir, "Plugins", "x86_64"));
+
+        foreach (var dir in candidates)
+        {
+            if (!Directory.Exists(dir)) continue;
+            foreach (var loader in KnownLoaders)
+            {
+                var path = Path.Combine(dir, loader);
+                if (File.Exists(path)) return path;
+            }
+        }
+        return null;
     }
 
     /// <summary>确保模拟器 DLL 已解压到临时目录（缺失即解压，返回 DLL 路径）</summary>
@@ -52,14 +67,16 @@ public class UbisoftDeploymentService
         return dll;
     }
 
-    /// <summary>部署：备份 → 替换为模拟器（改名匹配 loader）→ 写默认 uplay_r2.ini</summary>
-    public (bool success, string message) Deploy(string gameDir, string loaderName, string language = "en-US")
+    /// <summary>部署：备份 → 替换为模拟器（按 loader 原名落位，upc_r2_loader64.dll 同名直覆盖）→ 写 uplay_r2.ini（loader 同目录）</summary>
+    public (bool success, string message) Deploy(string loaderPath, string language = "en-US")
     {
         try
         {
-            var loaderPath = Path.Combine(gameDir, loaderName);
-            if (!File.Exists(loaderPath))
-                return (false, $"未找到 {loaderName}，请确认游戏目录正确");
+            if (string.IsNullOrEmpty(loaderPath) || !File.Exists(loaderPath))
+                return (false, $"未找到 loader（{loaderPath}），请先在免育碧面板选择游戏目录并确认检测到 loader");
+
+            var loaderName = Path.GetFileName(loaderPath);
+            var dir = Path.GetDirectoryName(loaderPath)!;
 
             // 1. 备份原 loader（已备份则跳过）
             var bak = loaderPath + ".bak";
@@ -68,14 +85,13 @@ public class UbisoftDeploymentService
             else
                 Log("备份已存在，跳过备份");
 
-            // 2. 替换为模拟器 DLL（产物名 upc_r2_loader64.dll → 改名匹配原 loader）
-            var emuDll = EnsureExtracted();
-            File.Copy(emuDll, loaderPath, true);
+            // 2. 替换为模拟器 DLL（目标名 = 原 loader 名）
+            File.Copy(EnsureExtracted(), loaderPath, true);
 
-            // 3. 写默认 uplay_r2.ini（与 loader 同目录）
-            File.WriteAllText(Path.Combine(gameDir, IniFileName), BuildIni(language), new System.Text.UTF8Encoding(false));
+            // 3. 写 uplay_r2.ini（与 loader 同目录，emu.cpp 按 lib_path 读）
+            File.WriteAllText(Path.Combine(dir, IniFileName), BuildIni(language), new System.Text.UTF8Encoding(false));
 
-            Log($"已部署：{loaderName} → Goldberg R2 模拟器（原文件备份为 {loaderName}.bak），并生成 {IniFileName}");
+            Log($"已部署：{loaderName} → Goldberg R2（原文件备份为 {loaderName}.bak），uplay_r2.ini 已生成于 {dir}");
             return (true, $"部署完成：{loaderName} → Goldberg R2（原文件已备份为 {loaderName}.bak）");
         }
         catch (Exception ex)
@@ -86,22 +102,23 @@ public class UbisoftDeploymentService
     }
 
     /// <summary>还原：删除模拟器与 ini，把 .bak 改回原 loader 名</summary>
-    public (bool success, string message) Restore(string gameDir, string loaderName)
+    public (bool success, string message) Restore(string loaderPath)
     {
         try
         {
-            var loaderPath = Path.Combine(gameDir, loaderName);
+            if (string.IsNullOrEmpty(loaderPath)) return (false, "loader 路径为空");
+            var dir = Path.GetDirectoryName(loaderPath)!;
             var bak = loaderPath + ".bak";
             if (File.Exists(bak))
             {
                 if (File.Exists(loaderPath)) File.Delete(loaderPath);
                 File.Move(bak, loaderPath);
             }
-            var ini = Path.Combine(gameDir, IniFileName);
+            var ini = Path.Combine(dir, IniFileName);
             if (File.Exists(ini)) File.Delete(ini);
 
-            Log($"已还原 {loaderName} 并删除 {IniFileName}");
-            return (true, "已还原原版 loader）");
+            Log($"已还原 {Path.GetFileName(loaderPath)} 并删除 {IniFileName}");
+            return (true, "已还原原版 loader");
         }
         catch (Exception ex)
         {
