@@ -71,7 +71,7 @@
                 </NavigationViewItem>
                 <NavigationViewItem x:Name="NavNoSteam" Tag="nosteam">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE711;" /></NavigationViewItem.Icon>
-                    <NavigationViewItem.Content>S.A.C</NavigationViewItem.Content>
+                    <NavigationViewItem.Content>模拟器</NavigationViewItem.Content>
                 </NavigationViewItem>
             </NavigationView.MenuItems>
 
