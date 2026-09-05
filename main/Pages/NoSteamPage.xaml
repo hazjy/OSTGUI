@@ -156,12 +156,46 @@
                 </StackPanel>
             </ScrollViewer>
 
-            <!-- 免育碧：UI 占位，功能后续接入 -->
+            <!-- 免育碧：Goldberg R2 模拟器部署（Phase 1） -->
             <Grid Grid.Row="1" x:Name="UbisoftPanel" Visibility="Collapsed">
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
-                    <StackPanel Spacing="24" MaxWidth="900" HorizontalAlignment="Center" Padding="0,16,0,40">
-                        <TextBlock Text="免育碧 · 功能开发中" FontSize="14"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <StackPanel Spacing="20" MaxWidth="900" HorizontalAlignment="Center" Padding="0,16,0,40">
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                CornerRadius="8" Padding="16" BorderThickness="1"
+                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="免育碧 · Goldberg R2 模拟器" FontSize="16" FontWeight="SemiBold" />
+                                <TextBlock Text="替换游戏的 uplay loader 为模拟器，之后无需运行 Ubisoft Connect 即可启动游戏。无 D 加密游戏可直接游玩；D 加密游戏需先在正版环境激活一次。"
+                                           FontSize="12" TextWrapping="Wrap"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="UbisoftDirBox" Grid.Column="0" Header="游戏目录"
+                                             PlaceholderText="选择游戏安装目录（含 uplay_r2_loader64.dll）" />
+                                    <Button Grid.Column="1" Content="浏览…" Click="BrowseUbisoftDir_Click"
+                                            VerticalAlignment="Bottom" />
+                                </Grid>
+
+                                <TextBlock x:Name="UbisoftLoaderStatus" FontSize="12"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+                                <StackPanel Orientation="Horizontal" Spacing="12">
+                                    <Button Content="开始部署" Click="DeployUbisoft_Click"
+                                            Style="{StaticResource AccentButtonStyle}" />
+                                    <Button Content="还原" Click="RestoreUbisoft_Click" />
+                                </StackPanel>
+
+                                <TextBox x:Name="UbisoftLogBox" IsReadOnly="True" AcceptsReturn="True"
+                                         TextWrapping="Wrap" ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                         FontFamily="Cascadia Code, Consolas, monospace" FontSize="12"
+                                         MinHeight="140" MaxHeight="260"
+                                         Background="{ThemeResource TextControlBackgroundFocused}" />
+                            </StackPanel>
+                        </Border>
                     </StackPanel>
                 </ScrollViewer>
             </Grid>

@@ -34,6 +34,11 @@
     <Content Include="Assets\important.html" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- 免育碧：Goldberg R2 模拟器预编译 DLL（LGPL-3.0，自编译自 RefProjects/Goldberg_r2_extended，见 THIRD-PARTY-NOTICES） -->
+    <EmbeddedResource Include="Assets\Ubisoft\upc_r2_loader64.dll" />
+  </ItemGroup>
+
   <!-- MSBuild Publish 默认漏复制 WinUI 应用的 .xbf / OSTGUI.pri，
        缺失会导致启动时 XamlParseException、窗口创建失败；发布后自动补齐 -->
   <Target Name="CopyWinUIResourcesToPublish" AfterTargets="Publish" Condition="'$(PublishDir)' != ''">

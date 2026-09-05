@@ -78,6 +78,7 @@ public partial class App : Application
         services.AddSingleton<SteamlessService>();
         services.AddSingleton<GBEDeploymentService>();
         services.AddSingleton<NoSteamLaunchOrchestrator>();
+        services.AddSingleton<UbisoftDeploymentService>();
         services.AddSingleton<MainViewModel>();
         services.AddTransient<SearchViewModel>();
         services.AddTransient<LibraryViewModel>();

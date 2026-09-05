@@ -36,6 +36,18 @@
 [OpenSteamTool](https://github.com/OpenSteam001/OpenSteamTool)、
 [FluentInstall](https://github.com/Files-community/FluentInstaller) 等见 `RefProjects/`（该目录不纳入版本控制）。
 
+## 5. Goldberg R2 模拟器（免育碧）
+
+| 项目 | 内容 |
+|---|---|
+| 文件 | `main/Assets/Ubisoft/upc_r2_loader64.dll`（内嵌资源，免育碧部署时解压并改名复制到游戏目录） |
+| 上游 | https://github.com/Detanup01/Goldberg_r2_extended |
+| 许可证 | GNU LGPL-3.0 |
+| 用途 | 替换育碧游戏的 uplay loader（`uplay_r2_loader64.dll` / `uplaypc_r2_loader64.dll`），无需运行 Ubisoft Connect 即可启动游戏 |
+| 构建说明 | 自 `RefProjects/Goldberg_r2_extended`（latest main）源码编译：`cl /std:c++20 /LD /DEMU_RELEASE_BUILD /DNDEBUG emu.cpp User32.lib Shell32.lib Ole32.lib /EHsc /Ox /link /OUT:upc_r2_loader64.dll`；相对最新 release 含 UPC_StorageFileOpen 存档修复 |
+
+> ⚠️ 与 GSE 同样采用 **LGPL-3.0**。本项目以自编译的本体 DLL 形式集成本组件，仅供非商业的学习与研究用途。
+
 ---
 
 ## 使用声明
