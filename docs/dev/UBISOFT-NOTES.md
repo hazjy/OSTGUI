@@ -107,6 +107,56 @@
 - **loader 命名三档（服务 KnownLoaders）**：`upc_r2_loader64.dll`（Unity 育碧新作，如 UNO）/ `uplay_r2_loader64.dll` / `uplaypc_r2_loader64.dll`；布局：根目录 或 `*_Data\Plugins\x86_64\`（Unity）；`uplay_r2.ini` **必须与 loader 同目录**（emu.cpp `lib_path + "\\uplay_r2.ini"`）；
 - **结论**：免育碧可选**两条路线**——① Goldberg 单 loader（轻、已实现，兼容传统单 loader R2 游戏）；② ServerEmus 链路（DLL+命名管道+本地 Server，理论覆盖 UNO 类，**未实测 + Server 需自建 + 重架构**）。UNO 本身作为"不兼容样本"记录，需此类游戏支持则走路线②（spike 门槛高，暂不集成）。
 
+## 6.6 ServerEmus spike 实验结论（2026-09-06，UNO 实测）
+
+- **做了**（本机全链路实操）：检出 UplayServer 源码 → `dotnet publish ServerApp`（net9.0，恢复 NuGet——本机 TLS/schannel 需完全权限沙箱才可；日志另记）→ `cert/v2_run` 自签证书（global CA + services.pfx，密码 CustomUplay，SAN 覆盖 `*.ubi.com`/dmx/ubiservices/onlineconfigservice）→ hosts 劫持 `dmx.upc.ubisoft.com` + `local-ubiservices.ubi.com` → 证书装系统受信任根 → Server 监听 0.0.0.0:443（单一 TLS 服务，Demux/HTTPS 同端口路由）→ 启动 UNO；
+- **结果**：**连接层完全打通**——Server 日志确认收到 UNO 的 `POST /v1/profiles/{userid}/global/ubiconnect/playsession/api/sessions`、economy/challenges/rewards/configuration 等请求（游戏启动即向育碧服务鉴权）；**但业务层半成品**（`Functionality [ ]` 属实），playsession 等路由应答不完整 → UNO 进程退出，未过"需要育碧客户端"；
+- **双路线边界定型**：Goldberg=接口层可用、缺网络服务；ServerEmus=网络层可用、业务未完成——**完整支持 UNO 类 = 接口模拟 + 网络服务 + 业务应答三合一（上游未完成的大工程）**；
+- **决策**：免育碧**归档为挂起项**——保留 Goldberg 单 loader 实现（传统 R2 游戏可用）；UNO 类依赖上游 ServerEmus 成熟度（upc_r2/dbdata 仍活跃发布，**追踪点**：若其业务补完再评估接入）；当前重心回归 Steam 主线。实验态已清理（Server 停止、443 释放）；hosts 两行与 Root 证书可逆可删。
+
+### 6.6.1 可复现路径与环境记录（复测用）
+
+- **产物（保留于本机）**：`RefProjects/UplayServer/out-server/`（ServerApp net9.0 发布物 + ServerCore/依赖）、`RefProjects/UplayServer/cert/`（自签 global/services/signer 证书，密码 `CustomUplay`；SAN 覆盖 `*.ubi.com` 及 dmx/ubiservices/onlineconfigservice 等）；
+- **构建**：`dotnet publish Server\ServerApp\ServerApp.csproj -c Release -o out-server`（依赖 NuGet：LiteDB/ModdableWebServer/NetCoreServer/JWT/Google.Protobuf/Uplay-Protobufs 等；**本机 TLS/schannel 在受限沙箱不可用**——构建须在完全权限沙箱或正常终端下执行）；
+- **启动坑**：无 stdin 后台运行 `dotnet ServerApp.dll` 会因 `Console.ReadLine()!` 返回 null 崩（Program.cs:34 NRE）——本地已加实验补丁 `if (endCheck == null) Thread.Sleep(Timeout.Infinite)` 保持服务（仅实验用途）；`ServerConfig.json` 自动生成：`DemuxUrl=dmx.local.upc.ubisoft.com:443`、`HTTPS_Url=local-ubiservices.ubi.com:443`（**Demux 与 HTTPS 同 socket 单 TLS 443 端口按路由分发**，非端口冲突）、`GlobalOwnerShipCheck=true`、`ServicesCertPassword=CustomUplay`；
+- **装配**：hosts 追加 `127.0.0.1 dmx.upc.ubisoft.com` + `local-ubiservices.ubi.com`（先备份）；`certutil -addstore Root global.crt`（+ services.crt 可选）；
+- **实测信号**：Server 日志收到 `POST /v1/profiles/{userid}/global/ubiconnect/playsession/api/sessions`、economy/challenges/rewards/configuration/entities 等——游戏启动即向育碧服务鉴权，链路全通；失败点 = 业务应答不完整；
+- **清理（可逆）**：停 Server → hosts 删上述两行（备份 `%TEMP%\hosts.bak_*`）→ `certutil -delstore Root "Custom Ubisoft"` / `"*.ubi.com"`。
+
+## 6.7 第三方候选清单（2026-09-06 子代理联网调研全量）
+
+> 结论：**不存在"开箱即用、公开维护"的第三条完整路线**（全网"uplay/ubiconnect emulator"收敛回 Goldberg 系与 ServerEmus 系）。以下为组件级/旁门候选，作后续积木或澄清排除用。
+
+**A. 组件/研究级（最接近"第三条路线"的现成材料）**
+
+| # | 项目 | 定位 | 成熟度 | 对 UNO 类覆盖 |
+|---|---|---|---|---|
+| A1 | [denuvosanctuary/ubi-dbdata](https://github.com/denuvosanctuary/ubi-dbdata) | `dbdata.dll` 客户端模拟（育碧 Denuvo 变体），可 drop-in 替换 | 活跃（2026，~79★） | 仅 dbdata 一件；与 UC 原生 dbdata 是否同变体需核验 |
+| A2 | [YoobieRE/ubisoft-demux-node](https://github.com/YoobieRE/ubisoft-demux-node) | 游戏↔UC 的 named-pipe/protobuf demux 协议实现 | 库级非成品（22★） | 可作"本地假 UC 核心"通信层 |
+| A3 | [UplayDB 组织](https://github.com/UplayDB)（Protobufs/Ubi-Parser/UbiProxyDlls/ChannelKit/UplayWrapper） | upc.exe 完整 protobuf 定义 + UC 缓存解析 | 研究资源，2026 仍在更 | 业务层"协议图纸"，不直接覆盖 |
+| A4 | [ServerEmus/Release.Uplay](https://github.com/ServerEmus/Release.Uplay) | 预编译 upc_r1/r164/r2/r264 + dbdata（AOT/UPX） | 12★，2025-09 后停更 | 属路线 2 现成产物 |
+| A5 | ServerEmus Plugin.Photon / Plugin.UplayServer.Quazal / Plugin.DTLS | Photon/Quazal 联机服务模拟 | 2025-2026 活跃 | 与启动无关（UNO 多人走 Photon，联机才需要） |
+
+**B. 旁门 / 特定游戏**
+
+- **UNO-TiNYiSO（2018-01-13 场景组破解）**：UNO 曾"复制 crack 即玩"（联机不可用）——**证明其多组件 UC 栈存在 per-game 绕过路径，但无通用工具**（[ovagames](https://www.ovagames.com/638498-uno-tinyiso.html)、[skidrowrepack](https://skidrowrepack.com/9599-uno.html)）；
+- 中文站离线 Build / "免Uplay补丁"（3DM、17wanjia：看门狗 2014、AC3 等）——**R1 时代 per-game**，非通用；
+- 官方离线：AC Brotherhood Steam 版已官方支持免 UC 离线（[steamsolo](https://steamsolo.com/guide/...)）；**UNO 官方明确回复"必须 UC"**（[Steam 讨论](https://steamcommunity.com/app/470220/discussions/1/5081733371341210063/)）；
+- [Skip-Game-Launcher](https://github.com/voc0der/Skip-Game-Launcher)：仅跳启动器 UI 直拉 exe，不破 DRM，仅适用本体不强制校验的游戏；
+- UplayR1/R2 Unlocker / Koalageddon / CreamInstaller（DynDruid/ubden）：**正版 DLC 解锁器**（需客户端在线），非免客户端方案（澄清排除）。
+
+**C. 已排除/死掉**：Nemirtingas 生态（无 Uplay 方向，仅 Steam/Epic/GOG/Galaxy）；philicious/open-uplay（2016，R1）；gloriag/uplay-stub（404 疑似删除）；Rat431 系（Mini_Uplay_API_Emu/ColdPlay_Uplay）与 Re0xCat/uplay-r1-loader、Detanup01/upc_r1（均 R1，UNO 是 R2）；HOCKI1/Mr_Goldberg_UPlay_R2_emu（2022 单日 fork，同 Goldberg R2）；michal-kapala/ubi-gs（2000-2005 老 GS 服务，非现代 ubiservices）；jbousquie/OfficeGames（同名无关）。
+
+**UNO 多组件栈覆盖缺口表**
+
+| UNO 组件 | 现成覆盖 |
+|---|---|
+| `upc_r2_loader64.dll` | Goldberg_r2_extended / ServerEmus upc_r2（已有，UNO 实测失败） |
+| `dbdata.dll` | ServerEmus Uplay.dbdata（服务端）+ ubi-dbdata（客户端，待核验） |
+| `ubiservices.dll` / `uprofile.dll` / `Storm.dll` | **无任何项目针对性模拟** |
+
+**现实方向**：覆盖 UNO 类 = 用 UplayDB 协议资料 + ubisoft-demux-node **自建本地假 UC 核心**（工程量大、非通用），或 per-game 补丁；通用"免 UC"对多组件 Unity 育碧游戏属上游未完成领域，暂不接。
+
 ## 7. 结论备忘
 
 - **最佳方案（2026-09 定论）**：核心组件 = **Goldberg_r2_extended**（满足"免启动器"），D 密层靠**"正版激活一次"留本机缓存**——组合即"Steam 侧 dbdata+OST 的育碧同构"；部署骨架可完全复用 NoSteam（检测 `uplay*_r2_loader64.dll` → 备份 → 替换 → 写 `uplay_r2.ini`）；
