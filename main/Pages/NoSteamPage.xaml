@@ -47,7 +47,7 @@
                                 HorizontalAlignment="Stretch"
                                 SelectionChanged="NoSteamSegmented_SelectionChanged">
                 <controls:SegmentedItem Content="免Steam" IsSelected="True" />
-                <controls:SegmentedItem Content="免育碧" />
+                <controls:SegmentedItem Content="免育碧（实验性）" />
             </controls:Segmented>
 
             <ScrollViewer Grid.Row="1" x:Name="NoSteamPanel" VerticalScrollMode="Auto" VerticalScrollBarVisibility="Auto">
@@ -164,8 +164,8 @@
                                 CornerRadius="8" Padding="16" BorderThickness="1"
                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
                             <StackPanel Spacing="12">
-                                <TextBlock Text="免育碧 · Goldberg R2 模拟器" FontSize="16" FontWeight="SemiBold" />
-                                <TextBlock Text="替换游戏的 uplay loader 为模拟器，之后无需运行 Ubisoft Connect 即可启动游戏。无 D 加密游戏可直接游玩；D 加密游戏需先在正版环境激活一次。"
+                                <TextBlock Text="免育碧 · Goldberg R2 模拟器（实验性）" FontSize="16" FontWeight="SemiBold" />
+                                <TextBlock Text="实验性功能：基于 Goldberg R2 模拟器替换 uplay/upc loader，无需运行 Ubisoft Connect 即可启动。仅适用于传统单 loader 的育碧 R2 游戏；多组件 UC 栈（如 UNO：ubiservices/uprofile/dbdata）暂不支持，本功能处于挂起状态（待上游 ServerEmus 生态成熟后再评估）。无 D 加密游戏可直接游玩；D 加密游戏需先在正版环境激活一次。"
                                            FontSize="12" TextWrapping="Wrap"
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 
