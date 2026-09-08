@@ -35,7 +35,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- 免育碧：Goldberg R2 模拟器预编译 DLL（LGPL-3.0，自编译自 RefProjects/Goldberg_r2_extended，见 THIRD-PARTY-NOTICES） -->
+    <!-- 免育碧：Goldberg R2 模拟器预编译 DLL（LGPL-3.0，自编译自 RefProjects/1-在用/Goldberg_r2_extended，见 THIRD-PARTY-NOTICES） -->
     <EmbeddedResource Include="Assets\Ubisoft\upc_r2_loader64.dll" />
   </ItemGroup>
 

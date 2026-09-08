@@ -4,7 +4,7 @@ namespace OSTGUI.Services;
 
 /// <summary>
 /// 免育碧部署：探测 uplay/upc loader → 备份 → 替换为 Goldberg R2 模拟器 → 写 uplay_r2.ini。
-/// 资源：upc_r2_loader64.dll（自编译自 RefProjects/Goldberg_r2_extended，LGPL-3.0，见 docs/dev/THIRD-PARTY-NOTICES.md）。
+/// 资源：upc_r2_loader64.dll（自编译自 RefProjects/1-在用/Goldberg_r2_extended，LGPL-3.0，见 docs/dev/THIRD-PARTY-NOTICES.md）。
 /// 引擎证据：模拟器从自身 DLL 同目录读 uplay_r2.ini（emu.cpp UPC_Init: lib_path + "\\uplay_r2.ini"），故 ini 与 loader 同目录写入。
 /// </summary>
 public class UbisoftDeploymentService

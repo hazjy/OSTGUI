@@ -116,7 +116,7 @@
 
 ### 6.6.1 可复现路径与环境记录（复测用）
 
-- **产物（保留于本机）**：`RefProjects/UplayServer/out-server/`（ServerApp net9.0 发布物 + ServerCore/依赖）、`RefProjects/UplayServer/cert/`（自签 global/services/signer 证书，密码 `CustomUplay`；SAN 覆盖 `*.ubi.com` 及 dmx/ubiservices/onlineconfigservice 等）；
+- **产物（保留于本机）**：`RefProjects/2-挂起/UplayServer/out-server/`（ServerApp net9.0 发布物 + ServerCore/依赖）、`RefProjects/2-挂起/UplayServer/cert/`（自签 global/services/signer 证书，密码 `CustomUplay`；SAN 覆盖 `*.ubi.com` 及 dmx/ubiservices/onlineconfigservice 等）；
 - **构建**：`dotnet publish Server\ServerApp\ServerApp.csproj -c Release -o out-server`（依赖 NuGet：LiteDB/ModdableWebServer/NetCoreServer/JWT/Google.Protobuf/Uplay-Protobufs 等；**本机 TLS/schannel 在受限沙箱不可用**——构建须在完全权限沙箱或正常终端下执行）；
 - **启动坑**：无 stdin 后台运行 `dotnet ServerApp.dll` 会因 `Console.ReadLine()!` 返回 null 崩（Program.cs:34 NRE）——本地已加实验补丁 `if (endCheck == null) Thread.Sleep(Timeout.Infinite)` 保持服务（仅实验用途）；`ServerConfig.json` 自动生成：`DemuxUrl=dmx.local.upc.ubisoft.com:443`、`HTTPS_Url=local-ubiservices.ubi.com:443`（**Demux 与 HTTPS 同 socket 单 TLS 443 端口按路由分发**，非端口冲突）、`GlobalOwnerShipCheck=true`、`ServicesCertPassword=CustomUplay`；
 - **装配**：hosts 追加 `127.0.0.1 dmx.upc.ubisoft.com` + `local-ubiservices.ubi.com`（先备份）；`certutil -addstore Root global.crt`（+ services.crt 可选）；
