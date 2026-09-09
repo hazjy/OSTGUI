@@ -37,16 +37,30 @@ public class ManifestFileService
         }
 
         var count = 0;
+        var failed = new List<string>();
         foreach (var manifestFile in manifestFiles)
         {
             var fileName = Path.GetFileName(manifestFile);
+            var copiedAny = false;
             foreach (var depotcache in depotcachePaths)
             {
-                if (!string.IsNullOrEmpty(depotcache))
+                if (string.IsNullOrEmpty(depotcache)) continue;
+                try
+                {
                     File.Copy(manifestFile, Path.Combine(depotcache, fileName), true);
+                    copiedAny = true;
+                }
+                catch (Exception ex)
+                {
+                    // [本地修补 2026-09-09] 逐份拷贝独立容错：一个目录失败（如 Steam 占用
+                    // depotcache 根）不再中断整轮，避免"config 有、根没有"的静默半成品。
+                    failed.Add($"{fileName} -> {depotcache} ({ex.Message})");
+                }
             }
-            count++;
+            if (copiedAny) count++;
         }
+        if (failed.Count > 0)
+            Log($"警告: 以下清单拷贝未全部成功（可重试入库补拷）: {string.Join("; ", failed)}");
         return count;
     }
 

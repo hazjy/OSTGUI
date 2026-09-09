@@ -40,72 +40,90 @@ public class SteamGameInfoService
 
     private async Task<GameInfo?> GetGameDetailsFromSteamCmdAsync(string appId)
     {
-        try
+        // [本地补丁 2026-09-09] SteamCMD API 在本机 SSL/连接层偶发失败（schannel 受加速器干扰），
+        // 实测日志"重试即成功"——引入最多 3 次重试，且每次使用全新 HttpClient
+        // （规避连接池复用失败 TLS 会话），稳定 MHub 前置的 manifest gid 获取。
+        const int maxAttempts = 3;
+        for (int attempt = 0; attempt < maxAttempts; attempt++)
         {
-            var url = $"https://api.steamcmd.net/v1/info/{appId}";
-            Log($"请求 SteamCMD API: {url}");
-            var response = await _http.GetAsync(url);
-            if (!response.IsSuccessStatusCode)
-                return null;
-
-            var json = await response.Content.ReadAsStringAsync();
-            var doc = JsonDocument.Parse(json);
-            if (!doc.RootElement.TryGetProperty("data", out var data) ||
-                !data.TryGetProperty(appId, out var appData) ||
-                !appData.TryGetProperty("depots", out var depotsObj))
-                return null;
-
-            var game = new GameInfo { AppId = appId };
-            if (appData.TryGetProperty("name", out var nameElem))
-                game.Name = nameElem.GetString() ?? "";
-
-            var depotCount = 0;
-            foreach (var prop in depotsObj.EnumerateObject())
+            try
             {
-                if (!prop.Name.All(char.IsDigit))
-                    continue;
+                var url = $"https://api.steamcmd.net/v1/info/{appId}";
+                Log(attempt == 0
+                    ? $"请求 SteamCMD API: {url}"
+                    : $"请求 SteamCMD API 重试({attempt + 1}/{maxAttempts}): {url}");
+                if (attempt > 0)
+                    await Task.Delay(500 * attempt);
 
-                var depotData = prop.Value;
-                var depot = new DepotInfo { DepotId = prop.Name };
-
-                if (depotData.TryGetProperty("name", out var depotName))
-                    depot.Name = depotName.GetString() ?? "";
-
-                if (depotData.TryGetProperty("manifests", out var manifestsObj) &&
-                    manifestsObj.TryGetProperty("public", out var publicManifest))
+                using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
+                var response = await client.GetAsync(url);
+                if (!response.IsSuccessStatusCode)
                 {
-                    if (publicManifest.TryGetProperty("gid", out var gidElem))
-                    {
-                        var gid = gidElem.GetString();
-                        if (gid != null)
-                            depot.Manifests.Add(gid);
-                    }
-
-                    if (publicManifest.TryGetProperty("download", out var downloadElem))
-                        depot.MaxSize = GetInt64Safe(downloadElem);
-                    else if (publicManifest.TryGetProperty("size", out var sizeElem))
-                        depot.MaxSize = GetInt64Safe(sizeElem);
+                    Log($"SteamCMD API 非成功响应 ({(int)response.StatusCode}), 重试({attempt + 1}/{maxAttempts})");
+                    continue;
                 }
 
-                if (depotData.TryGetProperty("dlcappid", out var dlcElem))
-                    depot.DlcAppId = dlcElem.GetString() ?? "";
+                var json = await response.Content.ReadAsStringAsync();
+                var doc = JsonDocument.Parse(json);
+                if (!doc.RootElement.TryGetProperty("data", out var data) ||
+                    !data.TryGetProperty(appId, out var appData) ||
+                    !appData.TryGetProperty("depots", out var depotsObj))
+                    return null;
 
-                if (depotData.TryGetProperty("encrypted", out var encryptedObj) &&
-                    encryptedObj.TryGetProperty("key", out var keyElem))
-                    depot.DecryptionKey = keyElem.GetString() ?? "";
+                var game = new GameInfo { AppId = appId };
+                if (appData.TryGetProperty("name", out var nameElem))
+                    game.Name = nameElem.GetString() ?? "";
 
-                game.Depots[prop.Name] = depot;
-                depotCount++;
+                var depotCount = 0;
+                foreach (var prop in depotsObj.EnumerateObject())
+                {
+                    if (!prop.Name.All(char.IsDigit))
+                        continue;
+
+                    var depotData = prop.Value;
+                    var depot = new DepotInfo { DepotId = prop.Name };
+
+                    if (depotData.TryGetProperty("name", out var depotName))
+                        depot.Name = depotName.GetString() ?? "";
+
+                    if (depotData.TryGetProperty("manifests", out var manifestsObj) &&
+                        manifestsObj.TryGetProperty("public", out var publicManifest))
+                    {
+                        if (publicManifest.TryGetProperty("gid", out var gidElem))
+                        {
+                            var gid = gidElem.GetString();
+                            if (gid != null)
+                                depot.Manifests.Add(gid);
+                        }
+
+                        if (publicManifest.TryGetProperty("download", out var downloadElem))
+                            depot.MaxSize = GetInt64Safe(downloadElem);
+                        else if (publicManifest.TryGetProperty("size", out var sizeElem))
+                            depot.MaxSize = GetInt64Safe(sizeElem);
+                    }
+
+                    if (depotData.TryGetProperty("dlcappid", out var dlcElem))
+                        depot.DlcAppId = dlcElem.GetString() ?? "";
+
+                    if (depotData.TryGetProperty("encrypted", out var encryptedObj) &&
+                        encryptedObj.TryGetProperty("key", out var keyElem))
+                        depot.DecryptionKey = keyElem.GetString() ?? "";
+
+                    game.Depots[prop.Name] = depot;
+                    depotCount++;
+                }
+
+                Log($"SteamCMD API 解析到 {depotCount} 个 Depot");
+                return depotCount > 0 ? game : null;
             }
-
-            Log($"SteamCMD API 解析到 {depotCount} 个 Depot");
-            return depotCount > 0 ? game : null;
+            catch (Exception ex)
+            {
+                Log($"SteamCMD API 异常 ({attempt + 1}/{maxAttempts}): {ex.Message}");
+                if (attempt == maxAttempts - 1)
+                    return null;
+            }
         }
-        catch (Exception ex)
-        {
-            Log($"SteamCMD API 异常: {ex.Message}");
-            return null;
-        }
+        return null;
     }
 
     /// <summary>
