@@ -10,7 +10,7 @@ OSTGUI 是 [OpenSteamTool](https://github.com/OpenSteam001/OpenSteamTool) 的桌
 
 - **免 Steam 启动**：选择游戏 EXE 一键完成 SteamStub 脱壳与 Goldberg 模拟器部署（含配置生成、可选反检测 Bypass），之后无需启动 Steam 直接游玩
 - **搜索入库**：按游戏名称 / AppID / Steam 链接搜索，一键生成完整 Lua 配置并写入 `Steam/config/lua/`
-- **多源清单**：MHub 清单源 + Sudama 密钥源级联，任一成功即完成入库（历史 8 预置源及 GitHub 分支模式已于 v1.3.x 清理，详见 `SOURCES.md`）
+- **多源清单**：MHub 清单源 + Sudama 密钥源级联，任一成功即完成入库（历史 8 预置源及 GitHub 分支模式已于 v1.3.x 清理，详见 `docs/dev/` 相关文档）
 - **密钥与令牌**：Sudama 全量密钥缓存（缓存存在即用、不自动过期），支持应用内手动刷新与本地文件导入，入库自动补齐 depot key / access token
 - **DLC 支持**：可选"添加所有 DLC"，自动追加 DLC 的 addappid 与 addtoken
 - **固定版本配置**：可选预写注释形式的 `setManifestid`，备用不启用，随时可在库页切换
@@ -71,7 +71,7 @@ main/
 
 ## 清单源
 
-内置 **MHub**（清单源，需 API Key）与 **Sudama**（密钥源）两个已接入源：MHub 负责下载清单文件，Sudama 提供 depot 密钥与访问令牌；入库时按 MHub → Sudama 级联，任一成功即完成。历史其余 6 个预置源（SAC 分流、Walftech、SteamAutoCracks V2、清单不求人、GitHub (Auiowu)、自动搜索 GitHub）及 GitHub 分支清单模式已于 v1.3.x 清理，详见 `SOURCES.md`。
+内置 **MHub**（清单源，需 API Key）与 **Sudama**（密钥源）两个已接入源：MHub 负责下载清单文件，Sudama 提供 depot 密钥与访问令牌；入库时按 MHub → Sudama 级联，任一成功即完成。历史其余 6 个预置源（SAC 分流、Walftech、SteamAutoCracks V2、清单不求人、GitHub (Auiowu)、自动搜索 GitHub）及 GitHub 分支清单模式已于 v1.3.x 清理，详见 `docs/dev/` 相关文档。
 
 ## 免责声明
 
