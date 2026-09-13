@@ -57,6 +57,31 @@
                 <Border Padding="20" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                     <StackPanel Spacing="16">
+                        <TextBlock Text="D 加密模式" FontSize="16" FontWeight="SemiBold" />
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="身份模式" FontSize="13" />
+                            <StackPanel Orientation="Horizontal" Spacing="16">
+                                <RadioButton GroupName="DenuvoMode" Content="普通模式"
+                                             IsChecked="{Binding IsDenuvoNormalMode, Mode=TwoWay}" />
+                                <RadioButton GroupName="DenuvoMode" Content="兼容模式"
+                                             IsChecked="{Binding IsDenuvoCompatMode, Mode=TwoWay}" />
+                            </StackPanel>
+                            <TextBlock Text="普通模式：授权窗口外按你当前登录的账号运行，游戏存档 / 云存档绑定你自己的账号（推荐）"
+                                       FontSize="12" TextWrapping="Wrap"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Text="兼容模式：整场按票据所属账号运行，供少数仍会复验身份的严格标题使用；该游戏的存档 / 云存档会绑定出票账号"
+                                       FontSize="12" TextWrapping="Wrap"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <TextBlock Text="{Binding DenuvoConfigPath, Mode=OneWay}"
+                                       FontSize="12" TextWrapping="Wrap"
+                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                        </StackPanel>
+                    </StackPanel>
+                </Border>
+
+                <Border Padding="20" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                    <StackPanel Spacing="16">
                         <TextBlock Text="外观设置" FontSize="16" FontWeight="SemiBold" />
                         <StackPanel Spacing="8">
                             <TextBlock Text="主题" FontSize="13" />
@@ -106,9 +131,12 @@
                                                         <ColumnDefinition Width="*" />
                                                         <ColumnDefinition Width="Auto" />
                                                     </Grid.ColumnDefinitions>
-                                                    <StackPanel Grid.Column="0" Spacing="4">
+                                                    <StackPanel Grid.Column="0" Orientation="Horizontal"
+                                                                VerticalAlignment="Center">
                                                         <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" />
-                                                        <TextBlock Text="{Binding Description}" FontSize="11"
+                                                        <TextBlock Text="|" FontSize="12" VerticalAlignment="Center"
+                                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                        <TextBlock Text="{Binding Description}" FontSize="11" VerticalAlignment="Center"
                                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                                     </StackPanel>
                                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">

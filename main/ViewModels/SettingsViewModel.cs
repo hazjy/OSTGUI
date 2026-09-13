@@ -40,6 +40,57 @@ public partial class SettingsViewModel : ObservableObject
         && v is >= 150 and <= 600
         && v != (int)_configService.Config.NavigationPaneWidth;
 
+    // === D 加密模式 ===
+    // 唯一数据源是内核的 <Steam>\opensteamtool.toml（[denuvo] mode），不写进应用配置；
+    // 内核热重载该文件，所以这里改完立即生效，无需重启 Steam。
+    private string _denuvoMode = "normal";
+
+    public bool IsDenuvoNormalMode
+    {
+        get => _denuvoMode == "normal";
+        set { if (value) SetDenuvoMode("normal"); }
+    }
+
+    public bool IsDenuvoCompatMode
+    {
+        get => _denuvoMode == "compat";
+        set { if (value) SetDenuvoMode("compat"); }
+    }
+
+    /// <summary>内核配置文件路径（界面展示，便于用户直接手改）</summary>
+    [ObservableProperty] private string _denuvoConfigPath = "";
+
+    /// <summary>切换 D 加密模式：写内核配置文件；失败则回读文件真实值，避免界面与文件不一致</summary>
+    private void SetDenuvoMode(string mode)
+    {
+        if (_denuvoMode == mode) return;
+
+        var (ok, message) = _steamDllService.SetDenuvoMode(mode);
+        if (!ok)
+        {
+            SetStatus(message, "Error");
+            ToastService.ShowError("D 加密模式切换失败", message);
+            RefreshDenuvoModeFromKernel();
+            return;
+        }
+
+        _denuvoMode = mode;
+        OnPropertyChanged(nameof(IsDenuvoNormalMode));
+        OnPropertyChanged(nameof(IsDenuvoCompatMode));
+        LogService.AddLog(message);
+        SetStatus(message, "Success");
+        ToastService.ShowSuccess("D 加密模式已切换", message);
+    }
+
+    /// <summary>从内核配置文件读回当前模式（进入设置页时调用，可覆盖外部手改）</summary>
+    public void RefreshDenuvoModeFromKernel()
+    {
+        _denuvoMode = _steamDllService.GetDenuvoMode();
+        DenuvoConfigPath = _steamDllService.GetConfigPath() ?? "（未设置 Steam 路径，无法定位 opensteamtool.toml）";
+        OnPropertyChanged(nameof(IsDenuvoNormalMode));
+        OnPropertyChanged(nameof(IsDenuvoCompatMode));
+    }
+
     // === 日志显示 ===
     [ObservableProperty] private string _logsText = "";
 
@@ -207,8 +258,8 @@ public partial class SettingsViewModel : ObservableObject
             .ToList();
 
         var text = times.Count == 0
-            ? "尚未生成缓存"
-            : $"缓存更新于 {times.Max().ToLocalTime():yyyy-MM-dd HH:mm}";
+            ? "上次更新：暂无缓存"
+            : $"上次更新：{times.Max().ToLocalTime():yyyy-MM-dd HH:mm}";
 
         // 写进 Sudama 源行自身，集合元素替换触发该行重绑定
         for (var i = 0; i < VisibleSources.Count; i++)
@@ -243,6 +294,7 @@ public partial class SettingsViewModel : ObservableObject
             LoadSourcesFromConfig(c);
 
             RefreshOstStatus();
+            RefreshDenuvoModeFromKernel();
         }
         finally
         {
@@ -291,9 +343,18 @@ public partial class SettingsViewModel : ObservableObject
             var merged = false;
             foreach (var preset in ManifestSource.GetPresetSources())
             {
-                if (!sources.Any(s => s.Id == preset.Id))
+                var existing = sources.FirstOrDefault(s => s.Id == preset.Id);
+                if (existing == null)
                 {
                     sources.Add(preset);
+                    merged = true;
+                }
+                else if (ManifestSource.IsImplementedSource(preset.Id) &&
+                         (existing.Name != preset.Name || existing.Description != preset.Description))
+                {
+                    // 内置源的显示名/说明以代码为准（旧配置里存的是历史文案，如"Sudama 库"）
+                    existing.Name = preset.Name;
+                    existing.Description = preset.Description;
                     merged = true;
                 }
             }

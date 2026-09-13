@@ -32,6 +32,7 @@ public sealed partial class SettingsPage : Page
         {
             VM.LogsText = string.Join("\n", LogService.Logs);
             VM.RefreshSudamaCacheAge();
+            VM.RefreshDenuvoModeFromKernel();
         };
     }
 

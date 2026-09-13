@@ -97,13 +97,13 @@ public class ManifestSource
     {
         new()
         {
-            Id = "mhub", Name = "MHub", Description = "MHub 清单源",
+            Id = "mhub", Name = "MHub", Description = "清单源",
             BaseUrl = "https://api.manifesthub2.filegear-sg.me/manifest?apikey={key}&depotid={depotid}&manifestid={manifestid}",
             Type = ManifestSourceType.MHub, RequiresToken = true, Priority = 1
         },
         new()
         {
-            Id = "sudama", Name = "Sudama 库", Description = "仅提供密钥",
+            Id = "sudama", Name = "Sudama", Description = "密钥源",
             BaseUrl = "https://api.993499094.xyz/depotkeys.json",
             Type = ManifestSourceType.KeyOnly, Priority = 2
         },
