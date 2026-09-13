@@ -4,6 +4,8 @@ OpenSteamTool 可视化管理工具（Windows / WinUI 3）。
 
 OSTGUI 是 [OpenSteamTool](https://github.com/OpenSteam001/OpenSteamTool) 的桌面图形界面：搜索并入库游戏、自动生成解锁 Lua 配置、补齐 depot 解密密钥与访问令牌、管理已入库游戏、处理 Denuvo 授权与联机启动，并支持一键免 Steam 启动（自动脱壳 + Goldberg 模拟器部署）。
 
+配套内核为 **[ZSteamTool](https://github.com/hazjy/ZSteamTool)**（OpenSteamTool 的定制发行版，含 D 加密模式、联机会话身份与清单投喂等改动），GUI 的新功能需要它配套。本仓库只负责图形界面，不含内核代码。
+
 > ⚠️ 本项目仅供学习与交流。请支持正版，购买你玩的游戏。
 
 ## 功能
@@ -27,7 +29,7 @@ OSTGUI 是 [OpenSteamTool](https://github.com/OpenSteam001/OpenSteamTool) 的桌
 
 - Windows 10 19041（20H1）及以上，x64
 - Steam 客户端（可自动检测安装路径）
-- OpenSteamTool 内核已注入 Steam（主页会显示关键 DLL 状态）
+- [ZSteamTool](https://github.com/hazjy/ZSteamTool) 内核已部署到 Steam 根目录（v1.1.0+；主页会显示三个关键 DLL 的状态）
 
 ## 构建
 
