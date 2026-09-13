@@ -19,9 +19,10 @@ public class OnlineFixService
     }
 
     /// <summary>
-    /// 通过 steam.exe -applaunch 启动游戏并附加 -onlinefix 参数
+    /// 通过 steam.exe -applaunch 启动游戏并附加 -onlinefix 参数。
+    /// sessionAppId = 会话身份（默认 480），内核按 -onlinefix=&lt;appid&gt; 解析。
     /// </summary>
-    public async Task<(bool success, string message)> StartAsync(string appId)
+    public async Task<(bool success, string message)> StartAsync(string appId, string sessionAppId)
     {
         var steamPath = _steamService.GetSteamPath();
         if (string.IsNullOrEmpty(steamPath))
@@ -39,7 +40,7 @@ public class OnlineFixService
             Process.Start(new ProcessStartInfo
             {
                 FileName = steamExe,
-                Arguments = $"-applaunch {appId} -onlinefix",
+                Arguments = $"-applaunch {appId} -onlinefix={sessionAppId}",
                 UseShellExecute = true
             });
 
@@ -48,7 +49,7 @@ public class OnlineFixService
             {
                 await Task.Delay(500);
                 if (FindOnlineFixProcessIds().Count > 0)
-                    return (true, $"已启动 AppID {appId}（480 联机模式）");
+                    return (true, $"已启动 AppID {appId}（会话身份 {sessionAppId}）");
             }
 
             return (true, $"已请求启动 AppID {appId}（未检测到联机进程，请确认游戏已安装）");

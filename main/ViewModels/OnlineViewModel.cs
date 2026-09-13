@@ -14,6 +14,11 @@ public partial class OnlineViewModel : ObservableObject
 
     [ObservableProperty] private string _onlineAppId = "";
     [ObservableProperty] private string _gameName = "";
+
+    // 联机会话身份：默认 Spacewar(480)，自定义时用 SessionAppId（内核 -onlinefix=<appid>）
+    [ObservableProperty] private bool _isDefaultSession = true;
+    [ObservableProperty] private bool _isCustomSession;
+    [ObservableProperty] private string _sessionAppId = "";
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(StatusText))]
     [NotifyPropertyChangedFor(nameof(CanStart))]
@@ -58,7 +63,7 @@ public partial class OnlineViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 启动 480 联机
+    /// 启动联机（默认 480 身份，或自定义会话身份）
     /// </summary>
     public async Task<(bool success, string message)> StartAsync()
     {
@@ -66,13 +71,22 @@ public partial class OnlineViewModel : ObservableObject
         if (string.IsNullOrEmpty(appId) || !appId.All(char.IsDigit))
             return (false, "请先输入正确的 AppID");
 
+        var sessionAppId = "480";
+        if (IsCustomSession)
+        {
+            sessionAppId = SessionAppId.Trim();
+            // 内核只认 uint32 内的十进制 AppID，非法值会静默回落 480，这里先挡住
+            if (!uint.TryParse(sessionAppId, out var parsed) || parsed == 0)
+                return (false, "请输入正确的会话身份 AppID（十进制，非 0）");
+        }
+
         if (IsRunning)
             return (false, "已有联机游戏在运行，请先停止");
 
         IsBusy = true;
         try
         {
-            var (ok, msg) = await _onlineFixService.StartAsync(appId);
+            var (ok, msg) = await _onlineFixService.StartAsync(appId, sessionAppId);
             RefreshRunningState();
             return (ok, msg);
         }
