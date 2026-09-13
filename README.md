@@ -10,15 +10,14 @@ OSTGUI 为配套内核 **[ZSteamTool](https://github.com/hazjy/ZSteamTool)** 提
 
 ## 功能
 
-- **免 Steam 启动**：选择游戏 EXE 一键完成 SteamStub 脱壳与 Goldberg 模拟器部署（含配置生成、可选反检测 Bypass），之后无需启动 Steam 直接游玩
-- **搜索入库**：按游戏名称 / AppID / Steam 链接搜索，一键生成完整 Lua 配置并写入 `Steam/config/lua/`
-- **多源清单**：MHub 清单源 + Sudama 密钥源级联，任一成功即完成入库（历史 8 预置源及 GitHub 分支模式已于 v1.3.x 清理，详见 `docs/dev/` 相关文档）
-- **密钥与令牌**：Sudama 全量密钥缓存（缓存存在即用、不自动过期），支持应用内手动刷新与本地文件导入，入库自动补齐 depot key / access token
-- **DLC 支持**：可选"添加所有 DLC"，自动追加 DLC 的 addappid 与 addtoken
-- **固定版本配置**：可选预写注释形式的 `setManifestid`，备用不启用，随时可在库页切换
-- **入库管理**：扫描已入库游戏、编辑 Lua、复制 AppID / 游戏名、查看入库信息、切换版本模式（自动 / 固定）
+- **免 Steam 启动**：选择游戏 EXE 一键完成部署，之后无需启动 Steam 直接游玩
+- **搜索入库**：按游戏名称 / AppID / Steam 链接搜索，一键完成入库
+- **多源清单**：MHub 清单源 + Sudama 密钥源级联，任一成功即完成入库
+- **密钥与令牌**：Sudama 全量密钥缓存，支持应用内手动刷新与本地文件导入，入库自动补齐
+- **DLC 支持**：可选"添加所有 DLC"
+- **入库管理**：扫描已入库游戏、编辑配置、复制 AppID / 游戏名、切换版本模式
 - **Denuvo 授权**：.ost 授权文件导入 / 导出 / 在线提取
-- **480 联机**：以 Spacewar(480) 身份启动已入库游戏，启用 Steamworks 联机
+- **联机启动**：以 Spacewar(480) 或自定义会话身份启动已入库游戏，启用 Steamworks 联机
 - **其他**：浅色 / 深色 / 跟随系统主题、入库结果系统通知、运行日志（可复制 / 查看文件）
 
 ## 界面
