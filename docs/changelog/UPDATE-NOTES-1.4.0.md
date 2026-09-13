@@ -2,11 +2,22 @@
 
 > 适用版本：v1.4.0（对比上一版本 1.3.4）
 
-## 特别说明：9.9「无互联网连接」已解决（致谢苏大妈）
+## 特别说明
+
+### 致谢苏大妈：9.9「无互联网连接」已解决
 
 得益于苏大妈的热心贡献，9.9 日起出现的“无互联网连接”已经解决。只需下载随 Release 发布的 `manifest.lua`，并将其放入你 lua 所在的文件夹即可生效。
 
 这次修复成本巨大，苏大妈的钱包要顶不住啦！所以 V 苏大妈 50 是表达感谢的最好方法！TA 的 B 站首页：<https://space.bilibili.com/168926035>，请充电支持 TA！
+
+### 配套内核：ZSteamTool v1.1.0
+
+本版 GUI 的联机会话身份与 D 加密模式开关都依赖同一批发布的内核 **[ZSteamTool v1.1.0](https://github.com/hazjy/ZSteamTool/releases)**（Release 内含 `Debug\` / `Release\` 两套三 DLL + 配置模板）。要点：
+
+- **D 加密模式（`[denuvo] mode`）**：`normal`（默认）只在 D 加密授权握手期间使用票据身份，其余时间按你**当前登录的账号**运行 → 游戏存档 / 云存档 / 设置绑定你自己的账号；`compat` 整场按票据账号运行，供少数复验身份的严格标题使用（代价是该游戏存档绑到出票账号）。**修复了此前 D 加密游戏"读不到自己存档"的问题**；
+- **联机会话身份**：支持 `-onlinefix=<appid>` 自定义会话身份（默认 480），联机页已接入；
+- **下载链路**：请求码收口环境下以「清单投喂 depotcache」为正路，858 所有权票据增加 Forge 兜底，请求码等待窗口放宽到 30s；
+- **升级方式**：替换 Steam 根目录下的 `OpenSteamTool.dll` / `dwmapi.dll` / `xinput1_4.dll`（先用 `Release\`，排障再用 `Debug\`）；已有的 `opensteamtool.toml` **不需要替换**，缺少 `[denuvo]` 段时默认即 `normal`。
 
 ## 新功能
 
@@ -32,15 +43,6 @@
 - **入库链路两处容错**：
   - SteamCMD 信息查询失败时自动重试（最多 3 次，递增延迟），偶发网络失败不再打断入库前置步骤；
   - 清单写入 depotcache 改为逐份容错并汇总警告，避免单份失败导致整轮中断、留下"config 有、根目录没有"的半成品（该状态会表现为下载报 No connection）。
-
-## 配套内核：ZSteamTool v1.1.0
-
-本版 GUI 的联机会话身份与 D 加密模式开关都依赖同一批发布的内核 **[ZSteamTool v1.1.0](https://github.com/hazjy/ZSteamTool/releases)**（Release 内含 `Debug\` / `Release\` 两套三 DLL + 配置模板）。要点：
-
-- **D 加密模式（`[denuvo] mode`）**：`normal`（默认）只在 D 加密授权握手期间使用票据身份，其余时间按你**当前登录的账号**运行 → 游戏存档 / 云存档 / 设置绑定你自己的账号；`compat` 整场按票据账号运行，供少数复验身份的严格标题使用（代价是该游戏存档绑到出票账号）。**修复了此前 D 加密游戏"读不到自己存档"的问题**；
-- **联机会话身份**：支持 `-onlinefix=<appid>` 自定义会话身份（默认 480），联机页已接入；
-- **下载链路**：请求码收口环境下以「清单投喂 depotcache」为正路，858 所有权票据增加 Forge 兜底，请求码等待窗口放宽到 30s；
-- **升级方式**：替换 Steam 根目录下的 `OpenSteamTool.dll` / `dwmapi.dll` / `xinput1_4.dll`（先用 `Release\`，排障再用 `Debug\`）；已有的 `opensteamtool.toml` **不需要替换**，缺少 `[denuvo]` 段时默认即 `normal`。
 
 ## 说明
 
