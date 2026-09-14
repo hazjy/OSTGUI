@@ -20,6 +20,7 @@ public partial class SettingsViewModel : ObservableObject
 
     // === 基本设置 ===
     [ObservableProperty] private string _steamPath = "";
+    [ObservableProperty] private string _luaPath = "";
     [ObservableProperty] private bool _showSystemNotifications = true;
     [ObservableProperty] private bool _showVersionChangeNotifications = true;
     [ObservableProperty] private string _defaultSource = "auto";
@@ -282,6 +283,8 @@ public partial class SettingsViewModel : ObservableObject
         {
             var c = _configService.Config;
             SteamPath = c.SteamPath;
+            LuaPath = c.LuaPath;
+            _steamService.SetLuaPath(LuaPath);
             DefaultSource = c.DefaultManifestSource;
             DefaultAddAllDlc = c.DefaultAddAllDlc;
             StFixedVersionDefault = c.StFixedVersionDefault;
@@ -404,6 +407,7 @@ public partial class SettingsViewModel : ObservableObject
             _configService.UpdateAndSaveAsync(c =>
             {
                 c.SteamPath = SteamPath;
+                c.LuaPath = LuaPath;
                 c.DefaultManifestSource = DefaultSource;
                 c.DefaultAddAllDlc = DefaultAddAllDlc;
                 c.StFixedVersionDefault = StFixedVersionDefault;
@@ -444,6 +448,87 @@ public partial class SettingsViewModel : ObservableObject
         {
             SetStatus($"保存失败: {ex.Message}", "Error");
         }
+    }
+
+    /// <summary>
+    /// Steam 路径失焦处理：清理输入（去空白 / 成对引号）；为空则自动检测并回填；
+    /// 非空但目录下没有 steam.exe 时回滚为当前生效值，避免把坏路径写进配置。
+    /// </summary>
+    public void ApplySteamPathOnBlur()
+    {
+        var input = NormalizePathInput(SteamPath);
+        if (string.IsNullOrEmpty(input))
+        {
+            var detected = _steamService.DetectSteamPath();
+            if (!string.IsNullOrEmpty(detected))
+            {
+                SteamPath = detected;
+                _steamService.SetSteamPath(detected);
+                SetStatus($"未填写 Steam 路径，已自动检测：{detected}", "Success");
+            }
+            else
+            {
+                SetStatus("未能自动检测到 Steam，请手动指定路径", "Warning");
+            }
+        }
+        else if (!File.Exists(Path.Combine(input, "steam.exe")))
+        {
+            var current = _steamService.GetSteamPath() ?? string.Empty;
+            SteamPath = current;
+            SetStatus("该目录下未找到 steam.exe，已回滚为当前生效路径", "Warning");
+        }
+        else
+        {
+            SteamPath = input;
+            _steamService.SetSteamPath(input);
+            SetStatus($"Steam 路径已更新：{input}", "Success");
+        }
+
+        SaveAllToConfig();
+    }
+
+    /// <summary>
+    /// Lua 路径失焦处理：为空 = 使用内核默认的 &lt;Steam&gt;\config\lua；
+    /// 非空则清理输入并确保目录存在（创建失败则回滚，避免指向不可用目录）。
+    /// </summary>
+    public void ApplyLuaPathOnBlur()
+    {
+        var input = NormalizePathInput(LuaPath);
+        if (string.IsNullOrEmpty(input))
+        {
+            LuaPath = string.Empty;
+            _steamService.SetLuaPath(null);
+            SetStatus($"Lua 路径留空，将使用默认目录：{_steamService.GetEffectiveLuaDir()}", "Info");
+        }
+        else
+        {
+            try
+            {
+                Directory.CreateDirectory(input);
+                LuaPath = input;
+                _steamService.SetLuaPath(input);
+                SetStatus($"Lua 路径已更新：{input}", "Success");
+            }
+            catch (Exception ex)
+            {
+                var defaultDir = Path.Combine(_steamService.GetSteamPath() ?? string.Empty, "config", "lua");
+                var current = _steamService.GetEffectiveLuaDir() ?? string.Empty;
+                LuaPath = string.Equals(current, defaultDir, StringComparison.OrdinalIgnoreCase) ? string.Empty : current;
+                _steamService.SetLuaPath(LuaPath);
+                SetStatus($"Lua 路径不可用（{ex.Message}），已回滚", "Warning");
+            }
+        }
+
+        SaveAllToConfig();
+    }
+
+    /// <summary>去掉首尾空白与成对引号（从资源管理器"复制路径"粘贴回来常带引号）</summary>
+    private static string NormalizePathInput(string? value)
+    {
+        var s = (value ?? string.Empty).Trim();
+        if (s.Length >= 2 && ((s[0] == '"' && s[^1] == '"') || (s[0] == '\'' && s[^1] == '\'')))
+            s = s[1..^1].Trim();
+        return s;
     }
 
     /// <summary>

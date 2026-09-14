@@ -33,24 +33,39 @@
                     <StackPanel Spacing="16">
                         <TextBlock Text="基本设置" FontSize="16" FontWeight="SemiBold" />
                         <StackPanel Spacing="8">
-                            <TextBlock Text="Steam 路径" FontSize="13" />
                             <Grid ColumnSpacing="8">
                                 <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0" Text="Steam 路径：" FontSize="13" VerticalAlignment="Center" />
+                                <TextBox Grid.Column="1" Text="{Binding SteamPath, Mode=TwoWay}"
+                                         PlaceholderText="留空则自动检测"
+                                         TextChanged="OnSettingChanged"
+                                         LostFocus="OnSteamPathLostFocus" />
+                                <Button Grid.Column="2" Content="浏览" Click="BrowseSteam_Click" />
+                            </Grid>
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBox Grid.Column="0" Text="{Binding SteamPath, Mode=TwoWay}"
-                                         PlaceholderText="留空则自动检测"
-                                         TextChanged="OnSettingChanged" />
-                                <Button Grid.Column="1" Content="浏览" Click="BrowseSteam_Click" />
-                                <Button Grid.Column="2" Content="自动检测" Click="DetectSteam_Click" />
+                                <TextBlock Grid.Column="0" Text="Lua 路径：" FontSize="13" VerticalAlignment="Center" />
+                                <TextBox Grid.Column="1" Text="{Binding LuaPath, Mode=TwoWay}"
+                                         PlaceholderText="留空则使用默认"
+                                         TextChanged="OnSettingChanged"
+                                         LostFocus="OnLuaPathLostFocus" />
+                                <Button Grid.Column="2" Content="浏览" Click="BrowseLua_Click" />
                             </Grid>
                         </StackPanel>
-                <CheckBox Content="入库结果通知" IsChecked="{Binding ShowSystemNotifications, Mode=TwoWay}"
-                                  Checked="OnSettingChanged" Unchecked="OnSettingChanged" />
-                        <CheckBox Content="版本状态更改通知" IsChecked="{Binding ShowVersionChangeNotifications, Mode=TwoWay}"
-                                  Checked="OnSettingChanged" Unchecked="OnSettingChanged" />
+                        <StackPanel Orientation="Horizontal" Spacing="24">
+                            <CheckBox Content="入库结果通知" IsChecked="{Binding ShowSystemNotifications, Mode=TwoWay}"
+                                      Checked="OnSettingChanged" Unchecked="OnSettingChanged" />
+                            <CheckBox Content="版本状态更改通知" IsChecked="{Binding ShowVersionChangeNotifications, Mode=TwoWay}"
+                                      Checked="OnSettingChanged" Unchecked="OnSettingChanged" />
+                        </StackPanel>
                     </StackPanel>
                 </Border>
 

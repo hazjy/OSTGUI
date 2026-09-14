@@ -78,14 +78,30 @@ public class SteamService
     /// </summary>
     public string? GetSteamPath() => _steamPath;
 
+    private string? _luaPath;
+
+    /// <summary>
+    /// 设置自定义 Lua 配置目录（null / 空 = 使用默认 &lt;Steam&gt;\config\lua）
+    /// </summary>
+    public void SetLuaPath(string? path) =>
+        _luaPath = string.IsNullOrWhiteSpace(path) ? null : path.Trim();
+
+    /// <summary>
+    /// 当前生效的 Lua 配置目录（不创建）
+    /// </summary>
+    public string? GetEffectiveLuaDir()
+    {
+        if (!string.IsNullOrWhiteSpace(_luaPath)) return _luaPath;
+        return string.IsNullOrEmpty(_steamPath) ? null : Path.Combine(_steamPath, "config", "lua");
+    }
+
     /// <summary>
     /// 获取 Lua 配置目录
     /// </summary>
     public string? GetLuaConfigDir()
     {
-        var steamPath = _steamPath;
-        if (string.IsNullOrEmpty(steamPath)) return null;
-        var dir = Path.Combine(steamPath, "config", "lua");
+        var dir = GetEffectiveLuaDir();
+        if (string.IsNullOrEmpty(dir)) return null;
         Directory.CreateDirectory(dir);
         return dir;
     }
