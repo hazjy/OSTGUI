@@ -61,4 +61,27 @@ public sealed partial class OnlinePage : Page
         else
             ToastService.ShowWarning("480 联机", msg);
     }
+
+    /// <summary>使用说明：弹出说明窗口（弹窗定义在 XAML 里，见 OnlineGuideDialog）</summary>
+    private async void ViewOnlineGuide_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            OnlineGuideDialog.XamlRoot = this.XamlRoot;   // WinUI 3 必须显式给 XamlRoot
+            await OnlineGuideDialog.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            ToastService.ShowError("打开使用说明失败", ex.Message);
+        }
+    }
+
+    /// <summary>复制 480 安装命令</summary>
+    private void CopyInstallCmd_Click(object sender, RoutedEventArgs e)
+    {
+        var pkg = new Windows.ApplicationModel.DataTransfer.DataPackage();
+        pkg.SetText("steam://install/480");
+        Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(pkg);
+        ToastService.ShowInfo("已复制", "steam://install/480");
+    }
 }
