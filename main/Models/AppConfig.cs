@@ -1,7 +1,5 @@
 namespace OSTGUI.Models;
 
-using System.Text.Json.Serialization;
-
 /// <summary>
 /// 应用全局配置模型
 /// 后期可扩展添加新配置项
@@ -9,10 +7,8 @@ using System.Text.Json.Serialization;
 public class AppConfig
 {
     // === 基本设置 ===
-    // Steam 路径**不落盘**：留空时每次启动自动检测（注册表等），用户手填的值只在本进程内生效。
-    // 之前把它写进 config.json，等于每次打一个字符就把半截路径存盘，下次启动/失焦又被读回来，
-    // 表现为"失焦自动恢复上一次的输入"、检测永远不生效 —— 故直接排除出配置持久化。
-    [JsonIgnore]
+    // Steam 路径：只有用户在设置页明确指定过才写进来；留空/自动检测的结果不落盘。
+    // （曾经把检测结果也写进来，steam 一挪位置就变成读到失效路径，检测形同虚设。）
     public string SteamPath { get; set; } = string.Empty;
     public string ManifestHubApiKey { get; set; } = string.Empty;
     public bool ShowSystemNotifications { get; set; } = true;

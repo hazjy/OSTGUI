@@ -19,7 +19,6 @@ public partial class SettingsViewModel : ObservableObject
     private bool _isLoading;
 
     // === 基本设置 ===
-    [ObservableProperty] private string _steamPath = "";
     /// <summary>GUI 写入 lua 的目录；改它会同步进内核配置，内核与 GUI 始终共用一个目录</summary>
     [ObservableProperty] private string _luaPath = "";
     [ObservableProperty] private bool _showSystemNotifications = true;
@@ -375,31 +374,21 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 回填路径输入框：Steam 路径取已生效值（没有就现场检测）；Lua 路径取内核配置里写的目录，
-    /// 内核没写就留空（输入框显示「默认路径」，实际用的就是 &lt;Steam&gt;\config\lua）。
+    /// 回填路径输入框：Steam 路径只走自动检测（不提供手动设置）；
+    /// Lua 路径取内核配置里写的目录，内核没写就留空（输入框显示「默认路径」，
+    /// 实际用的就是 &lt;Steam&gt;\config\lua）。
     /// </summary>
     public void RefreshPaths()
     {
-        SteamPath = _steamService.GetSteamPath()
-                    ?? _steamService.DetectSteamPath()
-                    ?? string.Empty;
-        _steamService.SetSteamPath(SteamPath);
+        _steamService.DetectSteamPath();
+        SteamPathDisplay = _steamService.GetSteamPath() ?? string.Empty;
 
         LuaPath = ToAbsolute(_steamDllService.GetLuaPath());
         _steamService.SetLuaPath(LuaPath);
     }
 
-    /// <summary>
-    /// Steam 路径失焦：**输入框为空才自动检测并回填**（有值就不动，你填什么就是什么）。
-    /// 检测不到就保持空白，下次失焦再试。
-    /// </summary>
-    public void DetectSteamPathOnBlur()
-    {
-        if (!string.IsNullOrWhiteSpace(SteamPath)) return;
-
-        SteamPath = _steamService.DetectSteamPath() ?? string.Empty;
-        if (SteamPath.Length > 0) _steamService.SetSteamPath(SteamPath);
-    }
+    /// <summary>只读展示：Steam 安装目录（自动检测的结果，界面上不可改）</summary>
+    [ObservableProperty] private string _steamPathDisplay = "";
 
     /// <summary>内核配置里的路径可能是相对 Steam 目录写的，补成绝对路径</summary>
     private string ToAbsolute(string? path)
@@ -454,7 +443,7 @@ public partial class SettingsViewModel : ObservableObject
                     c.ManifestSourceEnabled[source.Id] = source.IsEnabled;
             }).GetAwaiter().GetResult();
         }
-        catch { }
+        catch (Exception ex) { LogService.AddLog($"[SaveAllToConfig] 失败: {ex.Message}"); }
     }
 
     /// <summary>
@@ -466,12 +455,7 @@ public partial class SettingsViewModel : ObservableObject
         SaveAllToConfig();
         try
         {
-            // 更新 Steam 路径
-            if (!string.IsNullOrEmpty(SteamPath))
-                _steamService.SetSteamPath(SteamPath);
-            else
-                _steamService.DetectSteamPath();
-
+            _steamService.DetectSteamPath();      // Steam 路径只走自动检测
             RefreshOstStatus();
             SetStatus("设置已保存", "Success");
         }

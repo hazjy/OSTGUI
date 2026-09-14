@@ -33,19 +33,9 @@
                     <StackPanel Spacing="16">
                         <TextBlock Text="基本设置" FontSize="16" FontWeight="SemiBold" />
                         <StackPanel Spacing="8">
-                            <Grid ColumnSpacing="8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Grid.Column="0" Text="Steam 路径：" FontSize="13" VerticalAlignment="Center" />
-                                <TextBox Grid.Column="1" Text="{Binding SteamPath, Mode=TwoWay}"
-                                         PlaceholderText="留空则失焦时自动检测"
-                                         TextChanged="OnSettingChanged"
-                                         LostFocus="OnSteamPathLostFocus" />
-                                <Button Grid.Column="2" Content="浏览" Click="BrowseSteam_Click" />
-                            </Grid>
+                            <TextBlock Text="{Binding SteamPathDisplay, Mode=OneWay}"
+                                       FontSize="12" TextWrapping="Wrap"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             <Grid ColumnSpacing="8">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
