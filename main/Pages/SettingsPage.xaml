@@ -41,8 +41,7 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="Steam 路径：" FontSize="13" VerticalAlignment="Center" />
                                 <TextBox Grid.Column="1" Text="{Binding SteamPath, Mode=TwoWay}"
-                                         TextChanged="OnSettingChanged"
-                                         LostFocus="OnSteamPathLostFocus" />
+                                         TextChanged="OnSettingChanged" />
                                 <Button Grid.Column="2" Content="浏览" Click="BrowseSteam_Click" />
                             </Grid>
                             <Grid ColumnSpacing="8">
@@ -53,7 +52,7 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="Lua 路径：" FontSize="13" VerticalAlignment="Center" />
                                 <TextBox Grid.Column="1" Text="{Binding LuaPath, Mode=TwoWay}"
-                                         TextChanged="OnSettingChanged"
+                                         PlaceholderText="默认路径"
                                          LostFocus="OnLuaPathLostFocus" />
                                 <Button Grid.Column="2" Content="浏览" Click="BrowseLua_Click" />
                             </Grid>

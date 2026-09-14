@@ -120,18 +120,11 @@ public sealed partial class SettingsPage : Page
         _tokenFocusOldValue = null;
     }
 
-    /// <summary>Steam 路径：失焦时按输入框里的新内容校验（为空自动检测，无效回滚）</summary>
-    private void OnSteamPathLostFocus(object sender, RoutedEventArgs e)
-    {
-        if (sender is TextBox tb) VM.SteamPath = tb.Text ?? string.Empty;
-        VM.ApplySteamPathOnBlur();
-    }
-
-    /// <summary>Lua 路径：失焦时按输入框里的新内容校验，并把生效目录同步给内核</summary>
+    /// <summary>Lua 路径：失焦时把输入框里的目录写进内核配置</summary>
     private void OnLuaPathLostFocus(object sender, RoutedEventArgs e)
     {
         if (sender is TextBox tb) VM.LuaPath = tb.Text ?? string.Empty;
-        VM.ApplyLuaPathOnBlur();
+        VM.SyncLuaPathToKernel();
     }
 
     private async void BrowseLua_Click(object sender, RoutedEventArgs e)
@@ -149,7 +142,7 @@ public sealed partial class SettingsPage : Page
             if (folder != null)
             {
                 VM.LuaPath = folder.Path;
-                VM.ApplyLuaPathOnBlur();
+                VM.SyncLuaPathToKernel();
             }
         }
         catch (Exception ex)

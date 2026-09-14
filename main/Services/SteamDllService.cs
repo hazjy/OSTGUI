@@ -139,15 +139,17 @@ public class SteamDllService
     /// 把内核 [lua] paths 写成唯一一项：内核与 GUI 共用一个 Lua 目录。
     /// 路径等于 GUI 默认目录时改为注释行（内核回落默认值），否则写入该行；内核热重载，无需重启 Steam。
     /// </summary>
-    public (bool success, string message) SetLuaPath(string? path, string defaultPath)
+    public (bool success, string message) SetLuaPath(string? path, string defaultPath, string steamPath = "")
     {
         var configPath = GetConfigPath();
         if (configPath == null)
             return (false, "Steam 路径未设置，无法定位 opensteamtool.toml");
 
-        // TOML 基本字符串里反斜杠要转义，正斜杠内核与 Windows 都认
-        var custom = !string.IsNullOrWhiteSpace(path) && !PathsEqual(path, defaultPath);
-        var line = custom ? $"paths = [\"{path!.Trim().Replace('\\', '/')}\"]" : "# paths = []";
+        // TOML 基本字符串里反斜杠要转义，正斜杠内核与 Windows 都认；Steam 目录内的
+        // 目录写成相对路径（内核按 Steam 目录解析），换机器/换盘也能用
+        var value = ToTomlPath(path, steamPath);
+        var custom = value.Length > 0 && !PathsEqual(path, defaultPath);
+        var line = custom ? $"paths = [\"{value}\"]" : "# paths = []";
 
         try
         {
@@ -197,6 +199,20 @@ public class SteamDllService
         var value = close < 0 ? line[(i + 1)..] : line[(i + 1)..close];
         value = value.Replace("\\\\", "\\");   // TOML 基本字符串里反斜杠成对出现
         return value.Length == 0 ? null : value;
+    }
+
+    /// <summary>
+    /// TOML 里写的路径形式：Steam 目录内 → 相对路径（config/lua），盘外 → 绝对路径。
+    /// 一律用正斜杠（TOML 基本字符串里反斜杠要转义）。
+    /// </summary>
+    private static string ToTomlPath(string? path, string steamPath)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+
+        var full = Path.GetFullPath(path.Trim());
+        if (!string.IsNullOrWhiteSpace(steamPath) && Directory.Exists(steamPath))
+            full = Path.GetRelativePath(Path.GetFullPath(steamPath), full);
+        return full.Replace('\\', '/');
     }
 
     /// <summary>判断路径是否指向同一目录（大小写与结尾分隔符不敏感）</summary>
