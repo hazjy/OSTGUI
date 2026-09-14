@@ -38,9 +38,6 @@
                                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                                 <StackPanel Spacing="12">
                                     <TextBlock Text="480 联机启动" FontSize="20" FontWeight="SemiBold" />
-                                    <TextBlock Text="以 Spacewar(480) 或自定义会话身份启动已入库游戏，启用 Steamworks 联机功能（需 Steam 在线）"
-                                               FontSize="13" TextWrapping="Wrap"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 
                                     <StackPanel Orientation="Horizontal" Spacing="12">
                                         <TextBox Header="AppID" Width="180"
@@ -63,9 +60,6 @@
                                                      Text="{Binding SessionAppId, Mode=TwoWay}"
                                                      IsEnabled="{Binding IsCustomSession}" />
                                         </StackPanel>
-                                        <TextBlock Text="对端需使用相同会话身份；可选带 Steam Input 手柄配置的免费 AppID"
-                                                   FontSize="12" TextWrapping="Wrap"
-                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     </StackPanel>
 
                                     <StackPanel Orientation="Horizontal" Spacing="12">
