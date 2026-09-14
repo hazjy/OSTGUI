@@ -120,6 +120,13 @@ public sealed partial class SettingsPage : Page
         _tokenFocusOldValue = null;
     }
 
+    /// <summary>Steam 路径：失焦时若为空则自动检测并回填</summary>
+    private void OnSteamPathLostFocus(object sender, RoutedEventArgs e)
+    {
+        if (sender is TextBox tb) VM.SteamPath = tb.Text ?? string.Empty;
+        VM.DetectSteamPathOnBlur();
+    }
+
     /// <summary>Lua 路径：失焦时把输入框里的目录写进内核配置</summary>
     private void OnLuaPathLostFocus(object sender, RoutedEventArgs e)
     {

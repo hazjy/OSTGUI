@@ -375,16 +375,30 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 回填路径输入框：Steam 路径取已配置值；Lua 路径取内核配置里写的目录，
+    /// 回填路径输入框：Steam 路径取已生效值（没有就现场检测）；Lua 路径取内核配置里写的目录，
     /// 内核没写就留空（输入框显示「默认路径」，实际用的就是 &lt;Steam&gt;\config\lua）。
     /// </summary>
     public void RefreshPaths()
     {
-        SteamPath = _configService.Config.SteamPath;
+        SteamPath = _steamService.GetSteamPath()
+                    ?? _steamService.DetectSteamPath()
+                    ?? string.Empty;
         _steamService.SetSteamPath(SteamPath);
 
         LuaPath = ToAbsolute(_steamDllService.GetLuaPath());
         _steamService.SetLuaPath(LuaPath);
+    }
+
+    /// <summary>
+    /// Steam 路径失焦：**输入框为空才自动检测并回填**（有值就不动，你填什么就是什么）。
+    /// 检测不到就保持空白，下次失焦再试。
+    /// </summary>
+    public void DetectSteamPathOnBlur()
+    {
+        if (!string.IsNullOrWhiteSpace(SteamPath)) return;
+
+        SteamPath = _steamService.DetectSteamPath() ?? string.Empty;
+        if (SteamPath.Length > 0) _steamService.SetSteamPath(SteamPath);
     }
 
     /// <summary>内核配置里的路径可能是相对 Steam 目录写的，补成绝对路径</summary>
@@ -425,7 +439,6 @@ public partial class SettingsViewModel : ObservableObject
         {
             _configService.UpdateAndSaveAsync(c =>
             {
-                c.SteamPath = SteamPath;
                 c.DefaultManifestSource = DefaultSource;
                 c.DefaultAddAllDlc = DefaultAddAllDlc;
                 c.StFixedVersionDefault = StFixedVersionDefault;

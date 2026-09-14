@@ -115,10 +115,8 @@ public partial class MainViewModel : ObservableObject
         await ConfigService.LoadAsync();
         var config = ConfigService.Config;
 
-        // 检测 Steam 路径
-        var steamPath = !string.IsNullOrEmpty(config.SteamPath)
-            ? config.SteamPath
-            : SteamService.DetectSteamPath();
+        // 检测 Steam 路径（该值不落盘，每次启动都自动检测）
+        var steamPath = SteamService.DetectSteamPath();
 
         if (!string.IsNullOrEmpty(steamPath))
         {

@@ -41,7 +41,9 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Grid.Column="0" Text="Steam 路径：" FontSize="13" VerticalAlignment="Center" />
                                 <TextBox Grid.Column="1" Text="{Binding SteamPath, Mode=TwoWay}"
-                                         TextChanged="OnSettingChanged" />
+                                         PlaceholderText="留空则失焦时自动检测"
+                                         TextChanged="OnSettingChanged"
+                                         LostFocus="OnSteamPathLostFocus" />
                                 <Button Grid.Column="2" Content="浏览" Click="BrowseSteam_Click" />
                             </Grid>
                             <Grid ColumnSpacing="8">
