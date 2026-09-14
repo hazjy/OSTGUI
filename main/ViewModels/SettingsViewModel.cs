@@ -20,6 +20,7 @@ public partial class SettingsViewModel : ObservableObject
 
     // === 基本设置 ===
     [ObservableProperty] private string _steamPath = "";
+    /// <summary>GUI 写入 lua 的目录；改它会同步进内核配置，内核与 GUI 始终共用一个目录</summary>
     [ObservableProperty] private string _luaPath = "";
     [ObservableProperty] private bool _showSystemNotifications = true;
     [ObservableProperty] private bool _showVersionChangeNotifications = true;
@@ -282,9 +283,7 @@ public partial class SettingsViewModel : ObservableObject
         try
         {
             var c = _configService.Config;
-            SteamPath = c.SteamPath;
-            LuaPath = c.LuaPath;
-            _steamService.SetLuaPath(LuaPath);
+            RefreshPaths();
             DefaultSource = c.DefaultManifestSource;
             DefaultAddAllDlc = c.DefaultAddAllDlc;
             StFixedVersionDefault = c.StFixedVersionDefault;
@@ -376,21 +375,67 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 自动检测 Steam 路径
+    /// 回填两个路径输入框：Steam 路径取已配置值（没有则检测），Lua 路径取内核实际扫描的目录
+    /// （内核开放了「改目录」的配置项，所以由内核配置说了算；它没有配置时才用默认目录）。
     /// </summary>
-    [RelayCommand]
-    private void DetectSteamPath()
+    public void RefreshPaths()
     {
-        var path = _steamService.DetectSteamPath();
-        if (!string.IsNullOrEmpty(path))
-        {
-            SteamPath = path;
-            SetStatus($"已检测到 Steam 路径: {path}", "Success");
-        }
-        else
-        {
-            SetStatus("未能自动检测到 Steam，请手动指定路径", "Warning");
-        }
+        SteamPath = SteamPathFromConfig();
+        _steamService.SetSteamPath(SteamPath);
+
+        LuaPath = ResolveLuaPath();
+        _steamService.SetLuaPath(LuaPath);
+    }
+
+    /// <summary>Steam 路径：本次已填的 → 已保存的 → 注册表检测结果；都没有返回空串</summary>
+    private string SteamPathFromConfig()
+    {
+        var candidates = new[] { _configService.Config.SteamPath, _steamService.GetSteamPath() };
+        return candidates.FirstOrDefault(p => !string.IsNullOrWhiteSpace(p) && Directory.Exists(p))
+               ?? _steamService.DetectSteamPath()
+               ?? string.Empty;
+    }
+
+    /// <summary>
+    /// 生效的 Lua 目录：内核配置（opensteamtool.toml 的 [lua] paths）优先，其次是已保存的设置，
+    /// 都没有就是默认目录 &lt;Steam&gt;\config\lua；路径以 Steam 目录为基准解析。
+    /// </summary>
+    private string ResolveLuaPath()
+    {
+        var steam = _steamService.GetSteamPath() ?? string.Empty;
+        var fromKernel = _steamDllService.GetLuaPath();
+        var raw = !string.IsNullOrWhiteSpace(fromKernel)
+            ? fromKernel
+            : (string.IsNullOrWhiteSpace(LuaPath) ? _configService.Config.LuaPath : LuaPath);
+        return ResolveAgainst(raw, steam);
+    }
+
+    /// <summary>
+    /// 内核与 GUI 共用同一 Lua 目录：把当前生效目录写进内核配置（等于默认目录时改写为注释行）。
+    /// </summary>
+    private void SyncLuaPathToKernel()
+    {
+        var (ok, message) = _steamDllService.SetLuaPath(LuaPath, GetDefaultLuaDir());
+        SetStatus(ok ? message : $"Lua 路径写入内核配置失败：{message}", ok ? "Info" : "Warning");
+    }
+
+    /// <summary>默认 Lua 目录：&lt;Steam&gt;\config\lua（没有 Steam 路径时为空串）</summary>
+    private string GetDefaultLuaDir()
+    {
+        var steam = _steamService.GetSteamPath();
+        return string.IsNullOrEmpty(steam) ? string.Empty : Path.Combine(steam, "config", "lua");
+    }
+
+    /// <summary>当前生效的 Lua 目录（已存储值的相对路径按 Steam 目录补齐）</summary>
+    private string GetEffectiveLuaDir() => ResolveAgainst(LuaPath, _steamService.GetSteamPath() ?? string.Empty);
+
+    /// <summary>相对路径按 Steam 根目录解析（与内核 weakly_canonical 的行为一致），绝对路径原样返回</summary>
+    private static string ResolveAgainst(string? path, string steamPath)
+    {
+        if (string.IsNullOrWhiteSpace(path)) return string.Empty;
+        return Path.IsPathFullyQualified(path) || string.IsNullOrEmpty(steamPath)
+            ? path
+            : Path.GetFullPath(Path.Combine(steamPath, path));
     }
 
     /// <summary>
@@ -451,54 +496,53 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// Steam 路径失焦处理：清理输入（去空白 / 成对引号）；为空则自动检测并回填；
-    /// 非空但目录下没有 steam.exe 时回滚为当前生效值，避免把坏路径写进配置。
+    /// Steam 路径失焦处理（检测的是输入框里的新内容）：清理输入（去空白 / 成对引号）；
+    /// 为空则自动检测并回填；非空但目录下没有 steam.exe 时回滚为当前生效值。
+    /// Lua 目录若仍停在原默认位置，则跟着 Steam 目录一起搬。
     /// </summary>
     public void ApplySteamPathOnBlur()
     {
+        var oldDefault = GetDefaultLuaDir();
+        var oldLua = GetEffectiveLuaDir();
         var input = NormalizePathInput(SteamPath);
-        if (string.IsNullOrEmpty(input))
+
+        if (input.Length == 0)
         {
             var detected = _steamService.DetectSteamPath();
-            if (!string.IsNullOrEmpty(detected))
+            if (string.IsNullOrEmpty(detected))
             {
-                SteamPath = detected;
-                _steamService.SetSteamPath(detected);
-                SetStatus($"未填写 Steam 路径，已自动检测：{detected}", "Success");
-            }
-            else
-            {
+                SteamPath = _steamService.GetSteamPath() ?? string.Empty;
                 SetStatus("未能自动检测到 Steam，请手动指定路径", "Warning");
+                SaveAllToConfig();
+                return;
             }
+            input = detected;
         }
         else if (!File.Exists(Path.Combine(input, "steam.exe")))
         {
-            var current = _steamService.GetSteamPath() ?? string.Empty;
-            SteamPath = current;
+            SteamPath = _steamService.GetSteamPath() ?? string.Empty;
             SetStatus("该目录下未找到 steam.exe，已回滚为当前生效路径", "Warning");
-        }
-        else
-        {
-            SteamPath = input;
-            _steamService.SetSteamPath(input);
-            SetStatus($"Steam 路径已更新：{input}", "Success");
+            SaveAllToConfig();
+            return;
         }
 
+        SteamPath = input;
+        _steamService.SetSteamPath(input);
+        MigrateLuaPathIfDefault(oldLua, oldDefault);
+        SetStatus($"Steam 路径：{input}", "Success");
         SaveAllToConfig();
     }
 
     /// <summary>
-    /// Lua 路径失焦处理：为空 = 使用内核默认的 &lt;Steam&gt;\config\lua；
-    /// 非空则清理输入并确保目录存在（创建失败则回滚，避免指向不可用目录）。
+    /// Lua 路径失焦处理（检测的是输入框里的新内容）：清理输入并确保目录可用，然后写入内核配置
+    /// （内核与 GUI 从此共用这一个目录）；创建失败则回滚，留空即默认目录。
     /// </summary>
     public void ApplyLuaPathOnBlur()
     {
         var input = NormalizePathInput(LuaPath);
-        if (string.IsNullOrEmpty(input))
+        if (input.Length == 0)
         {
-            LuaPath = string.Empty;
-            _steamService.SetLuaPath(null);
-            SetStatus($"Lua 路径留空，将使用默认目录：{_steamService.GetEffectiveLuaDir()}", "Info");
+            LuaPath = GetDefaultLuaDir();
         }
         else
         {
@@ -506,20 +550,33 @@ public partial class SettingsViewModel : ObservableObject
             {
                 Directory.CreateDirectory(input);
                 LuaPath = input;
-                _steamService.SetLuaPath(input);
-                SetStatus($"Lua 路径已更新：{input}", "Success");
             }
             catch (Exception ex)
             {
-                var defaultDir = Path.Combine(_steamService.GetSteamPath() ?? string.Empty, "config", "lua");
-                var current = _steamService.GetEffectiveLuaDir() ?? string.Empty;
-                LuaPath = string.Equals(current, defaultDir, StringComparison.OrdinalIgnoreCase) ? string.Empty : current;
-                _steamService.SetLuaPath(LuaPath);
-                SetStatus($"Lua 路径不可用（{ex.Message}），已回滚", "Warning");
+                LuaPath = GetEffectiveLuaDir();
+                SetStatus($"Lua 路径不可用（{ex.Message}），已回滚为 {LuaPath}", "Warning");
+                SaveAllToConfig();
+                return;
             }
         }
 
+        _steamService.SetLuaPath(LuaPath);
+        SyncLuaPathToKernel();
         SaveAllToConfig();
+    }
+
+    /// <summary>
+    /// Lua 目录原本由默认位置推导而来（跟着 Steam 目录走），Steam 目录变了就一起搬；
+    /// 显式设过别的目录则保持不动。
+    /// </summary>
+    private void MigrateLuaPathIfDefault(string oldLua, string oldDefault)
+    {
+        if (oldLua.Length == 0 || oldDefault.Length == 0
+            || !string.Equals(oldLua, oldDefault, StringComparison.OrdinalIgnoreCase)) return;
+
+        LuaPath = GetDefaultLuaDir();
+        _steamService.SetLuaPath(LuaPath);
+        SyncLuaPathToKernel();
     }
 
     /// <summary>去掉首尾空白与成对引号（从资源管理器"复制路径"粘贴回来常带引号）</summary>

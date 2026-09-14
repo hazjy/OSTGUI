@@ -8,7 +8,7 @@ public class AppConfig
 {
     // === 基本设置 ===
     public string SteamPath { get; set; } = string.Empty; // 留空则自动检测
-    public string LuaPath { get; set; } = string.Empty;   // 留空则使用默认 <Steam>\config\lua
+    public string LuaPath { get; set; } = string.Empty;   // GUI 与内核共用的 lua 目录（内核侧写在 opensteamtool.toml 的 [lua] paths）
     public string ManifestHubApiKey { get; set; } = string.Empty;
     public bool ShowSystemNotifications { get; set; } = true;
     public bool ShowVersionChangeNotifications { get; set; } = true;

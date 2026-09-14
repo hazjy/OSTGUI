@@ -130,8 +130,9 @@ public partial class MainViewModel : ObservableObject
             SteamPathDisplay = "未检测到 Steam，请在设置中手动配置";
         }
 
-        // Lua 目录：留空 = 内核默认的 <Steam>\config\lua
-        SteamService.SetLuaPath(config.LuaPath);
+        // Lua 目录：内核配置（opensteamtool.toml 的 [lua] paths）优先，其次上次保存的设置；
+        // 两者都没有就是内核默认的 <Steam>\config\lua
+        SteamService.SetLuaPath(_steamDllService.GetLuaPath() ?? config.LuaPath);
 
         // 检查状态
         IsOstInjected = _steamDllService.IsOSTDllInjected();

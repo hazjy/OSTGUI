@@ -32,6 +32,7 @@ public sealed partial class SettingsPage : Page
         {
             VM.LogsText = string.Join("\n", LogService.Logs);
             VM.RefreshSudamaCacheAge();
+            VM.RefreshPaths();
             VM.RefreshDenuvoModeFromKernel();
         };
     }
@@ -119,14 +120,14 @@ public sealed partial class SettingsPage : Page
         _tokenFocusOldValue = null;
     }
 
-    /// <summary>Steam 路径：失焦时校验 —— 为空则自动检测并回填，无效则回滚为当前生效值</summary>
+    /// <summary>Steam 路径：失焦时按输入框里的新内容校验（为空自动检测，无效回滚）</summary>
     private void OnSteamPathLostFocus(object sender, RoutedEventArgs e)
     {
         if (sender is TextBox tb) VM.SteamPath = tb.Text ?? string.Empty;
         VM.ApplySteamPathOnBlur();
     }
 
-    /// <summary>Lua 路径：失焦时校验 —— 为空表示使用默认；非空则规范化并确保目录可用</summary>
+    /// <summary>Lua 路径：失焦时按输入框里的新内容校验，并把生效目录同步给内核</summary>
     private void OnLuaPathLostFocus(object sender, RoutedEventArgs e)
     {
         if (sender is TextBox tb) VM.LuaPath = tb.Text ?? string.Empty;

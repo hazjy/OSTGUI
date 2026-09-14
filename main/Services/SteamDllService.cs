@@ -109,6 +109,103 @@ public class SteamDllService
         return (start, end < 0 ? lines.Count : end);
     }
 
+    /// <summary>
+    /// 读取内核 [lua] paths 的首项 = 内核实际扫描的 Lua 目录。
+    /// 未配置（缺文件 / 缺段 / 缺键 / 数组为空 / 整行注释掉）返回 null，由内核默认值兜底。
+    /// </summary>
+    public string? GetLuaPath()
+    {
+        var path = GetConfigPath();
+        if (path == null || !File.Exists(path)) return null;
+
+        try
+        {
+            var lines = File.ReadAllLines(path).ToList();
+            var (start, end) = SectionRange(lines, "lua");
+            if (start < 0) return null;
+
+            for (var i = start + 1; i < end; i++)
+            {
+                var line = lines[i].Trim();
+                if (line.StartsWith('#')) continue;          // 注释掉的示例行不算生效值
+                if (line.StartsWith("paths") && FirstQuoted(line) is { } v) return v;
+            }
+        }
+        catch { }
+        return null;
+    }
+
+    /// <summary>
+    /// 把内核 [lua] paths 写成唯一一项：内核与 GUI 共用一个 Lua 目录。
+    /// 路径等于 GUI 默认目录时改为注释行（内核回落默认值），否则写入该行；内核热重载，无需重启 Steam。
+    /// </summary>
+    public (bool success, string message) SetLuaPath(string? path, string defaultPath)
+    {
+        var configPath = GetConfigPath();
+        if (configPath == null)
+            return (false, "Steam 路径未设置，无法定位 opensteamtool.toml");
+
+        // TOML 基本字符串里反斜杠要转义，正斜杠内核与 Windows 都认
+        var custom = !string.IsNullOrWhiteSpace(path) && !PathsEqual(path, defaultPath);
+        var line = custom ? $"paths = [\"{path!.Trim().Replace('\\', '/')}\"]" : "# paths = []";
+
+        try
+        {
+            var text = File.Exists(configPath) ? File.ReadAllText(configPath) : "";
+            var newline = text.Contains("\r\n") ? "\r\n" : "\n";
+            var lines = text.Length == 0 ? new List<string>() : text.Split(newline).ToList();
+            while (lines.Count > 0 && lines[^1].Trim().Length == 0) lines.RemoveAt(lines.Count - 1);
+
+            var (start, end) = SectionRange(lines, "lua");
+            var at = -1;
+            if (start >= 0)
+            {
+                for (var i = start + 1; i < end; i++)
+                {
+                    if (lines[i].TrimStart().TrimStart('#').TrimStart().StartsWith("paths"))
+                    {
+                        at = i;
+                        break;
+                    }
+                }
+            }
+
+            if (at >= 0) lines[at] = line;
+            else if (start >= 0) lines.Insert(start + 1, line);
+            else { lines.Add("[lua]"); lines.Add(line); }
+
+            File.WriteAllText(configPath, string.Join(newline, lines) + newline);
+            return (true, custom
+                ? $"已写入 {ConfigFileName}：[lua] paths = [\"{path}\"]（内核立即热重载）"
+                : $"未设置自定义目录，内核使用默认 {defaultPath}");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"写入 {ConfigFileName} 失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>取一行文本里的第一个引号字符串（容忍 TOML 的 " 与 '；反转义 \\）</summary>
+    private static string? FirstQuoted(string line)
+    {
+        var eq = line.IndexOf('=');
+        if (eq < 0) return null;
+
+        var i = line.IndexOfAny(new[] { '"', '\'' }, eq);
+        if (i < 0) return null;
+        var close = line.IndexOf(line[i], i + 1);
+        var value = close < 0 ? line[(i + 1)..] : line[(i + 1)..close];
+        value = value.Replace("\\\\", "\\");   // TOML 基本字符串里反斜杠成对出现
+        return value.Length == 0 ? null : value;
+    }
+
+    /// <summary>判断路径是否指向同一目录（大小写与结尾分隔符不敏感）</summary>
+    private static bool PathsEqual(string a, string b) =>
+        string.Equals(
+            a.Trim().Replace('\\', '/').TrimEnd('/'),
+            b.Trim().Replace('\\', '/').TrimEnd('/'),
+            StringComparison.OrdinalIgnoreCase);
+
     /// <summary>匹配段内的 mode = "normal|compat" 行（容忍行内注释与空白）</summary>
     private static bool TryParseModeLine(string line, out string mode)
     {
