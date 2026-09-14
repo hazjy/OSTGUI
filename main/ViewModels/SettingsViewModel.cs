@@ -374,21 +374,14 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 回填路径输入框：Steam 路径只走自动检测（不提供手动设置）；
-    /// Lua 路径取内核配置里写的目录，内核没写就留空（输入框显示「默认路径」，
-    /// 实际用的就是 &lt;Steam&gt;\config\lua）。
+    /// 回填 Lua 路径输入框：取内核配置里写的目录，内核没写就留空
+    /// （输入框显示「默认路径」，实际用的就是 &lt;Steam&gt;\config\lua）。
     /// </summary>
     public void RefreshPaths()
     {
-        _steamService.DetectSteamPath();
-        SteamPathDisplay = _steamService.GetSteamPath() ?? string.Empty;
-
         LuaPath = ToAbsolute(_steamDllService.GetLuaPath());
         _steamService.SetLuaPath(LuaPath);
     }
-
-    /// <summary>只读展示：Steam 安装目录（自动检测的结果，界面上不可改）</summary>
-    [ObservableProperty] private string _steamPathDisplay = "";
 
     /// <summary>内核配置里的路径可能是相对 Steam 目录写的，补成绝对路径</summary>
     private string ToAbsolute(string? path)
