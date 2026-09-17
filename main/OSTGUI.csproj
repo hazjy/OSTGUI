@@ -41,12 +41,15 @@
   </ItemGroup>
 
   <!-- MSBuild Publish 默认漏复制 WinUI 应用的 .xbf / OSTGUI.pri，
-       缺失会导致启动时 XamlParseException、窗口创建失败；发布后自动补齐 -->
+       缺失会导致启动时 XamlParseException、窗口创建失败；发布后自动补齐。
+       注意 .xbf 要按目录递归取（Pages、Views 以及以后新增的任何子目录），
+       只写 Pages\*.xbf 会让新目录下的视图编译资源漏掉。 -->
   <Target Name="CopyWinUIResourcesToPublish" AfterTargets="Publish" Condition="'$(PublishDir)' != ''">
     <ItemGroup>
-      <_WinUiPageXbf Include="$(TargetDir)Pages\*.xbf" />
+      <!-- Exclude 掉 publish 自身：它在 TargetDir 之下，不排除会递归复制出 publish\publish -->
+      <_WinUiXbf Include="$(TargetDir)**\*.xbf" Exclude="$(PublishDir)**\*.xbf" />
     </ItemGroup>
     <Copy SourceFiles="$(TargetDir)App.xbf;$(TargetDir)MainWindow.xbf;$(TargetDir)OSTGUI.pri" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true" />
-    <Copy SourceFiles="@(_WinUiPageXbf)" DestinationFolder="$(PublishDir)Pages" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(_WinUiXbf)" DestinationFiles="@(_WinUiXbf->'$(PublishDir)%(RecursiveDir)%(Filename)%(Extension)')" SkipUnchangedFiles="true" />
   </Target>
 </Project>
