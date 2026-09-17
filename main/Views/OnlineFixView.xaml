@@ -26,10 +26,12 @@
                     <StackPanel Spacing="8">
                         <TextBlock Text="联机会话身份" FontSize="13" />
                         <StackPanel Orientation="Horizontal" Spacing="16">
-                            <!-- GroupName 必须和其他视图不同：同名即同一个组，两页会互相取消勾选 -->
-                            <RadioButton GroupName="SessionIdentityFix" Content="默认（480）"
+                            <!-- 不写 GroupName：走隐式分组，分组根是直接父级（本 StackPanel），
+                                 两个视图各成一组；写了 GroupName 反而会把分组根提到整棵可视树，
+                                 于是同名即同组、两页互相取消勾选 -->
+                            <RadioButton Content="默认（480）"
                                          IsChecked="{Binding IsDefaultSession, Mode=TwoWay}" />
-                            <RadioButton GroupName="SessionIdentityFix" Content="自定义"
+                            <RadioButton Content="自定义"
                                          IsChecked="{Binding IsCustomSession, Mode=TwoWay}" />
                             <TextBox Width="180" VerticalAlignment="Center"
                                      PlaceholderText="AppID"

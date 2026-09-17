@@ -41,10 +41,10 @@
                     <StackPanel Spacing="8">
                         <TextBlock Text="协议AppID" FontSize="14" />
                         <StackPanel Orientation="Horizontal" Spacing="16">
-                            <!-- 与 480 页共用同一份会话身份状态，但 GroupName 必须不同，否则两页互相取消勾选 -->
-                            <RadioButton GroupName="SessionIdentityOther" Content="默认（480）"
+                            <!-- 同上：不写 GroupName，隐式分组按直接父级，天然和 480 视图互不干扰 -->
+                            <RadioButton Content="默认（480）"
                                          IsChecked="{Binding IsDefaultSession, Mode=TwoWay}" />
-                            <RadioButton GroupName="SessionIdentityOther" Content="自定义"
+                            <RadioButton Content="自定义"
                                          IsChecked="{Binding IsCustomSession, Mode=TwoWay}" />
                             <TextBox Width="180" VerticalAlignment="Center"
                                      PlaceholderText="AppID"
