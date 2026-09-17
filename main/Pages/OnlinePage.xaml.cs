@@ -1,6 +1,5 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
-using OSTGUI.Services;
 using OSTGUI.ViewModels;
 
 namespace OSTGUI.Pages;
@@ -31,57 +30,14 @@ public sealed partial class OnlinePage : Page
         };
     }
 
+    /// <summary>切换联机方式视图（0 = 480 联机，1 = 其他）</summary>
     private void OnlineSegmented_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         // 控件初始化阶段会提前触发一次，此时命名元素尚未就绪
-        if (OnlineFixPanel == null || OtherPanel == null) return;
+        if (FixView == null || OtherView == null) return;
 
         var index = OnlineSegmented.SelectedIndex;
-        OnlineFixPanel.Visibility = index == 0 ? Visibility.Visible : Visibility.Collapsed;
-        OtherPanel.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
-    }
-
-    private async void QueryName_Click(object sender, RoutedEventArgs e)
-        => await VM.LoadGameNameAsync();
-
-    private async void StartOnlineFix_Click(object sender, RoutedEventArgs e)
-    {
-        var (ok, msg) = await VM.StartAsync();
-        if (ok)
-            ToastService.ShowInfo("480 联机", msg);
-        else
-            ToastService.ShowError("480 联机失败", msg);
-    }
-
-    private void StopOnlineFix_Click(object sender, RoutedEventArgs e)
-    {
-        var (ok, msg) = VM.Stop();
-        if (ok)
-            ToastService.ShowInfo("480 联机", msg);
-        else
-            ToastService.ShowWarning("480 联机", msg);
-    }
-
-    /// <summary>使用说明：弹出说明窗口（弹窗定义在 XAML 里，见 OnlineGuideDialog）</summary>
-    private async void ViewOnlineGuide_Click(object sender, RoutedEventArgs e)
-    {
-        try
-        {
-            OnlineGuideDialog.XamlRoot = this.XamlRoot;   // WinUI 3 必须显式给 XamlRoot
-            await OnlineGuideDialog.ShowAsync();
-        }
-        catch (Exception ex)
-        {
-            ToastService.ShowError("打开使用说明失败", ex.Message);
-        }
-    }
-
-    /// <summary>复制 480 安装命令</summary>
-    private void CopyInstallCmd_Click(object sender, RoutedEventArgs e)
-    {
-        var pkg = new Windows.ApplicationModel.DataTransfer.DataPackage();
-        pkg.SetText("steam://install/480");
-        Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(pkg);
-        ToastService.ShowInfo("已复制", "steam://install/480");
+        FixView.Visibility = index == 0 ? Visibility.Visible : Visibility.Collapsed;
+        OtherView.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
     }
 }

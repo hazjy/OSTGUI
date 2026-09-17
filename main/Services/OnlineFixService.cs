@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace OSTGUI.Services;
 
@@ -90,6 +91,140 @@ public class OnlineFixService
         return killed > 0
             ? (true, $"已停止 {killed} 个联机游戏进程")
             : (false, "停止失败，请手动在 Steam 中结束游戏");
+    }
+
+    /// <summary>
+    /// 宿主 480 启动（不依赖内核 -onlinefix）：由 OnlineHost.exe 以会话身份初始化 Steam，
+    /// 再把游戏作为子进程拉起，游戏自身的 appid / 大厅 / P2P 证书天然一致。
+    /// </summary>
+    public (bool success, string message) StartViaHost(string gameExe, string sessionAppId)
+    {
+        if (!_steamService.IsSteamRunning())
+            return (false, "Steam 未运行，请先启动并登录 Steam（需在线模式）");
+
+        var host = Path.Combine(AppContext.BaseDirectory, "OnlineHost.exe");
+        if (!File.Exists(host))
+            return (false, $"未找到 OnlineHost.exe: {host}");
+
+        try
+        {
+            Process.Start(new ProcessStartInfo(host)
+            {
+                Arguments = $"\"{gameExe}\" {sessionAppId}",
+                UseShellExecute = false
+            });
+            return (true, $"已以 {sessionAppId} 身份启动 {Path.GetFileName(gameExe)}");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"启动失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 按 AppID 解析已安装游戏的主程序路径：libraryfolders.vdf 找库 → appmanifest 的 installdir。
+    /// </summary>
+    public string? ResolveGameExe(string appId)
+    {
+        var steamPath = _steamService.GetSteamPath();
+        if (string.IsNullOrEmpty(steamPath) || appId.Length == 0 || !appId.All(char.IsDigit))
+            return null;
+
+        var libs = new List<string> { steamPath };
+        foreach (var vdf in new[]
+                 {
+                     Path.Combine(steamPath, "steamapps", "libraryfolders.vdf"),
+                     Path.Combine(steamPath, "config", "libraryfolders.vdf")
+                 })
+        {
+            if (!File.Exists(vdf)) continue;
+            foreach (Match m in Regex.Matches(File.ReadAllText(vdf), "\"path\"\\s+\"(.+?)\""))
+                libs.Add(m.Groups[1].Value.Replace(@"\\", @"\"));
+            break;
+        }
+
+        foreach (var lib in libs.Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            var acf = Path.Combine(lib, "steamapps", $"appmanifest_{appId}.acf");
+            if (!File.Exists(acf)) continue;
+
+            var m = Regex.Match(File.ReadAllText(acf), "\"installdir\"\\s+\"(.+?)\"");
+            if (!m.Success) continue;
+
+            var dir = Path.Combine(lib, "steamapps", "common", m.Groups[1].Value);
+            if (Directory.Exists(dir)) return MainExeIn(dir);
+        }
+        return null;
+    }
+
+    /// <summary>主程序：优先与目录同名的 exe，否则取目录里最大的（排除崩溃处理器/卸载器等）。</summary>
+    private static string? MainExeIn(string dir)
+    {
+        var named = Path.Combine(dir, Path.GetFileName(dir) + ".exe");
+        if (File.Exists(named)) return named;
+
+        return new DirectoryInfo(dir).GetFiles("*.exe")
+            .Where(f => !f.Name.Contains("CrashHandler", StringComparison.OrdinalIgnoreCase)
+                     && !f.Name.Contains("vcredist", StringComparison.OrdinalIgnoreCase)
+                     && !f.Name.StartsWith("unins", StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(f => f.Length)
+            .FirstOrDefault()?.FullName;
+    }
+
+    /// <summary>是否有 DLL 注入（宿主 480）联机游戏在运行</summary>
+    public bool IsHostRunning() => FindHostProcessIds().Count > 0;
+
+    /// <summary>
+    /// 停止 DLL 注入联机游戏：先从宿主命令行里取出游戏 exe 结束游戏，再结束宿主。
+    /// </summary>
+    public (bool success, string message) StopViaHost()
+    {
+        var hosts = FindHostProcessIds();
+        if (hosts.Count == 0)
+            return (false, "当前没有正在运行的 DLL 注入游戏");
+
+        var games = 0;
+        var stopped = 0;
+        foreach (var pid in hosts)
+        {
+            var gameExe = GameExeFromHost(pid);
+            if (gameExe is not null)
+            {
+                var name = Path.GetFileNameWithoutExtension(gameExe);
+                foreach (var game in Process.GetProcessesByName(name))
+                {
+                    try { game.Kill(); games++; } catch { }
+                    finally { game.Dispose(); }
+                }
+            }
+
+            try { Process.GetProcessById(pid).Kill(); stopped++; } catch { }
+        }
+
+        return stopped > 0
+            ? (true, $"已停止游戏 {games} 个、启动器 {stopped} 个")
+            : (false, "停止失败，请手动结束进程");
+    }
+
+    private static List<int> FindHostProcessIds()
+    {
+        var result = new List<int>();
+        foreach (var proc in Process.GetProcessesByName("OnlineHost"))
+        {
+            result.Add(proc.Id);
+            proc.Dispose();
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// 宿主命令行形如: OnlineHost.exe "&lt;游戏 exe&gt;" &lt;appid&gt;
+    /// 取最后一个带引号的 .exe —— 第一个可能是宿主自己（argv[0] 不一定带引号）。
+    /// </summary>
+    private static string? GameExeFromHost(int pid)
+    {
+        var matches = Regex.Matches(ReadCommandLine(pid) ?? "", "\"([^\"]+\\.exe)\"", RegexOptions.IgnoreCase);
+        return matches.Count > 0 ? matches[matches.Count - 1].Groups[1].Value : null;
     }
 
     /// <summary>

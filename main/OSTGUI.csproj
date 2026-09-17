@@ -28,6 +28,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\NoSteamLauncher\NoSteamLauncher.csproj" />
+    <ProjectReference Include="..\OnlineHost\OnlineHost.csproj" />
   </ItemGroup>
 
   <ItemGroup>

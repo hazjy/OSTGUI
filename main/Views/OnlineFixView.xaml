@@ -1,0 +1,123 @@
+<UserControl
+    x:Class="OSTGUI.Views.OnlineFixView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="24" MaxWidth="920" HorizontalAlignment="Center" Padding="0,16,0,40">
+            <!-- 焦点锚点：WinUI 空白点击会把焦点投给 ScrollViewer 内第一个可聚焦控件（#4364），
+                 此处拦截，避免落到 AppID 输入框 -->
+            <Grid IsTabStop="True" TabIndex="0" Width="1" Height="1"
+                  HorizontalAlignment="Left" VerticalAlignment="Top" Opacity="0" />
+
+            <Border Width="560" Padding="24" CornerRadius="12"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                <StackPanel Spacing="12">
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <TextBox Header="AppID" Width="180"
+                                 Text="{Binding OnlineAppId, Mode=TwoWay}" />
+                        <Button Content="查询" Click="QueryName_Click"
+                                VerticalAlignment="Bottom" />
+                    </StackPanel>
+
+                    <TextBlock Text="{Binding GameName}" FontSize="16" FontWeight="SemiBold" />
+
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="联机会话身份" FontSize="13" />
+                        <StackPanel Orientation="Horizontal" Spacing="16">
+                            <!-- GroupName 必须和其他视图不同：同名即同一个组，两页会互相取消勾选 -->
+                            <RadioButton GroupName="SessionIdentityFix" Content="默认（480）"
+                                         IsChecked="{Binding IsDefaultSession, Mode=TwoWay}" />
+                            <RadioButton GroupName="SessionIdentityFix" Content="自定义"
+                                         IsChecked="{Binding IsCustomSession, Mode=TwoWay}" />
+                            <TextBox Width="180" VerticalAlignment="Center"
+                                     PlaceholderText="AppID"
+                                     Text="{Binding SessionAppId, Mode=TwoWay}"
+                                     IsEnabled="{Binding IsCustomSession}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button Click="StartOnlineFix_Click"
+                                Style="{StaticResource AccentButtonStyle}"
+                                IsEnabled="{Binding CanStart}"
+                                AutomationProperties.Name="启动联机"
+                                ToolTipService.ToolTip="启动联机">
+                            <SymbolIcon Symbol="Play" />
+                        </Button>
+                        <Button Click="StopOnlineFix_Click"
+                                IsEnabled="{Binding IsRunning}"
+                                AutomationProperties.Name="停止游戏"
+                                ToolTipService.ToolTip="停止游戏">
+                            <SymbolIcon Symbol="Stop" />
+                        </Button>
+                    </StackPanel>
+
+                    <TextBlock Text="{Binding StatusText}" FontSize="13"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+            </Border>
+
+            <!-- 使用说明 -->
+            <Border Width="560" Padding="24" CornerRadius="12"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock Grid.Column="0" Text="使用说明" FontSize="20" FontWeight="SemiBold"
+                               VerticalAlignment="Center" />
+                    <Button Grid.Column="1" Content="查看" Click="ViewOnlineGuide_Click"
+                            Style="{StaticResource AccentButtonStyle}" />
+                </Grid>
+            </Border>
+
+            <!-- 使用说明弹窗（本页唯一的 XAML 内联弹窗，其余弹窗都是 C# 动态创建） -->
+            <ContentDialog x:Name="OnlineGuideDialog"
+                           Title="使用说明"
+                           SecondaryButtonText=" "
+                           CloseButtonText="关闭"
+                           DefaultButton="Close">
+                <ScrollViewer MaxHeight="460" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="14">
+                        <StackPanel Spacing="6">
+                            <TextBlock Text="第一步：安装 Spacewar（480）" FontSize="14" FontWeight="SemiBold" />
+                            <TextBlock Text="把下面这行粘到浏览器地址栏（或在「运行」里执行）即可安装："
+                                       FontSize="12" TextWrapping="Wrap"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox Grid.Column="0" Text="steam://install/480" IsReadOnly="True"
+                                         FontFamily="Cascadia Code, Consolas" />
+                                <Button Grid.Column="1" Content="复制" Click="CopyInstallCmd_Click" />
+                            </Grid>
+                        </StackPanel>
+
+                        <TextBlock Text="一、原理与功能" FontSize="14" FontWeight="SemiBold" />
+                        <TextBlock TextWrapping="Wrap" FontSize="13"
+                                   Text="480（Spacewar）是 Valve 官方的联机测试用 App，任何人都能安装、且自带 Steamworks 联机接口。启动器把已入库游戏的进程以 480 的身份拉起来，游戏就会走 Steam 的联机 / P2P 通道，从而恢复好友邀请、房间列表、Steam Input 手柄配置这些联机能力。" />
+                        <TextBlock TextWrapping="Wrap" FontSize="13"
+                                   Text="启动后是「真联机」：对端也以同一会话身份启动，双方就能互相看到房间。" />
+
+                        <TextBlock Text="二、界面操作" FontSize="14" FontWeight="SemiBold" />
+                        <TextBlock TextWrapping="Wrap" FontSize="13"
+                                   Text="1. AppID —— 填你要联机的、已入库游戏的 AppID，点「查询」确认是它，再点启动（▶）。" />
+                        <TextBlock TextWrapping="Wrap" FontSize="13"
+                                   Text="2. 联机会话身份 —— 默认「默认（480）」即可；若 480 没有手柄配置、或需要换一个带 Steam Input 配置的免费 AppID，就选「自定义」并在右侧填那个 AppID。" />
+                        <TextBlock TextWrapping="Wrap" FontSize="13"
+                                   Text="3. 对端必须使用相同的会话身份，否则互相看不到。启动后点停止（■）可结束；下方会显示当前运行情况。" />
+                        <TextBlock TextWrapping="Wrap" FontSize="12"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   Text="提示：首次使用需 Steam 在线；游戏本体要已在库中（入库功能见「搜索入库」）。" />
+                    </StackPanel>
+                </ScrollViewer>
+            </ContentDialog>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

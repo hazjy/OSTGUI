@@ -15,7 +15,8 @@ public partial class OnlineViewModel : ObservableObject
     [ObservableProperty] private string _onlineAppId = "";
     [ObservableProperty] private string _gameName = "";
 
-    // 联机会话身份：默认 Spacewar(480)，自定义时用 SessionAppId（内核 -onlinefix=<appid>）
+    // 联机会话身份：默认 Spacewar(480)，自定义时用 SessionAppId
+    // 两个联机视图共用这份状态；各视图内的单选靠各自 GroupName 分组（两个视图的名字必须不同）
     [ObservableProperty] private bool _isDefaultSession = true;
     [ObservableProperty] private bool _isCustomSession;
     [ObservableProperty] private string _sessionAppId = "";
@@ -29,6 +30,58 @@ public partial class OnlineViewModel : ObservableObject
 
     public string StatusText => IsRunning ? "联机游戏中" : "未运行";
     public bool CanStart => !IsRunning && !IsBusy;
+
+    // 「其他」页 —— DLL 注入：游戏 AppID（查询定位游戏程序）与定位结果
+    [ObservableProperty] private string _dllGameAppId = "";
+    [ObservableProperty] private string _dllGameExePath = "";
+
+    /// <summary>协议 AppID：默认 480，或自定义（两个联机视图共用同一份状态）</summary>
+    private (bool ok, string value) ResolveSessionAppId()
+    {
+        if (!IsCustomSession) return (true, "480");
+
+        var input = SessionAppId.Trim();
+        // 内核只认 uint32 内的十进制 AppID，非法值会静默回落 480，这里先挡住
+        return uint.TryParse(input, out var parsed) && parsed != 0 ? (true, input) : (false, "");
+    }
+
+    /// <summary>按「游戏 AppID」定位已安装游戏的主程序；定位不到返回 null</summary>
+    public string? ResolveDllGameExe()
+    {
+        if (DllGameAppId.Trim().Length == 0) return null;
+
+        var exe = _onlineFixService.ResolveGameExe(DllGameAppId.Trim());
+        if (exe is null) return null;
+
+        DllGameExePath = exe;
+        return exe;
+    }
+
+    /// <summary>DLL 注入启动（宿主 480：OnlineHost.exe 以会话身份拉起游戏）</summary>
+    public (bool success, string message) StartDllInject()
+    {
+        if (IsRunning)
+            return (false, "已有联机游戏在运行，请先停止");
+
+        if (string.IsNullOrWhiteSpace(DllGameExePath) || !File.Exists(DllGameExePath))
+            return (false, "请先点「查询」定位到游戏程序");
+
+        var (sessionOk, sessionAppId) = ResolveSessionAppId();
+        if (!sessionOk)
+            return (false, "请输入正确的协议 AppID（十进制，非 0）");
+
+        var (ok, msg) = _onlineFixService.StartViaHost(DllGameExePath, sessionAppId);
+        RefreshRunningState();
+        return (ok, msg);
+    }
+
+    /// <summary>停止 DLL 注入联机游戏（宿主 + 它拉起的游戏）</summary>
+    public (bool success, string message) StopDllInject()
+    {
+        var (ok, msg) = _onlineFixService.StopViaHost();
+        RefreshRunningState();
+        return (ok, msg);
+    }
 
     public OnlineViewModel(
         OnlineFixService onlineFixService,
@@ -71,14 +124,9 @@ public partial class OnlineViewModel : ObservableObject
         if (string.IsNullOrEmpty(appId) || !appId.All(char.IsDigit))
             return (false, "请先输入正确的 AppID");
 
-        var sessionAppId = "480";
-        if (IsCustomSession)
-        {
-            sessionAppId = SessionAppId.Trim();
-            // 内核只认 uint32 内的十进制 AppID，非法值会静默回落 480，这里先挡住
-            if (!uint.TryParse(sessionAppId, out var parsed) || parsed == 0)
-                return (false, "请输入正确的会话身份 AppID（十进制，非 0）");
-        }
+        var (sessionOk, sessionAppId) = ResolveSessionAppId();
+        if (!sessionOk)
+            return (false, "请输入正确的会话身份 AppID（十进制，非 0）");
 
         if (IsRunning)
             return (false, "已有联机游戏在运行，请先停止");
@@ -107,8 +155,8 @@ public partial class OnlineViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 刷新运行状态
+    /// 刷新运行状态（含两种启动方式：内核 -onlinefix 与 DLL 注入宿主）
     /// </summary>
     public void RefreshRunningState()
-        => IsRunning = _onlineFixService.IsRunning();
+        => IsRunning = _onlineFixService.IsRunning() || _onlineFixService.IsHostRunning();
 }

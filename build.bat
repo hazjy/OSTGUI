@@ -35,7 +35,7 @@ REM Pass an ABSOLUTE project path: with a relative one, custom
 REM BaseOutputPath (from Directory.Build.props) gets re-resolved against
 REM the current directory in some child evaluations and outputs land in
 REM main\.build\ instead of the canonical repo-root .build\.
-"%MSBUILD%" "%~dp0main\OSTGUI.csproj" /t:Build /p:Configuration=Debug /m /nologo ^
+"%MSBUILD%" "%~dp0main\OSTGUI.csproj" /t:Build /restore /p:Configuration=Debug /m /nologo ^
   /v:q ^
   /flp:"LogFile=%LOGFILE%;Verbosity=normal" ^
   /flp1:"LogFile=%ERRFILE%;Errorsonly=true"

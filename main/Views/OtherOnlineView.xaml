@@ -1,0 +1,84 @@
+<UserControl
+    x:Class="OSTGUI.Views.OtherOnlineView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="24" MaxWidth="920" HorizontalAlignment="Center" Padding="0,16,0,40">
+            <!-- 焦点锚点：同 480 页，拦截空白点击的焦点投递 -->
+            <Grid IsTabStop="True" TabIndex="0" Width="1" Height="1"
+                  HorizontalAlignment="Left" VerticalAlignment="Top" Opacity="0" />
+
+            <!-- 内容块 1：模式 -->
+            <Border Width="560" Padding="24" CornerRadius="12"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                <ComboBox x:Name="OnlineModeCombo" MinWidth="240" HorizontalAlignment="Left"
+                          SelectedIndex="0"
+                          SelectionChanged="OnlineModeCombo_SelectionChanged">
+                    <ComboBoxItem Content="DLL 注入" />
+                    <ComboBoxItem Content="其他" />
+                </ComboBox>
+            </Border>
+
+            <!-- 内容块 2：DLL 注入 -->
+            <Border x:Name="DllInjectPanel" Width="560" Padding="24" CornerRadius="12"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                <StackPanel Spacing="12">
+                    <StackPanel Spacing="6">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBox x:Name="DllGameAppIdBox" Header="游戏 AppID" Width="180"
+                                     Text="{Binding DllGameAppId, Mode=TwoWay}" />
+                            <Button Content="查询" Click="QueryDllGameExe_Click"
+                                    VerticalAlignment="Bottom" />
+                        </StackPanel>
+                        <TextBlock Text="{Binding DllGameExePath}" FontSize="13"
+                                   TextWrapping="Wrap" IsTextSelectionEnabled="True"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="协议AppID" FontSize="14" />
+                        <StackPanel Orientation="Horizontal" Spacing="16">
+                            <!-- 与 480 页共用同一份会话身份状态，但 GroupName 必须不同，否则两页互相取消勾选 -->
+                            <RadioButton GroupName="SessionIdentityOther" Content="默认（480）"
+                                         IsChecked="{Binding IsDefaultSession, Mode=TwoWay}" />
+                            <RadioButton GroupName="SessionIdentityOther" Content="自定义"
+                                         IsChecked="{Binding IsCustomSession, Mode=TwoWay}" />
+                            <TextBox Width="180" VerticalAlignment="Center"
+                                     PlaceholderText="AppID"
+                                     Text="{Binding SessionAppId, Mode=TwoWay}"
+                                     IsEnabled="{Binding IsCustomSession}" />
+                        </StackPanel>
+                    </StackPanel>
+
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <Button Click="StartDllInject_Click"
+                                Style="{StaticResource AccentButtonStyle}"
+                                IsEnabled="{Binding CanStart}"
+                                AutomationProperties.Name="启动游戏"
+                                ToolTipService.ToolTip="启动游戏">
+                            <SymbolIcon Symbol="Play" />
+                        </Button>
+                        <Button Click="StopDllInject_Click"
+                                IsEnabled="{Binding IsRunning}"
+                                AutomationProperties.Name="停止游戏"
+                                ToolTipService.ToolTip="停止游戏">
+                            <SymbolIcon Symbol="Stop" />
+                        </Button>
+                    </StackPanel>
+
+                    <TextBlock Text="{Binding StatusText}" FontSize="13"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+            </Border>
+
+            <!-- 其他（占位，以后再加） -->
+            <TextBlock x:Name="OtherModePanel" Visibility="Collapsed"
+                       Text="这一项还没有内容，以后再加。"
+                       FontSize="13"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>
