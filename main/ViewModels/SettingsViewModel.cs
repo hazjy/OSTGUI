@@ -31,6 +31,21 @@ public partial class SettingsViewModel : ObservableObject
 
     // === 外观设置 ===
     [ObservableProperty] private string _themeMode = "auto";
+
+    // 显示效果：0 = 无，1 = 云母，2 = 亚克力（改动即时生效并随自动保存落盘）
+    [ObservableProperty] private int _backdropIndex = 2;
+
+    /// <summary>显示效果的字符串形式（存进 config.json 的 BackdropMode）</summary>
+    public string BackdropMode => BackdropIndex switch { 0 => "none", 2 => "acrylic", _ => "mica" };
+
+    public event EventHandler? BackdropChanged;
+
+    partial void OnBackdropIndexChanged(int value)
+    {
+        OnPropertyChanged(nameof(BackdropMode));
+        if (!_isLoading) BackdropChanged?.Invoke(this, EventArgs.Empty);
+    }
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(CanApplyNavigationPaneWidth))]
     private string _navigationPaneWidthInput = "200";
@@ -288,6 +303,7 @@ public partial class SettingsViewModel : ObservableObject
             StFixedVersionDefault = c.StFixedVersionDefault;
             NavigationPaneWidthInput = ((int)c.NavigationPaneWidth).ToString();
             ThemeMode = c.ThemeMode;
+            BackdropIndex = c.BackdropMode switch { "none" => 0, "acrylic" => 2, _ => 1 };
             ShowSystemNotifications = c.ShowSystemNotifications;
             ShowVersionChangeNotifications = c.ShowVersionChangeNotifications;
             LogMaxLines = c.LogMaxLines;
@@ -425,6 +441,7 @@ public partial class SettingsViewModel : ObservableObject
                 c.DefaultAddAllDlc = DefaultAddAllDlc;
                 c.StFixedVersionDefault = StFixedVersionDefault;
                 c.ThemeMode = ThemeMode;
+                c.BackdropMode = BackdropMode;
                 c.ShowSystemNotifications = ShowSystemNotifications;
                 c.ShowVersionChangeNotifications = ShowVersionChangeNotifications;
                 c.LogMaxLines = (int)LogMaxLines;

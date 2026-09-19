@@ -21,6 +21,9 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
 
         _mainVM = App.Services.GetRequiredService<MainViewModel>();
 
+        // 显示效果先落地再激活窗口，避免闪一下默认底
+        ApplyBackdrop(_mainVM.ConfigService.Config.BackdropMode);
+
         // 点击空白（非输入控件区域）时把焦点收回到全局锚点，统一取消各页面输入框激活。
         // WinUI 在"已有焦点"时不会自行转移焦点（microsoft-ui-xaml #10051），需主动拉取；
         // TryEnqueue 保证在本轮指针事件的框架焦点处理之后执行，同时覆盖 #4364 的空点击误聚焦。
@@ -312,6 +315,25 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
             RefreshLibraryIfLoaded();
         }
         catch { }
+    }
+
+    /// <summary>
+    /// 显示效果：无 / 云母 / 亚克力（设置页改完即时调用；不支持的系统由框架回落纯色底）
+    /// </summary>
+    public void ApplyBackdrop(string mode)
+    {
+        SystemBackdrop = mode switch
+        {
+            "none" => null,
+            "acrylic" => new DesktopAcrylicBackdrop(),
+            _ => new MicaBackdrop(),
+        };
+
+        // 「无」时窗口底色跟的是系统主题，会和应用内主题打架，铺一层自己的纯色底（见 XAML 注释）
+        SolidBackdrop.Visibility = SystemBackdrop is null ? Visibility.Visible : Visibility.Collapsed;
+
+        // 选了没效果时先看这行日志在不在、类名对不对
+        LogService.AddAppLog($"[Backdrop] {mode} -> {SystemBackdrop?.GetType().Name ?? "null"}");
     }
 
     /// <summary>

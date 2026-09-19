@@ -20,6 +20,7 @@ public sealed partial class SettingsPage : Page
         this.DataContext = VM;
 
         VM.ThemeChanged += OnThemeChanged;
+        VM.BackdropChanged += OnBackdropChanged;
 
         // 监听日志变更，自动更新 LogsText 并滚动到底部。
         // 必须全面防御：LogService.AddLog 可能来自任意线程（经 DispatcherQueue 封送），
@@ -69,6 +70,14 @@ public sealed partial class SettingsPage : Page
         if (App.MainWindow is MainWindow mw)
         {
             mw.ApplyThemeAndChrome();
+        }
+    }
+
+    private void OnBackdropChanged(object? sender, EventArgs e)
+    {
+        if (App.MainWindow is MainWindow mw)
+        {
+            mw.ApplyBackdrop(VM.BackdropMode);
         }
     }
 

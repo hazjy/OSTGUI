@@ -144,7 +144,16 @@
 - Phase 1（v1.3.x）：`LuaBuilder` 主游戏行自动带上 Sudama depotkeys 中 AppID 自身的密钥（社区称"创意工坊密钥"，须恰好 64 位 hex）→ **新入库**即具备工坊下载解密能力；已入库游戏需重新入库或手动把主行改为 `addappid(appid, 1, "<key>")`
 - 边界：**限制匿名的工坊**（部分游戏/新 manifest 的 code 请求被服务器拒绝）无法绕过，需真实拥有该游戏的账号；**老式独立 workshop depot**（SteamDB 标注 Workshop 的 depot，如 Dying Light）需该 depot 单独密钥，Phase 1 不覆盖
 
-## 12. 文档索引
+## 12. 显示效果（无 / 云母 / 亚克力）
+
+- 入口：设置页「外观设置 → 显示效果」下拉；值存 `config.json` 的 `BackdropMode`（`none` / `mica` / `acrylic`），**默认 `acrylic`**（老配置没有这个键 → 落到默认值）
+- 接线：`SettingsViewModel.BackdropIndex`（0/1/2）双向绑定下拉 → 改动触发 `BackdropChanged` → `SettingsPage.OnBackdropChanged` → `MainWindow.ApplyBackdrop(VM.BackdropMode)`；落盘复用既有的自动保存（`PropertyChanged → SaveAllToConfig`，加载期间由 `_isLoading` 抑制）
+- 实现就一句：给 `Window.SystemBackdrop` 赋 `null` / `new MicaBackdrop()` / `new DesktopAcrylicBackdrop()`。`MainWindow.xaml` 里原来的静态 `<MicaBackdrop />` 已删掉，改代码单点控制；`MainWindow` 构造时就按配置执行一次，激活前就位、不闪一下默认底
+- ⚠️ **`SystemBackdrop = null` 时窗口底色跟的是系统主题，不是应用主题**：浅色应用主题 + 深色系统时背景会露成灰/黑（实测采样 `#808080`、导航栏处 `#000000`）。所以「无」档由 `SolidBackdrop`（`RootGrid` 第一层的 Border，`{ThemeResource SolidBackgroundFillColorBaseBrush}`）自己铺底，云母/亚克力时隐藏让 backdrop 透出来
+- 诊断：每次切换往应用日志写一行 `[Backdrop] <mode> -> <类名>`——"选了没效果"时先看这行在不在、类名对不对
+- 系统要求：云母 Win11 22000+、亚克力 Win11 22621+；不支持时框架静默回落纯色底（不崩），设置页有一行小字说明
+
+## 13. 文档索引
 
 - 事实考证（Lua 语义 / depot·manifest·key 关系 / Denuvo 授权 / 480 联机调研）：工作区根 `doc/` 下的事实考证（GUI 侧）
 - 重要事件与调研：`../../doc/EVENTS/`（工作区根 doc 下）

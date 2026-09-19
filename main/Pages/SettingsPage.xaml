@@ -81,6 +81,19 @@
                         </StackPanel>
                         </StackPanel>
 
+                        <StackPanel Spacing="8">
+                            <TextBlock Text="显示效果" FontSize="13" />
+                            <ComboBox MinWidth="180" HorizontalAlignment="Left"
+                                      AutomationProperties.Name="显示效果"
+                                      SelectedIndex="{Binding BackdropIndex, Mode=TwoWay}">
+                                <ComboBoxItem Content="无" />
+                                <ComboBoxItem Content="云母" />
+                                <ComboBoxItem Content="亚克力" />
+                            </ComboBox>
+                            <TextBlock Text="云母 / 亚克力需 Windows 11（亚克力需 22H2 及以上）；系统不支持时显示为纯色底。"
+                                       FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+
                         <!-- 侧边栏宽度（UI 先行，交互逻辑待接入：CanApplyNavigationPaneWidth/点击保存） -->
                         <StackPanel Spacing="8">
                             <StackPanel Orientation="Horizontal" Spacing="8">

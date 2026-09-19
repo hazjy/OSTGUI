@@ -43,6 +43,8 @@ public class AppConfig
 
     // === 外观设置 ===
     public string ThemeMode { get; set; } = "auto"; // light, dark, auto
+    // 窗口显示效果：none（纯色）/ mica（云母）/ acrylic（亚克力）
+    public string BackdropMode { get; set; } = "acrylic";
 
     // === 窗口状态记忆 ===
     public double WindowWidth { get; set; } = 1250;
@@ -82,6 +84,7 @@ public class AppConfig
         StFixedVersionDefault = true,
         StDownloadManifestDefault = true,
         ThemeMode = "auto",
+        BackdropMode = "acrylic",
         ManifestHubApiKey = "",
         WindowWidth = 1250,
         WindowHeight = 875,

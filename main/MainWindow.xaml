@@ -6,9 +6,7 @@
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     Title="OSTGUI - OpenSteamTool 可视化管理">
 
-    <Window.SystemBackdrop>
-        <MicaBackdrop />
-    </Window.SystemBackdrop>
+    <!-- 显示效果（无 / 云母 / 亚克力）由代码按配置设置，见 ApplyBackdrop -->
 
     <Grid x:Name="RootGrid">
         <Grid.Resources>
@@ -23,6 +21,12 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
+
+        <!-- 「无」显示效果时的纯色底：SystemBackdrop = null 时窗口底色跟随的是**系统**主题，
+             与应用内主题不一致（浅色主题会露出深色底），所以显式铺一层跟随应用主题的底色；
+             云母/亚克力时隐藏，让 backdrop 透出来 -->
+        <Border x:Name="SolidBackdrop" Grid.Row="0" Grid.RowSpan="2" Visibility="Collapsed"
+                Background="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
 
         <!-- 全局焦点锚点：点击任意页面空白时收回焦点（取消输入框激活）；1×1 透明不可见 -->
         <Grid x:Name="GlobalFocusAnchor" IsTabStop="True" TabIndex="0" Width="1" Height="1"
