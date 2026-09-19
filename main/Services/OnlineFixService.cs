@@ -94,10 +94,12 @@ public class OnlineFixService
     }
 
     /// <summary>
-    /// 宿主 480 启动（不依赖内核 -onlinefix）：由 OnlineHost.exe 以会话身份初始化 Steam，
+    /// 宿主启动（不依赖内核 -onlinefix）：由 OnlineHost.exe 以会话身份初始化 Steam，
     /// 再把游戏作为子进程拉起，游戏自身的 appid / 大厅 / P2P 证书天然一致。
+    /// viaAppIdFile = true 时走文件法（AppID Changer）：宿主只写游戏 exe 同目录的
+    /// steam_appid.txt，不设环境变量、不加载垫片，游戏退出后由宿主还原原文件。
     /// </summary>
-    public (bool success, string message) StartViaHost(string gameExe, string sessionAppId)
+    public (bool success, string message) StartViaHost(string gameExe, string sessionAppId, bool viaAppIdFile = false)
     {
         if (!_steamService.IsSteamRunning())
             return (false, "Steam 未运行，请先启动并登录 Steam（需在线模式）");
@@ -110,14 +112,66 @@ public class OnlineFixService
         {
             Process.Start(new ProcessStartInfo(host)
             {
-                Arguments = $"\"{gameExe}\" {sessionAppId}",
+                Arguments = viaAppIdFile
+                    ? $"--appid-txt \"{gameExe}\" {sessionAppId}"
+                    : $"\"{gameExe}\" {sessionAppId}",
                 UseShellExecute = false
             });
-            return (true, $"已以 {sessionAppId} 身份启动 {Path.GetFileName(gameExe)}");
+
+            if (!viaAppIdFile)
+                return (true, $"已以 {sessionAppId} 身份启动 {Path.GetFileName(gameExe)}");
+
+            // 文件法的成败全在这个文件上：目录只读/被占时宿主会立刻失败退出，
+            // 这里等最多 1.5 秒确认真的写上了，免得报了成功其实没启动
+            var target = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(gameExe))!, "steam_appid.txt");
+            for (var i = 0; i < 6; i++)
+            {
+                if (File.Exists(target) && File.ReadAllText(target).Trim() == sessionAppId)
+                    return (true, $"已写入 AppID {sessionAppId} 并启动 {Path.GetFileName(gameExe)}（退出后自动还原）");
+                Thread.Sleep(250);
+            }
+            return (false, $"写不进 {target}（目录只读或被占用），游戏未启动");
         }
         catch (Exception ex)
         {
             return (false, $"启动失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>文件法台账（与 config.json 同目录）：三行 = 游戏目录 / 原本有无该文件 / 原内容</summary>
+    public static string AppIdJournalPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "OSTGUI", "appid-changer.txt");
+
+    /// <summary>
+    /// 补还原：宿主被杀 / 断电会留下台账。宿主还活着说明会话仍在（它会自己还原），跳过。
+    /// </summary>
+    public void RestoreAppIdFileLeftover()
+    {
+        if (!File.Exists(AppIdJournalPath) || IsHostRunning()) return;
+
+        try
+        {
+            var lines = File.ReadAllText(AppIdJournalPath).Split('\n', 3);
+            var target = Path.Combine(lines[0].TrimEnd('\r'), "steam_appid.txt");
+            var original = lines.Length > 2 ? lines[2] : null;
+
+            if (lines[1].TrimEnd('\r') == "0")
+            {
+                if (File.Exists(target)) File.Delete(target);
+            }
+            else if (original is not null)
+            {
+                File.WriteAllText(target, original);
+            }
+
+            File.Delete(AppIdJournalPath);
+            ToastService.ShowSuccess("AppID Changer", "已恢复上次未还原的 steam_appid.txt");
+        }
+        catch (Exception ex)
+        {
+            LogService.AddAppLog($"[AppID Changer] 补还原失败: {ex.Message}");
+            ToastService.ShowError("AppID Changer", $"上次的 steam_appid.txt 还原失败：{ex.Message}");
         }
     }
 
@@ -198,7 +252,14 @@ public class OnlineFixService
                 }
             }
 
-            try { Process.GetProcessById(pid).Kill(); stopped++; } catch { }
+            try
+            {
+                // 先给宿主 3 秒自己收尾（文件法要还原文件、宿主路线要 SteamAPI_Shutdown），赖着不走才强杀
+                using var host = Process.GetProcessById(pid);
+                if (!host.WaitForExit(3000)) host.Kill();
+                stopped++;
+            }
+            catch { }
         }
 
         return stopped > 0

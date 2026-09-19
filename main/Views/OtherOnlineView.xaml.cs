@@ -5,23 +5,14 @@ using OSTGUI.ViewModels;
 
 namespace OSTGUI.Views;
 
-/// <summary>其他联机方式视图（当前只有 DLL 注入 / 宿主 480）</summary>
+/// <summary>其他联机方式视图（DLL 注入 / AppID Changer，共用同一套输入与启停按钮）</summary>
 public sealed partial class OtherOnlineView : UserControl
 {
     public OtherOnlineView() => this.InitializeComponent();
 
     private OnlineViewModel? VM => DataContext as OnlineViewModel;
 
-    /// <summary>切换联机方式（0 = DLL 注入，1 = 其他）</summary>
-    private void OnlineModeCombo_SelectionChanged(object sender, SelectionChangedEventArgs e)
-    {
-        // 控件初始化阶段会提前触发一次，此时命名元素尚未就绪
-        if (DllInjectPanel == null || OtherModePanel == null) return;
-
-        var isDll = OnlineModeCombo.SelectedIndex == 0;
-        DllInjectPanel.Visibility = isDll ? Visibility.Visible : Visibility.Collapsed;
-        OtherModePanel.Visibility = isDll ? Visibility.Collapsed : Visibility.Visible;
-    }
+    private bool IsChangerMode => OnlineModeCombo.SelectedIndex == 1;
 
     /// <summary>查询：按游戏 AppID 定位已安装游戏的主程序，结果显示在输入框下面一行</summary>
     private void QueryDllGameExe_Click(object sender, RoutedEventArgs e)
@@ -41,25 +32,30 @@ public sealed partial class OtherOnlineView : UserControl
             ToastService.ShowWarning("DLL 注入", "没找到该 AppID 的已安装游戏");
     }
 
-    private void StartDllInject_Click(object sender, RoutedEventArgs e)
+    /// <summary>启动：按当前方式分派（DLL 注入 / AppID Changer）</summary>
+    private void Start_Click(object sender, RoutedEventArgs e)
     {
         if (VM is null) return;
 
-        var (ok, msg) = VM.StartDllInject();
+        var changer = IsChangerMode;
+        var title = changer ? "AppID Changer" : "DLL 注入";
+        var (ok, msg) = changer ? VM.StartChanger() : VM.StartDllInject();
         if (ok)
-            ToastService.ShowSuccess("DLL 注入", msg);
+            ToastService.ShowSuccess(title, msg);
         else
-            ToastService.ShowError("DLL 注入失败", msg);
+            ToastService.ShowError($"{title}失败", msg);
     }
 
-    private void StopDllInject_Click(object sender, RoutedEventArgs e)
+    /// <summary>停止：两种方式共用（宿主 + 它拉起的游戏一起结束）</summary>
+    private void Stop_Click(object sender, RoutedEventArgs e)
     {
         if (VM is null) return;
 
+        var title = IsChangerMode ? "AppID Changer" : "DLL 注入";
         var (ok, msg) = VM.StopDllInject();
         if (ok)
-            ToastService.ShowInfo("DLL 注入", msg);
+            ToastService.ShowInfo(title, msg);
         else
-            ToastService.ShowWarning("DLL 注入", msg);
+            ToastService.ShowWarning(title, msg);
     }
 }

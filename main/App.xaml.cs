@@ -87,6 +87,9 @@ public partial class App : Application
         services.AddTransient<SettingsViewModel>();
         Services = services.BuildServiceProvider();
 
+        // 上次的文件法联机会话（AppID Changer）若没还原干净，这里补一刀
+        Services.GetRequiredService<OnlineFixService>().RestoreAppIdFileLeftover();
+
         var configService = Services.GetRequiredService<ConfigService>();
         await configService.LoadAsync();
         Log("Config loaded");

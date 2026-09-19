@@ -55,9 +55,9 @@
 - ⚠️ **教训**：.gitignore 里全局 `*.dll/*.exe` 曾差点把这些资源挡在版本控制外——凡"运行必需的二进制"入库时务必显式反向规则确认
 - 已知冲突：自带 winmm 依赖或反作弊的游戏对 Bypass 可能不适配（默认关闭）
 
-## 7. 联机（两条路线）
+## 7. 联机（三条路线）
 
-内核只认一条：`-onlinefix`。GUI 因此提供两条互不依赖的启动路线，**不要混用**（一次只走一条）。页面结构：联机页顶部 Segmented 切「内核原生」（`Views/OnlineFixView`）/「其他」（`Views/OtherOnlineView`）。
+内核只认一条：`-onlinefix`。GUI 因此提供三条互不依赖的启动路线，**不要混用**（一次只走一条）。页面结构：联机页顶部 Segmented 切「内核原生」（`Views/OnlineFixView`）/「其他」（`Views/OtherOnlineView`，下拉里是「DLL 注入（推荐）」与「AppID Changer（轻量）」两种方式——**推荐**＝宿主预注册 + 垫片预载，兼容性最好；**轻量**＝只写文件、不加载任何东西——两者共用同一套输入与启停按钮，靠下拉选中项分派）。
 
 ### 7.1 路线 A：内核原生（联机页「内核原生」）
 
@@ -73,13 +73,22 @@
 - 停止：先从宿主命令行里取**最后一个带引号的 `.exe`**（第一个可能是宿主自身）→ 按进程名结束游戏 → 再结束宿主。
 - 实测（2026-09-17）：这条路走的是**真大厅**——内核日志出现 `Recv k_EMsgClientMMSUserJoinedLobby(6619)` 与 `LobbyChatMsg(6614)`，PEAK 好友邀请**由用户与好友实测成功进房**；对照 09-02 用内核原生路线测 PEAK，纯好友邀请是死路（能弹邀请界面但进不去）。
 
-### 7.3 显示不对称不是故障
+### 7.3 路线 C：AppID Changer（文件法，联机页「其他 → AppID Changer」）
+
+- 做法：宿主 `OnlineHost.exe --appid-txt "<游戏 exe>" <会话 AppID>` 只写**游戏 exe 同目录**的 `steam_appid.txt`（**不设环境变量、不加载垫片**，刻意与路线 B 区分），再把游戏作为子进程拉起，游戏退出后按台账还原原文件。宿主把工作目录设成游戏 exe 目录，于是"文件放 CWD"与"放 exe 同目录"两种口径重合，不必赌 SDK 读哪个。
+- 为什么要有这条：环境变量只对宿主直接拉起的那个进程有效，游戏自己再起子进程或被重开就丢了；文件留在磁盘上，重开也生效。适用于只认文件、不认环境变量的游戏。
+- 台账 `%LOCALAPPDATA%\OSTGUI\appid-changer.txt`（三行 = 游戏目录 / 原本有无该文件 / 原内容）由宿主**先写台账再动文件**：中途被杀也能还原。宿主被杀 / 断电留下的残留，由 GUI 启动时的 `RestoreAppIdFileLeftover()` 补还原（有台账且**没有 OnlineHost 在跑**才动手，避免打断进行中的会话）。
+- 启动前校验：GUI 在拉起宿主后等最多 1.5 秒确认文件真写上（目录只读 / 被占时宿主会立刻失败退出，不能报假成功）。停止沿用路线 B 的 `StopViaHost()`（按宿主命令行反查游戏 exe → 结束游戏 → 宿主自行还原），该方法现在给宿主 3 秒自己收尾再强杀。
+- 实测（2026-09-19，PEAK 3527290，全程无环境变量、无垫片、无内核参与）：`gameprocess_log.txt` 出现 `AppID 480 adding PID …PEAK.exe`，`console_log.txt` 出现 `Game process added : AppID 480 ""…PEAK.exe""` 与 `SSGL: persona state flags`；PEAK 进程内 `steam_api64.dll` + `steamclient64.dll` + `gameoverlayrenderer64.dll` 三个模块齐全（叠加层正常）；退出后文件删除、台账消失。
+- 边界：① 只等宿主拉起的那个进程，"启动器 → 另起的 exe" 会提前还原（代码里已标 `ponytail:`）；② 缺路线 B 的"宿主先注册成同一 AppID"这一步，带自检游戏的表现待好友实测（进房未测）。
+
+### 7.4 显示不对称不是故障
 
 480 方案下双方都以 Spacewar(480) 身份运行，好友列表里互相显示"正在玩 480"属预期。反过来若看到好友被显示成真实游戏名（如 PEAK），那是**本机内核残留了 onlinefix 状态**在改写入站 persona（日志 `Patched friend persona entries (480 -> 3527290)`）——v1.1.3 起该状态随游戏进程退出清空。
 
-### 7.4 一次只能一条
+### 7.5 一次只能一条
 
-内核侧的会话状态只有一份（`-onlinefix` 语义），所以同一时间只能有一个 480 会话；宿主路线的并发由 GUI 按 `OnlineHost` 进程数管理（`IsHostRunning`）。
+内核侧的会话状态只有一份（`-onlinefix` 语义），所以同一时间只能有一个 480 会话；宿主路线的并发由 GUI 按 `OnlineHost` 进程数管理（`IsHostRunning`，路线 B 与 C 共用）。
 
 ## 8. WinUI 3 踩坑合集（两轮合并）
 
@@ -113,7 +122,7 @@
 | `SudamaKeyCache` | 密钥/令牌缓存（存在即用不自动过期、并行下载、手动刷新与本地导入）|
 | `LibraryScanner` | 扫描 Lua 目录、检测错误 |
 | `NoSteamLauncherService` / `NoSteamLaunchOrchestrator` | 免 Steam 部署封装 / 编排（Steamless + GBE + Bypass）|
-| `OnlineFixService` | 联机两条路线（§7）：内核原生（`steam.exe -applaunch <appid> -onlinefix=<session>` + PEB 读命令行检测/停止）与宿主 480（拉起 `OnlineHost.exe`、按 AppID 解析游戏 exe、从宿主命令行反查游戏进程后结束）|
+| `OnlineFixService` | 联机三条路线（§7）：内核原生（`steam.exe -applaunch <appid> -onlinefix=<session>` + PEB 读命令行检测/停止）、宿主 480（拉起 `OnlineHost.exe`、按 AppID 解析游戏 exe、从宿主命令行反查游戏进程后结束）、AppID Changer 文件法（`--appid-txt` + 台账还原 + 启动时补还原巡检）|
 | `SteamDllService` | 三 DLL 是否已注入 / 内核 `opensteamtool.toml` 读写（`[denuvo] mode`、`[lua] paths`）/ **内核版本读取**（读已部署 `OpenSteamTool.dll` 的 Windows 版本资源）|
 | `TicketService` / `OstFileService` / `SteamTicketExtractor` | Denuvo 授权管理 / .ost 导入导出 / 在线提取 |
 | `ConfigService` / `LogService` / `ToastService` / `GameNameCacheService` | 配置 / 日志 / 通知 / 名称缓存 |
@@ -124,7 +133,7 @@
 - 补齐版本配置写入的是当前 GID
 - 名称缓存 30 天 TTL，游戏改名后会显示旧名（08-28 起机制：仅主游戏入缓存；库页显示纯缓存读 + 后台静默补名；联机/DLC 等显示名处实时查询不参与缓存）
 - DLC token 无按需查询渠道：生成 Lua 时会逐个查 Sudama 全量缓存并写入命中的 `addtoken`，但 dump 未收录的受限 DLC 没有补充途径
-- 480 联机一次只能跑一个（内核侧会话状态只有一份；宿主路线由 GUI 按 `OnlineHost` 进程数管理，见 §7.4）
+- 480 联机一次只能跑一个（内核侧会话状态只有一份；宿主路线由 GUI 按 `OnlineHost` 进程数管理，见 §7.5）
 - Sudama 大文件下载速度取决于服务器线路，慢时走浏览器下载 + 手动导入
 
 ## 11. 创意工坊（Workshop）下载（Phase 1 已落地）

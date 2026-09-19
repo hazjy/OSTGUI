@@ -14,15 +14,14 @@
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                 <ComboBox x:Name="OnlineModeCombo" MinWidth="240" HorizontalAlignment="Left"
-                          SelectedIndex="0"
-                          SelectionChanged="OnlineModeCombo_SelectionChanged">
-                    <ComboBoxItem Content="DLL 注入" />
-                    <ComboBoxItem Content="其他" />
+                          SelectedIndex="0">
+                    <ComboBoxItem Content="DLL 注入（推荐）" />
+                    <ComboBoxItem Content="AppID Changer（轻量）" />
                 </ComboBox>
             </Border>
 
-            <!-- 内容块 2：DLL 注入 -->
-            <Border x:Name="DllInjectPanel" Width="560" Padding="24" CornerRadius="12"
+            <!-- 内容块 2：输入与启停（两种方式共用，靠上面的下拉分派） -->
+            <Border Width="560" Padding="24" CornerRadius="12"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                 <StackPanel Spacing="12">
@@ -54,14 +53,14 @@
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Spacing="12">
-                        <Button Click="StartDllInject_Click"
+                        <Button Click="Start_Click"
                                 Style="{StaticResource AccentButtonStyle}"
                                 IsEnabled="{Binding CanStart}"
                                 AutomationProperties.Name="启动游戏"
                                 ToolTipService.ToolTip="启动游戏">
                             <SymbolIcon Symbol="Play" />
                         </Button>
-                        <Button Click="StopDllInject_Click"
+                        <Button Click="Stop_Click"
                                 IsEnabled="{Binding IsRunning}"
                                 AutomationProperties.Name="停止游戏"
                                 ToolTipService.ToolTip="停止游戏">
@@ -73,12 +72,6 @@
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
             </Border>
-
-            <!-- 其他（占位，以后再加） -->
-            <TextBlock x:Name="OtherModePanel" Visibility="Collapsed"
-                       Text="这一项还没有内容，以后再加。"
-                       FontSize="13"
-                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
         </StackPanel>
     </ScrollViewer>
 </UserControl>

@@ -75,6 +75,24 @@ public partial class OnlineViewModel : ObservableObject
         return (ok, msg);
     }
 
+    /// <summary>AppID Changer 启动（文件法：宿主写游戏 exe 同目录的 steam_appid.txt 后拉起游戏，退出即还原）</summary>
+    public (bool success, string message) StartChanger()
+    {
+        if (IsRunning)
+            return (false, "已有联机游戏在运行，请先停止");
+
+        if (string.IsNullOrWhiteSpace(DllGameExePath) || !File.Exists(DllGameExePath))
+            return (false, "请先点「查询」定位到游戏程序");
+
+        var (sessionOk, sessionAppId) = ResolveSessionAppId();
+        if (!sessionOk)
+            return (false, "请输入正确的协议 AppID（十进制，非 0）");
+
+        var (ok, msg) = _onlineFixService.StartViaHost(DllGameExePath, sessionAppId, viaAppIdFile: true);
+        RefreshRunningState();
+        return (ok, msg);
+    }
+
     /// <summary>停止 DLL 注入联机游戏（宿主 + 它拉起的游戏）</summary>
     public (bool success, string message) StopDllInject()
     {
