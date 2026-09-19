@@ -57,7 +57,7 @@
 
 ## 7. 联机（三条路线）
 
-内核只认一条：`-onlinefix`。GUI 因此提供三条互不依赖的启动路线，**不要混用**（一次只走一条）。页面结构：联机页顶部 Segmented 切「内核原生」（`Views/OnlineFixView`）/「其他」（`Views/OtherOnlineView`，下拉里是「DLL 注入（推荐）」与「AppID Changer（轻量）」两种方式——**推荐**＝宿主预注册 + 垫片预载，兼容性最好；**轻量**＝只写文件、不加载任何东西——两者共用同一套输入与启停按钮，靠下拉选中项分派）。
+内核只认一条：`-onlinefix`。GUI 因此提供三条互不依赖的启动路线，**不要混用**（一次只走一条）。页面结构：联机页顶部 Segmented 切「内核原生」（`Views/OnlineFixView`）/「其他」（`Views/OtherOnlineView`，下拉里是「DLL 注入（推荐）」与「AppID Changer（轻量）」两种方式——**推荐**＝宿主预注册 + 垫片预载，兼容性最好；**轻量**＝只写文件、不加载任何东西——两者共用同一套输入与启停按钮，靠下拉选中项分派，选中项记进 `config.json` 的 `OnlineOtherMode`（0＝DLL 注入，1＝AppID Changer），下次进页面仍是上次那个）。两个分页的内容块（游戏 AppID + 查询 + 协议AppID + ▶■ + 状态行）样式与文字保持一致。
 
 ### 7.1 路线 A：内核原生（联机页「内核原生」）
 

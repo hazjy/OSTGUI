@@ -55,6 +55,8 @@ public class AppConfig
     public string DefaultPage { get; set; } = "home";
     public bool IsNavigationPaneOpen { get; set; } = true;
     public double NavigationPaneWidth { get; set; } = 200;
+    // 联机页「其他」下拉的选中项：0 = DLL 注入（推荐），1 = AppID Changer（轻量）
+    public int OnlineOtherMode { get; set; }
 
     // === 应用程序设置 ===
     public int LogMaxLines { get; set; } = 1000;
@@ -89,6 +91,7 @@ public class AppConfig
         DefaultPage = "home",
         IsNavigationPaneOpen = true,
         NavigationPaneWidth = 200,
+        OnlineOtherMode = 0,
         LogMaxLines = 1000,
         ManifestSourceEnabled = ManifestSource.GetPresetSources()
             .ToDictionary(s => s.Id, s => s.IsEnabled),

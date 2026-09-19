@@ -14,17 +14,21 @@
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                 <StackPanel Spacing="12">
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <TextBox Header="AppID" Width="180"
-                                 Text="{Binding OnlineAppId, Mode=TwoWay}" />
-                        <Button Content="查询" Click="QueryName_Click"
-                                VerticalAlignment="Bottom" />
+                    <StackPanel Spacing="6">
+                        <StackPanel Orientation="Horizontal" Spacing="12">
+                            <TextBox Header="游戏 AppID" Width="180"
+                                     Text="{Binding OnlineAppId, Mode=TwoWay}" />
+                            <Button Content="查询" Click="QueryName_Click"
+                                    VerticalAlignment="Bottom" />
+                        </StackPanel>
+
+                        <TextBlock Text="{Binding GameName}" FontSize="13"
+                                   TextWrapping="Wrap" IsTextSelectionEnabled="True"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
 
-                    <TextBlock Text="{Binding GameName}" FontSize="16" FontWeight="SemiBold" />
-
                     <StackPanel Spacing="8">
-                        <TextBlock Text="联机会话身份" FontSize="13" />
+                        <TextBlock Text="协议AppID" FontSize="14" />
                         <StackPanel Orientation="Horizontal" Spacing="16">
                             <!-- 不写 GroupName：走隐式分组，分组根是直接父级（本 StackPanel），
                                  两个视图各成一组；写了 GroupName 反而会把分组根提到整棵可视树，
@@ -109,9 +113,9 @@
 
                         <TextBlock Text="二、界面操作" FontSize="14" FontWeight="SemiBold" />
                         <TextBlock TextWrapping="Wrap" FontSize="13"
-                                   Text="1. AppID —— 填你要联机的、已入库游戏的 AppID，点「查询」确认是它，再点启动（▶）。" />
+                                   Text="1. 游戏 AppID —— 填你要联机的、已入库游戏的 AppID，点「查询」确认是它，再点启动（▶）。" />
                         <TextBlock TextWrapping="Wrap" FontSize="13"
-                                   Text="2. 联机会话身份 —— 默认「默认（480）」即可；若 480 没有手柄配置、或需要换一个带 Steam Input 配置的免费 AppID，就选「自定义」并在右侧填那个 AppID。" />
+                                   Text="2. 协议AppID —— 默认「默认（480）」即可；若 480 没有手柄配置、或需要换一个带 Steam Input 配置的免费 AppID，就选「自定义」并在右侧填那个 AppID。" />
                         <TextBlock TextWrapping="Wrap" FontSize="13"
                                    Text="3. 对端必须使用相同的会话身份，否则互相看不到。启动后点停止（■）可结束；下方会显示当前运行情况。" />
                         <TextBlock TextWrapping="Wrap" FontSize="12"

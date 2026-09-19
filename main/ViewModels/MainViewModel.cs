@@ -103,7 +103,7 @@ public partial class MainViewModel : ObservableObject
             ticketService, luaService, ostFileService,
             steamGameInfoService, steamService);
         SettingsVM = new SettingsViewModel(configService, steamService, _steamDllService, sudamaCache);
-        OnlineVM = new OnlineViewModel(onlineFixService, searchService, gameInfoService);
+        OnlineVM = new OnlineViewModel(onlineFixService, searchService, gameInfoService, configService);
     }
 
     /// <summary>

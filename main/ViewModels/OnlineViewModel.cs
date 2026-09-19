@@ -11,9 +11,16 @@ public partial class OnlineViewModel : ObservableObject
     private readonly OnlineFixService _onlineFixService;
     private readonly GameSearchService _searchService;
     private readonly SteamGameInfoService _gameInfoService;
+    private readonly ConfigService _configService;
 
     [ObservableProperty] private string _onlineAppId = "";
     [ObservableProperty] private string _gameName = "";
+
+    /// <summary>「其他」下拉的选中项（0 = DLL 注入，1 = AppID Changer）；改动即落盘，重开记住上次选择</summary>
+    [ObservableProperty] private int _otherModeIndex;
+
+    partial void OnOtherModeIndexChanged(int value)
+        => _ = _configService.UpdateAndSaveAsync(c => c.OnlineOtherMode = value);
 
     // 联机会话身份：默认 Spacewar(480)，自定义时用 SessionAppId
     // 两个联机视图共用这份状态；各视图内的单选靠各自 GroupName 分组（两个视图的名字必须不同）
@@ -104,11 +111,16 @@ public partial class OnlineViewModel : ObservableObject
     public OnlineViewModel(
         OnlineFixService onlineFixService,
         GameSearchService searchService,
-        SteamGameInfoService gameInfoService)
+        SteamGameInfoService gameInfoService,
+        ConfigService configService)
     {
         _onlineFixService = onlineFixService;
         _searchService = searchService;
         _gameInfoService = gameInfoService;
+        _configService = configService;
+
+        // 直接赋字段：走属性会触发一次无意义落盘
+        _otherModeIndex = configService.Config.OnlineOtherMode;
     }
 
     /// <summary>

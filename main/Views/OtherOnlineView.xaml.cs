@@ -12,7 +12,8 @@ public sealed partial class OtherOnlineView : UserControl
 
     private OnlineViewModel? VM => DataContext as OnlineViewModel;
 
-    private bool IsChangerMode => OnlineModeCombo.SelectedIndex == 1;
+    // 选中项存在 VM（绑定 SelectedIndex，改动即落盘），这里只读它，避免两处状态
+    private bool IsChangerMode => VM?.OtherModeIndex == 1;
 
     /// <summary>查询：按游戏 AppID 定位已安装游戏的主程序，结果显示在输入框下面一行</summary>
     private void QueryDllGameExe_Click(object sender, RoutedEventArgs e)

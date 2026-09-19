@@ -14,7 +14,7 @@
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                 <ComboBox x:Name="OnlineModeCombo" MinWidth="240" HorizontalAlignment="Left"
-                          SelectedIndex="0">
+                          SelectedIndex="{Binding OtherModeIndex, Mode=TwoWay}">
                     <ComboBoxItem Content="DLL 注入（推荐）" />
                     <ComboBoxItem Content="AppID Changer（轻量）" />
                 </ComboBox>
