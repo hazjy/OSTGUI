@@ -243,6 +243,25 @@ public class SteamDllService
     }
 
     /// <summary>
+    /// 已部署内核 DLL 的版本号（读 DLL 自带的 Windows 版本资源，如 1.1.3）。
+    /// 取不到（未部署 / 内核没带版本资源）返回 null。
+    /// </summary>
+    public string? GetKernelVersion()
+    {
+        var steamPath = _steamService.GetSteamPath();
+        if (string.IsNullOrEmpty(steamPath)) return null;
+
+        var path = Path.Combine(steamPath, "OpenSteamTool.dll");
+        if (!File.Exists(path)) return null;
+
+        var version = System.Diagnostics.FileVersionInfo.GetVersionInfo(path).FileVersion;
+        if (string.IsNullOrEmpty(version)) return null;
+
+        var parts = version.Split('.');
+        return parts.Length >= 3 ? $"{parts[0]}.{parts[1]}.{parts[2]}" : version;
+    }
+
+    /// <summary>
     /// 检查 OST DLL 是否已注入
     /// </summary>
     public bool IsOSTDllInjected()

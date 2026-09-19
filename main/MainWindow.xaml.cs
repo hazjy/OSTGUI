@@ -7,7 +7,6 @@ using OSTGUI.Pages;
 using OSTGUI.Services;
 using OSTGUI.ViewModels;
 using System.Runtime.InteropServices;
-using System.Reflection;
 
 namespace OSTGUI;
 
@@ -386,46 +385,6 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
         menu.ShowAt(item, new Windows.Foundation.Point(40, item.ActualHeight));
     }
 
-    private async void NavInfo_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
-    {
-        var version = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "?";
-
-        var content = new StackPanel { Spacing = 8 };
-        content.Children.Add(new TextBlock { Text = $"版本 v{version}", FontSize = 14 });
-        content.Children.Add(new TextBlock { Text = "制作者 ZJY", FontSize = 14 });
-        content.Children.Add(new TextBlock
-        {
-            Text = "https://github.com/hazjy/OSTGUI",
-            FontSize = 12,
-            TextWrapping = TextWrapping.Wrap,
-            IsTextSelectionEnabled = true
-        });
-
-        var dialog = new ContentDialog
-        {
-            XamlRoot = RootGrid.XamlRoot,
-            Title = "关于 OSTGUI",
-            Content = content,
-            PrimaryButtonText = "GitHub",
-            CloseButtonText = "退出",
-            DefaultButton = ContentDialogButton.Primary
-        };
-        dialog.PrimaryButtonClick += (_, _) =>
-        {
-            try
-            {
-                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                {
-                    FileName = "https://github.com/hazjy/OSTGUI",
-                    UseShellExecute = true
-                });
-            }
-            catch { }
-        };
-
-        await dialog.ShowAsync();
-    }
-
     /// <summary>
     /// 图标点击旋转动效（Composition 动画，0 → 360 度）
     /// </summary>
@@ -626,6 +585,7 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
                 "denuvo" => new DenuvoPage(_mainVM.DenuvoVM),
                 "nosteam" => new NoSteamPage(App.Services.GetRequiredService<NoSteamViewModel>()),
                 "settings" => new SettingsPage(_mainVM.SettingsVM),
+                "info" => new InfoPage(),
                 _ => new HomePage(_mainVM),
             };
 
