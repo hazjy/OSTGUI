@@ -88,6 +88,15 @@ public sealed class GBEDeployResult
     public TimeSpan Duration { get; init; }
 }
 
+public sealed class NoSteamRestoreResult
+{
+    public bool Success { get; init; }
+    /// <summary>逐条还原动作（含跳过的说明），UI 直接打印。</summary>
+    public string[] Actions { get; init; } = [];
+    /// <summary>未完成的动作（含原因）与复查残留。</summary>
+    public string[] Failures { get; init; } = [];
+}
+
 public sealed class LaunchResult
 {
     public bool Success { get; init; }

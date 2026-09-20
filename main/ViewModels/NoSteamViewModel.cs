@@ -547,6 +547,49 @@ public partial class NoSteamViewModel : ObservableObject
 
     private bool CanExecuteDeploy() => !IsRunning;
 
+    /// <summary>一键还原：撤掉部署进游戏目录的模拟器产物（EXE/DLL 备份、steam_settings、Bypass）</summary>
+    [RelayCommand]
+    private async Task RestoreAsync()
+    {
+        if (IsRunning)
+        {
+            ProgressLog += "[WARN] 正在部署中，稍后再试\n";
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(GameExePath) || !File.Exists(GameExePath))
+        {
+            ProgressLog += "[ERROR] 请先选择有效的游戏 EXE 文件\n";
+            return;
+        }
+
+        IsRunning = true;
+        ProgressLog += $"[INFO] 开始还原 {GameExePath}\n";
+
+        try
+        {
+            var result = await Task.Run(() => _noSteamService.Restore(GameExePath, _gbeLogger));
+
+            foreach (var action in result.Actions)
+                ProgressLog += $"[RESTORE] {action}\n";
+            foreach (var failure in result.Failures)
+                ProgressLog += $"[WARN] {failure}\n";
+
+            ProgressLog += result.Success
+                ? "[SUCCESS] 还原完成！游戏目录已回到部署前状态\n"
+                : "[WARN] 还原未完成：请关掉游戏后重试（文件被占用时无法替换）\n";
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Restore failed");
+            ProgressLog += $"[ERROR] 异常: {ex.Message}\n";
+        }
+        finally
+        {
+            IsRunning = false;
+        }
+    }
+
     [RelayCommand]
     private void ClearLog()
     {

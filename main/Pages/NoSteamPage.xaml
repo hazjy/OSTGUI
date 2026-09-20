@@ -135,6 +135,9 @@
                         <Button Content="开始部署" Command="{Binding DeployCommand}"
                                 Style="{StaticResource AccentButtonStyle}"
                                 Width="140" Height="40" FontSize="14" />
+                        <Button Content="一键还原" Command="{Binding RestoreCommand}"
+                                Width="120" Height="40" FontSize="14"
+                                ToolTipService.ToolTip="撤掉部署进游戏目录的模拟器产物（EXE/DLL 备份、steam_settings、Bypass），回到部署前状态" />
                         <Button Content="清空日志" Command="{Binding ClearLogCommand}"
                                 Width="100" Height="40" FontSize="14" />
                     </StackPanel>

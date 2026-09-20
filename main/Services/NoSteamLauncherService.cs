@@ -193,6 +193,13 @@ public sealed class NoSteamLauncherService : IDisposable
         return orchestrator.ValidateOptions(options);
     }
 
+    /// <summary>
+    /// 一键还原：照抄 SAC（SteamAutoCrack）Restore 的语义，撤掉游戏目录里的模拟器产物。
+    /// 只动游戏目录，不需要解压资源。
+    /// </summary>
+    public NoSteamRestoreResult Restore(string gameExePath, ILogger<GBEDeploymentService> gbeLogger)
+        => new GBEDeploymentService(gbeLogger).Restore(gameExePath);
+
     public void Dispose()
     {
         if (_disposed) return;

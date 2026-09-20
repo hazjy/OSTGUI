@@ -584,4 +584,140 @@ public sealed class GBEDeploymentService
         File.WriteAllText(Path.Combine(gameDir, "SteamAPICheckBypass.json"), jsonString);
         _logger.LogInformation("Generated SteamAPICheckBypass.json");
     }
+
+    /// <summary>
+    /// 一键还原：照抄 SAC（SteamAutoCrack）<c>Restore.RestoreFile</c> 的四步，不另加判据：
+    /// ① 存在 <c>SteamAPICheckBypass.json</c> → 递归删 <c>version.dll</c>/<c>winmm.dll</c>/<c>winhttp.dll</c>；
+    /// ② 递归删 <c>steam_interfaces.txt</c>/<c>local_save.txt</c>/<c>SteamAPICheckBypass.json</c>；
+    /// ③ 递归把所有 <c>*.bak</c> 改回原名；
+    /// ④ 递归删所有 <c>steam_settings</c> 目录。
+    /// 幂等：无残留时返回 <c>Success = true</c>；有文件被占用（游戏在跑）时逐项报告且不报成功。
+    /// </summary>
+    public NoSteamRestoreResult Restore(string gameExePath)
+    {
+        var actions = new List<string>();
+        var failures = new List<string>();
+
+        var gameDir = Path.GetDirectoryName(Path.GetFullPath(gameExePath));
+        if (string.IsNullOrEmpty(gameDir) || !Directory.Exists(gameDir))
+        {
+            return new NoSteamRestoreResult
+            {
+                Success = false,
+                Failures = [$"游戏目录不存在：{gameDir}"]
+            };
+        }
+
+        // appid 线索必须在删掉 steam_settings 之前读，用来提示模拟器存档位置
+        var appIds = ReadDeployedAppIds(gameDir);
+
+        var bypassJsons = Enumerate(gameDir, "SteamAPICheckBypass.json");
+
+        // ① 只有 Bypass 的配置文件在，才按 SAC 的判据删劫持 DLL
+        if (bypassJsons.Count > 0)
+        {
+            foreach (var name in new[] { "version.dll", "winmm.dll", "winhttp.dll" })
+                foreach (var file in Enumerate(gameDir, name))
+                    TryStep(actions, failures, $"删除劫持 DLL {Path.GetRelativePath(gameDir, file)}",
+                        () => File.Delete(file));
+        }
+
+        // ② 删模拟器配置残留文件
+        foreach (var name in new[] { "steam_interfaces.txt", "local_save.txt", "SteamAPICheckBypass.json" })
+            foreach (var file in Enumerate(gameDir, name))
+                TryStep(actions, failures, $"删除 {Path.GetRelativePath(gameDir, file)}", () => File.Delete(file));
+
+        // ③ 所有 *.bak 换回原名（SAC 是先删原文件再改名，这里用覆盖式 Move：结果一致，失败时不会丢失备份）
+        foreach (var bak in Enumerate(gameDir, "*.bak"))
+        {
+            var target = bak[..^4];
+            TryStep(actions, failures, $"还原 {Path.GetRelativePath(gameDir, target)} ← {Path.GetFileName(bak)}",
+                () => File.Move(bak, target, true));
+        }
+
+        // ④ 删所有 steam_settings 目录（部署时紧挨每个被替换的 DLL 放一份）
+        foreach (var settingsDir in EnumerateSettingsDirs(gameDir))
+            TryStep(actions, failures, $"删除配置目录 {Path.GetRelativePath(gameDir, settingsDir)}",
+                () => Directory.Delete(settingsDir, true));
+
+        // 复查：还有残留就是没撤干净（多半是游戏在跑占着文件），不能报成功
+        try
+        {
+            failures.AddRange(Enumerate(gameDir, "*.bak").Select(f => $"仍有残留：{Path.GetRelativePath(gameDir, f)}"));
+            failures.AddRange(Enumerate(gameDir, "SteamAPICheckBypass.json")
+                .Select(f => $"仍有残留：{Path.GetRelativePath(gameDir, f)}"));
+            failures.AddRange(EnumerateSettingsDirs(gameDir)
+                .Select(d => $"仍有残留：{Path.GetRelativePath(gameDir, d)}"));
+        }
+        catch (Exception ex)
+        {
+            failures.Add($"复查失败：{ex.Message}");
+        }
+
+        // 模拟器存档只提示不删（里面是用户进度）
+        foreach (var appId in appIds)
+        {
+            var saves = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "GSE Saves", appId);
+            if (Directory.Exists(saves))
+                actions.Add($"[提示] 模拟器存档仍在 {saves}（未删除，需要清理请自行处理）");
+        }
+
+        if (actions.Count == 0 && failures.Count == 0)
+            actions.Add("未发现模拟器残留（可能已还原）");
+
+        _logger.LogInformation("Restore finished: {Actions} actions, {Failures} problems",
+            actions.Count, failures.Count);
+
+        return new NoSteamRestoreResult
+        {
+            Success = failures.Count == 0,
+            Actions = actions.ToArray(),
+            Failures = failures.ToArray()
+        };
+    }
+
+    private void TryStep(List<string> actions, List<string> failures, string description, Action action)
+    {
+        try
+        {
+            action();
+            actions.Add(description);
+            _logger.LogInformation("Restore: {Action}", description);
+        }
+        catch (Exception ex)
+        {
+            // 单项失败不阻断其余项（典型原因：游戏还在跑，文件被占用）
+            failures.Add($"{description} —— 失败：{ex.Message}");
+            _logger.LogWarning(ex, "Restore step failed: {Action}", description);
+        }
+    }
+
+    // 先枚举成列表再动手：边遍历边删会让枚举器失效
+    private static List<string> Enumerate(string gameDir, string pattern) =>
+        Directory.EnumerateFiles(gameDir, pattern, SearchOption.AllDirectories).ToList();
+
+    private static List<string> EnumerateSettingsDirs(string gameDir) =>
+        Directory.EnumerateDirectories(gameDir, "steam_settings", SearchOption.AllDirectories).ToList();
+
+    private List<string> ReadDeployedAppIds(string gameDir)
+    {
+        var appIds = new List<string>();
+        try
+        {
+            foreach (var settingsDir in EnumerateSettingsDirs(gameDir))
+            {
+                var appIdFile = Path.Combine(settingsDir, "steam_appid.txt");
+                if (!File.Exists(appIdFile)) continue;
+
+                var appId = File.ReadAllText(appIdFile).Trim();
+                if (appId.Length > 0 && !appIds.Contains(appId)) appIds.Add(appId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogDebug(ex, "Reading steam_appid.txt failed");
+        }
+        return appIds;
+    }
 }
