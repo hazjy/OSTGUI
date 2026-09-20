@@ -67,7 +67,7 @@
 
 ### 7.2 路线 B：宿主 480（联机页「其他 → DLL 注入」）
 
-- 由独立进程 `OnlineHost.exe "<游戏 exe>" <会话 AppID>` 完成（源码 `OnlineHost/Program.cs`，随 GUI 发布、与主程序同目录）。宿主行为：设 `SteamAppId`/`SteamGameId` 环境变量 → best-effort 加载**游戏目录里自带的** `steam_api64.dll`（BFS ≤3 层，覆盖 Unity 的 `*_Data\Plugins\x86_64`）并调 `SteamAPI_InitFlat`（拿不到就退 `InitSafe`；连 DLL 都没有就跳过——**环境变量才是关键**）→ 把游戏**作为子进程**拉起 → 等它退出 → `SteamAPI_Shutdown`。
+- 由独立进程 `OnlineHost.exe "<游戏 exe>" <会话 AppID>` 完成（源码 `OnlineHost/Program.cs`，随 GUI 发布、与主程序同目录）。宿主行为：设 `SteamAppId`/`SteamGameId`/**`SteamOverlayGameId`** 环境变量 → best-effort 加载**游戏目录里自带的** `steam_api64.dll`（BFS ≤3 层，覆盖 Unity 的 `*_Data\Plugins\x86_64`）并调 `SteamAPI_InitFlat`（拿不到就退 `InitSafe`；连 DLL 都没有就跳过——**环境变量才是关键**）→ 把游戏**作为子进程**拉起 → 等它退出 → `SteamAPI_Shutdown`。
 - 原理：游戏进程自己以该身份初始化 Steam（appid / 大厅 / P2P 证书 / 叠加层天然一致），**完全不需要内核改写**。代价是它不经过内核的 `-onlinefix` 路径，所以内核那份会话状态必须已经清干净（v1.1.3 起随游戏进程退出即清，见内核 DEV-NOTES §2）。
 - 游戏 exe 由 GUI 按 AppID 自动解析：`libraryfolders.vdf` 找库 → `appmanifest_<appid>.acf` 的 `installdir` → 目录同名 exe，否则取目录里最大的 exe（排除 CrashHandler / vcredist / unins）。
 - 停止：先从宿主命令行里取**最后一个带引号的 `.exe`**（第一个可能是宿主自身）→ 按进程名结束游戏 → 再结束宿主。
@@ -75,12 +75,13 @@
 
 ### 7.3 路线 C：AppID Changer（文件法，联机页「其他 → AppID Changer」）
 
-- 做法：宿主 `OnlineHost.exe --appid-txt "<游戏 exe>" <会话 AppID>` 只写**游戏 exe 同目录**的 `steam_appid.txt`（**不设环境变量、不加载垫片**，刻意与路线 B 区分），再把游戏作为子进程拉起，游戏退出后按台账还原原文件。宿主把工作目录设成游戏 exe 目录，于是"文件放 CWD"与"放 exe 同目录"两种口径重合，不必赌 SDK 读哪个。
-- 为什么要有这条：环境变量只对宿主直接拉起的那个进程有效，游戏自己再起子进程或被重开就丢了；文件留在磁盘上，重开也生效。适用于只认文件、不认环境变量的游戏。
+- 做法：宿主 `OnlineHost.exe --appid-txt "<游戏 exe>" <会话 AppID>` 写**游戏 exe 同目录**的 `steam_appid.txt`，**同时设与路线 B 相同的那套环境变量**（`SteamAppId`/`SteamGameId`/`SteamOverlayGameId`）并同样先用游戏自带的 shim 自注册一次，再把游戏作为子进程拉起，游戏退出后按台账还原原文件。宿主把工作目录设成游戏 exe 目录，于是"文件放 CWD"与"放 exe 同目录"两种口径重合，不必赌 SDK 读哪个。
+- ⚠️ **2026-09-20 修正（原设计作废）**：这条路线原来是"只写文件、不设环境变量、不加载垫片"，被实测推翻——只写文件时 Steam 虽然会 `AppID 480 adding PID …` 把游戏登记成 480，但**没有 `GameOverlay: started`**，也拿不到 480 的真大厅/叠加层身份。对照物是闭源工具 `CaIInstallNext`（见 §7.4 与工作区 `doc/GUI-事实考证.md`）：它给子进程带的是 `SteamAppId`/`SteamGameId`/**`SteamOverlayGameId`**=480（外加 `SteamEnv`/`SteamAppUser`/`SteamVirtualGamepadInfo`/`STEAM_COMPAT_*`），并先起一个带环境的自身副本去注册。我们跟进的是前三个（联机必需）+ 自注册 + 文件；后四项没跟（Steam 自己的账号名/手柄信息/着色器缓存路径，联机不需要）。
+- 为什么还留文件：文件留在磁盘上，游戏自己再起子进程或被重开时仍然生效；环境变量只对宿主直接拉起的进程有效。文件 + 环境变量各管一半，闭源工具也是两样都写。
 - 台账 `%LOCALAPPDATA%\OSTGUI\appid-changer.txt`（三行 = 游戏目录 / 原本有无该文件 / 原内容）由宿主**先写台账再动文件**：中途被杀也能还原。宿主被杀 / 断电留下的残留，由 GUI 启动时的 `RestoreAppIdFileLeftover()` 补还原（有台账且**没有 OnlineHost 在跑**才动手，避免打断进行中的会话）。
-- 启动前校验：GUI 在拉起宿主后等最多 1.5 秒确认文件真写上（目录只读 / 被占时宿主会立刻失败退出，不能报假成功）。停止沿用路线 B 的 `StopViaHost()`（按宿主命令行反查游戏 exe → 结束游戏 → 宿主自行还原），该方法现在给宿主 3 秒自己收尾再强杀。
-- 实测（2026-09-19，PEAK 3527290，全程无环境变量、无垫片、无内核参与）：`gameprocess_log.txt` 出现 `AppID 480 adding PID …PEAK.exe`，`console_log.txt` 出现 `Game process added : AppID 480 ""…PEAK.exe""` 与 `SSGL: persona state flags`；PEAK 进程内 `steam_api64.dll` + `steamclient64.dll` + `gameoverlayrenderer64.dll` 三个模块齐全（叠加层正常）；退出后文件删除、台账消失。
-- 边界：① 只等宿主拉起的那个进程，"启动器 → 另起的 exe" 会提前还原（代码里已标 `ponytail:`）；② 缺路线 B 的"宿主先注册成同一 AppID"这一步，带自检游戏的表现待好友实测（进房未测）。
+- 启动前校验：GUI 在拉起宿主后等最多 1.5 秒确认文件真写上（目录只读 / 被占时宿主会立刻失败退出，不能报假成功）。停止沿用路线 B 的 `StopViaHost()`（按宿主命令行反查游戏 exe → 结束游戏 → 宿主自行还原），该方法给宿主 3 秒自己收尾再强杀。
+- 实测：① 2026-09-19 旧版（只写文件）——`gameprocess_log.txt` 有 `AppID 480 adding PID …PEAK.exe`、PEAK 进程内三个 steam 模块齐全，但**无叠加层启动记录**，用户实测判为"不生效"；② 2026-09-20 修正版——机械验证：子进程确实继承到 `SteamAppId`/`SteamGameId`/`SteamOverlayGameId=480`（PEB 直读），文件写入与退出还原、台账清理全部照旧；（真机联机效果待好友实测）
+- 边界：只等宿主拉起的那个进程，"启动器 → 另起的 exe" 会提前还原（代码里已标 `ponytail:`）。
 
 ### 7.4 显示不对称不是故障
 
@@ -107,7 +108,10 @@
 - **RadioButton 的分组语义（09-17 踩到）**：有 `GroupName` 时分组根取**整个视觉树**（XamlRoot 范围，源码 `dxaml/xcp/dxaml/lib/RadioButton_Partial.cpp:519-522`：`groupNameExists ? VisualRelativeKind_Root : VisualRelativeKind_Parent`），**没有 GroupName 才按直接父容器分组**。两个页面/视图各用一组同名 `GroupName` 会串成一组，组内自动取消会把共享的布尔写空（症状：两个圈都不选中）。修法是**不写 GroupName**、靠隐式分组各成一组；`RadioButtons` 容器虽然忽略 GroupName，但它的布局盒与圆圈行有 4px 偏差，做左对齐时不要用。
 - **打包时 `Views\` 下的 `.xbf` 也要拷**（09-17 差点发出去）：`CopyWinUIResourcesToPublish` 原先只拷 `Pages\*.xbf`，新增视图资源的包在别人机器上一打开该页就 `XamlParseException`——本机 Debug 目录里有文件，**本机测不出来**。现改为递归 `$(TargetDir)**\*.xbf`（并 `Exclude` publish 自身，否则会复制出 `publish\publish`）。
 - ⚠️ 强调色的主题陷阱：`SystemAccentColor` 基础色**不随应用深浅主题翻转**；深色模式下需要"提亮版强调填充"的场景应使用 `AccentFillColorDefaultBrush` 等画刷
-- **ContentDialog 恒为深色是刻意行为**：弹窗位于弹出层，不继承应用 `RequestedTheme`，浅色模式下也渲染成深色。曾尝试显式同步主题，但 WinUI 浅色弹窗对比度差、观感不佳，遂回退保留深色——勿当 bug 修复
+- **弹层主题（2026-09-20，两轮才查对，含一次错误结论）**：① **XAML 里声明**的 ContentDialog 挂在页面树里 → 继承 `RootGrid.RequestedTheme`（浅色应用 + 深色系统下「使用说明」弹窗实测浅色 `#E7E7E7`——我先只测了这一个就断言"弹层本来就跟随"，是错的）；② **代码 `new` 出来**的 ContentDialog 不在 XAML 树里 → 主题落到**系统主题**，浅色应用 + 深色系统下整片发黑（用户截图确认；10 个代码弹窗全中，账号弹窗为例）→ 现在统一在 `ShowAsync` 前调 `Helpers.PopupTheme.Apply(dialog)`，**只设 `RequestedTheme`，背景/画刷仍走框架默认**。旧记录「ContentDialog 恒为深色是刻意行为」只对第 ② 类成立，已作废
+- **代码搭的弹窗内容取画刷**：不能用 `Application.Current.Resources[...]`——同样走**系统主题**。改成在页面/窗口 XAML 里放"取样点"（`BrushProbe`：`{ThemeResource CardBackgroundFillColorDefaultBrush}` 等），代码读它的 `Background`/`BorderBrush`/`Foreground`。已改 `MainWindow`（账号弹窗）与 `LibraryPage`（入库信息弹窗）；账号弹窗的"确认重启"改用框架 `AccentButtonStyle`，不再手工染色
+- **弹层背景不走「显示效果」**：试过给弹层换纯色/亚克力画刷 → 浅色+亚克力下弹窗背景变近黑 `#171719`、深色菜单变浅灰 `#A3A3A3`，比框架默认难看，已回退（框架默认背景本身就是亚克力质感）
+- **`App.xaml` 自定义画刷已清空**（2026-09-20）：`OstAccentBrush`/`Status*Brush`/`FixedVersionBrush`/`AutoVersionBrush` 七个键实测**零引用**，已删，现在只挂 `XamlControlsResources`
 - **构建**：只能用 VS MSBuild（`dotnet build/publish` 缺 PRI 任务必挂）；首次 Release 自包含发布需先带 RID Restore（运行时包要从源下载，直连 nuget.org 失败时可切国内镜像）；旧实例不关会 MSB3021 锁 exe
 - 版本号只在 csproj 维护三处（Version/AssemblyVersion/FileVersion），运行时从程序集读取
 
@@ -152,6 +156,7 @@
 - ⚠️ **`SystemBackdrop = null` 时窗口底色跟的是系统主题，不是应用主题**：浅色应用主题 + 深色系统时背景会露成灰/黑（实测采样 `#808080`、导航栏处 `#000000`）。所以「无」档由 `SolidBackdrop`（`RootGrid` 第一层的 Border，`{ThemeResource SolidBackgroundFillColorBaseBrush}`）自己铺底，云母/亚克力时隐藏让 backdrop 透出来
 - 诊断：每次切换往应用日志写一行 `[Backdrop] <mode> -> <类名>`——"选了没效果"时先看这行在不在、类名对不对
 - 系统要求：云母 Win11 22000+、亚克力 Win11 22621+；不支持时框架静默回落纯色底（不崩），设置页有一行小字说明
+- 弹层（弹窗/菜单）**不**跟着这个设置换背景，只跟随深浅主题——实测与理由见 §8 那条「弹层走框架默认」
 
 ## 13. 文档索引
 
