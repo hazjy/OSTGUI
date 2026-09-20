@@ -98,6 +98,15 @@ public partial class App : Application
         _window = new MainWindow();
         Log("MainWindow created");
         _window.Activate();
+
+        // 必须在 Activate() 之后：恢复"最大化"会显示/激活窗口，早于订阅窗口的 Activated 事件
+        // 会让初始化永久丢失（症状：内容区空白、Steam 路径/DLL 为空）
+        if (_window is MainWindow mainWindow)
+        {
+            mainWindow.ApplyStartupMaximizeIfNeeded();
+            mainWindow.EnsureInitialized();
+        }
+
         Log("MainWindow activated");
     }
 

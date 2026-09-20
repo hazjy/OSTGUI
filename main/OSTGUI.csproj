@@ -23,7 +23,6 @@
     <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
     <PackageReference Include="System.Drawing.Common" Version="10.0.10" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
-    <PackageReference Include="WindowStateSaver.WinUi3" Version="0.0.1" />
   </ItemGroup>
 
   <ItemGroup>

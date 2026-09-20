@@ -32,14 +32,8 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(AppTitleBar);
 
-        // 注册窗口状态保存/恢复（位置）
-        WindowStateSaver.WinUi3.WindowStateSaver.RegisterAndLoad(this);
-
         // 配置已在窗口创建前完整加载，直接应用侧边栏/窗口状态，避免启动闪烁
         ApplyWindowStateFromConfig();
-
-        // 确保窗口在屏幕可见区域内
-        EnsureWindowIsVisible();
 
         // 监听标题变化
         _mainVM.PropertyChanged += (s, e) =>
@@ -73,7 +67,11 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
     }
 
     /// <summary>
-    /// 从已加载的配置中应用侧边栏展开状态、宽度与窗口大小
+    /// 从已加载的配置中应用侧边栏展开状态、宽度与窗口大小/位置。
+    /// 尺寸与位置统一走 Win32（本进程 PerMonitorV2 → 物理像素），存的是
+    /// <c>GetWindowPlacement().rcNormalPosition</c>（**还原态**矩形，最小化/最大化关闭时也正确）。
+    /// ⚠️ 这里**只做尺寸/位置**，不要调 <c>Maximize()</c> 这类会显示/激活窗口的 API —— 构造函数阶段
+    /// 提前激活会让后面注册的 <c>Activated</c> 订阅永久丢失（见 <see cref="ApplyStartupMaximizeIfNeeded"/>）。
     /// </summary>
     private void ApplyWindowStateFromConfig()
     {
@@ -89,20 +87,51 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
             var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
             if (hwnd == IntPtr.Zero) return;
 
-            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
-            var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
-            if (appWindow == null) return;
-
             // 全局窗口最小尺寸（系统级锁定，WM_GETMINMAXINFO）
             if (_hwnd == IntPtr.Zero)
                 SetupMinTrackSize(hwnd);
 
-            if (config.WindowWidth > 400 && config.WindowHeight > 300)
-            {
-                appWindow.Resize(new Windows.Graphics.SizeInt32(
-                    Math.Max((int)config.WindowWidth, MinWindowWidth),
-                    Math.Max((int)config.WindowHeight, MinWindowHeight)));
-            }
+            // 最小尺寸常量是逻辑值（MinMaxInfo 里按 DPI 放大），这里要按物理像素比较
+            var dpi = GetDpiForWindow(hwnd);
+            var work = GetWorkArea(hwnd);
+            var maxWidth = Math.Max(work.Right - work.Left, ScaleLogical(MinWindowWidth, dpi));
+            var maxHeight = Math.Max(work.Bottom - work.Top, ScaleLogical(MinWindowHeight, dpi));
+            var width = Math.Min(Math.Max((int)config.WindowWidth, ScaleLogical(MinWindowWidth, dpi)), maxWidth);
+            var height = Math.Min(Math.Max((int)config.WindowHeight, ScaleLogical(MinWindowHeight, dpi)), maxHeight);
+
+            // 位置：旧配置是 -1（从未存过）或落在已拔掉的显示器上 → 保持系统默认位置
+            var hasPosition = config.WindowX >= 0 && config.WindowY >= 0
+                && IsPointOnScreen((int)config.WindowX, (int)config.WindowY);
+
+            SetWindowPos(hwnd, IntPtr.Zero,
+                hasPosition ? (int)config.WindowX : 0,
+                hasPosition ? (int)config.WindowY : 0,
+                width, height,
+                SwpNoZOrder | SwpNoActivate | (hasPosition ? 0u : SwpNoMove));
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// 恢复"上次是最大化关闭"的状态。**必须在窗口已激活之后调用**（<c>App.OnLaunched</c> 里
+    /// <c>Activate()</c> 之后）：<c>OverlappedPresenter.Maximize()</c> 对未显示的窗口等价于
+    /// <c>ShowWindow(SW_MAXIMIZE)</c>，会当场激活窗口并同步抛出 <c>Activated</c>；若此时构造函数
+    /// 里的订阅还没注册，那个事件就永久丢失，初始化随之永不执行（实测症状：主页空白、
+    /// Steam 路径/DLL 全部为空）。窗口已激活后再最大化不会改变激活状态，因此安全。
+    /// </summary>
+    public void ApplyStartupMaximizeIfNeeded()
+    {
+        try
+        {
+            if (!_mainVM.ConfigService.Config.IsWindowMaximized) return;
+
+            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
+            if (hwnd == IntPtr.Zero) return;
+
+            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
+            if (Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId)?.Presenter
+                is Microsoft.UI.Windowing.OverlappedPresenter presenter)
+                presenter.Maximize();
         }
         catch { }
     }
@@ -120,6 +149,10 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
     private const int MinWindowHeight = 560;
     private const int GwlWndProc = -4;
     private const uint WmGetMinMaxInfo = 0x0024;
+    private const uint SwpNoMove = 0x0002;
+    private const uint SwpNoZOrder = 0x0004;
+    private const uint SwpNoActivate = 0x0010;
+    private const uint MonitorDefaultToNearest = 0x00000002;
 
     private IntPtr _hwnd;
     private IntPtr _oldWndProc;
@@ -138,6 +171,29 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
         public NativePoint PtMaxPosition;
         public NativePoint PtMinTrackSize;
         public NativePoint PtMaxTrackSize;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Rect { public int Left; public int Top; public int Right; public int Bottom; }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct WindowPlacement
+    {
+        public int Length;
+        public int Flags;
+        public int ShowCmd;
+        public NativePoint MinPosition;
+        public NativePoint MaxPosition;
+        public Rect NormalPosition;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MonitorInfo
+    {
+        public int Size;
+        public Rect Monitor;
+        public Rect Work;
+        public uint Flags;
     }
 
     /// <summary>
@@ -185,27 +241,45 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
     [DllImport("user32.dll")]
     private static extern uint GetDpiForWindow(IntPtr hwnd);
 
-    private void EnsureWindowIsVisible()
+    // ── 窗口状态持久化用的 Win32（本进程 PerMonitorV2 → 这里的数值都是物理像素）──
+
+    [DllImport("user32.dll")]
+    private static extern bool GetWindowPlacement(IntPtr hWnd, ref WindowPlacement placement);
+
+    [DllImport("user32.dll")]
+    private static extern bool SetWindowPos(IntPtr hWnd, IntPtr insertAfter, int x, int y, int cx, int cy, uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern bool IsZoomed(IntPtr hWnd);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromWindow(IntPtr hWnd, uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern IntPtr MonitorFromPoint(NativePoint point, uint flags);
+
+    [DllImport("user32.dll")]
+    private static extern bool GetMonitorInfo(IntPtr monitor, ref MonitorInfo info);
+
+    /// <summary>当前显示器工作区（物理像素）；取不到时返回一个"不设上限"的矩形，即不做夹取</summary>
+    private static Rect GetWorkArea(IntPtr hwnd)
     {
-        try
-        {
-            var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
-            if (hwnd == IntPtr.Zero) return;
+        var monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+        var info = new MonitorInfo { Size = Marshal.SizeOf<MonitorInfo>() };
+        if (monitor != IntPtr.Zero && GetMonitorInfo(monitor, ref info))
+            return info.Work;
 
-            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
-            var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
-            if (appWindow == null) return;
-
-            // 如果位置在屏幕外，重置到屏幕中心
-            if (appWindow.Position.X < 0 || appWindow.Position.Y < 0)
-            {
-                appWindow.Resize(new Windows.Graphics.SizeInt32(1250, 875));
-                appWindow.Move(new Windows.Graphics.PointInt32(100, 100));
-            }
-        }
-        catch { }
+        return new Rect { Left = 0, Top = 0, Right = int.MaxValue, Bottom = int.MaxValue };
     }
 
+    private static bool IsPointOnScreen(int x, int y)
+        => MonitorFromPoint(new NativePoint { X = x, Y = y }, 0) != IntPtr.Zero;
+
+    /// <summary>
+    /// 保存窗口状态。用 <c>GetWindowPlacement().rcNormalPosition</c> —— 它永远是**还原态**矩形，
+    /// 最小化/最大化关闭时也能拿到正确尺寸（旧实现取 <c>AppWindow.Size</c>，最小化存 353x56、
+    /// 最大化存 3868x2080，下次启动就错乱）。
+    /// </summary>
     private void SaveSizeToConfig()
     {
         try
@@ -213,13 +287,18 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
             var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
             if (hwnd == IntPtr.Zero) return;
 
-            var windowId = Microsoft.UI.Win32Interop.GetWindowIdFromWindow(hwnd);
-            var appWindow = Microsoft.UI.Windowing.AppWindow.GetFromWindowId(windowId);
-            if (appWindow == null) return;
+            var placement = new WindowPlacement { Length = Marshal.SizeOf<WindowPlacement>() };
+            if (!GetWindowPlacement(hwnd, ref placement)) return;
+
+            var rect = placement.NormalPosition;
+            if (rect.Right - rect.Left <= 0 || rect.Bottom - rect.Top <= 0) return;
 
             var config = _mainVM.ConfigService.Config;
-            config.WindowWidth = appWindow.Size.Width;
-            config.WindowHeight = appWindow.Size.Height;
+            config.WindowWidth = rect.Right - rect.Left;
+            config.WindowHeight = rect.Bottom - rect.Top;
+            config.WindowX = rect.Left;
+            config.WindowY = rect.Top;
+            config.IsWindowMaximized = IsZoomed(hwnd);
             _mainVM.ConfigService.SaveAsync().GetAwaiter().GetResult();
         }
         catch { }
@@ -253,16 +332,24 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
 
     private void OnWindowActivated(object sender, WindowActivatedEventArgs args)
     {
-        if (!_initialized)
-        {
-            _initialized = true;
-            _ = InitializeAppAsync();
-        }
-
+        EnsureInitialized();
         this.Activated -= OnWindowActivated;
     }
 
     private bool _initialized;
+
+    /// <summary>
+    /// 幂等的初始化入口。**不要只依赖一次性的 <c>Activated</c> 事件**：窗口在构造阶段被提前激活
+    /// （例如恢复"最大化"）时那个事件可能已经抛过、订阅却还没注册，初始化就会静默丢失
+    /// （症状：内容区空白、Steam 路径/DLL 为空、状态轮询与库刷新定时器都没启动）。
+    /// 因此 <c>App.OnLaunched</c> 在 <c>Activate()</c> 之后也直接调一次本方法兜底。
+    /// </summary>
+    public void EnsureInitialized()
+    {
+        if (_initialized) return;
+        _initialized = true;
+        _ = InitializeAppAsync();
+    }
 
     private async Task InitializeAppAsync()
     {
@@ -273,7 +360,8 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
             _mainVM.SettingsVM.LoadFromConfig();
 
             var config = _mainVM.ConfigService.Config;
-            NavigateTo(config.DefaultPage == "search" ? "search" : "home");
+            var page = config.DefaultPage == "search" ? "search" : "home";
+            NavigateTo(page);
 
             ApplyThemeAndChrome();
 
@@ -283,8 +371,15 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
 
             // 刷新库统计并更新标题
             await _mainVM.RefreshLibraryStatsAsync();
+
+            // 排查"启动后空白/数据全空"时先看这一行在不在（初始化有没有跑完）
+            LogService.AddAppLog($"[Init] page={page}, steam={_mainVM.SteamPathDisplay}");
         }
-        catch { }
+        catch (Exception ex)
+        {
+            // 以前这里静默吞掉，导致"初始化没跑"和"初始化跑了但失败"完全无法区分
+            LogService.AddAppLog($"[Init] 初始化失败: {ex}");
+        }
     }
 
     /// <summary>
