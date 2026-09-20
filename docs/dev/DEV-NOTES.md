@@ -54,6 +54,9 @@
 - **资源嵌入机制**：所有二进制（Steamless CLI/插件、GSE 模板、Bypass）以 EmbeddedResource 打进 NoSteamLauncher.dll，运行时解压到 `%TEMP%\OSTGUI_NoSteamLauncher\<版本>\` 并做关键文件完整性校验，缺失自动重解压
 - ⚠️ **教训**：.gitignore 里全局 `*.dll/*.exe` 曾差点把这些资源挡在版本控制外——凡"运行必需的二进制"入库时务必显式反向规则确认
 - 已知冲突：自带 winmm 依赖或反作弊的游戏对 Bypass 可能不适配（默认关闭）
+- **一键还原（2026-09-20，用户要求"照抄 SAC"）**：模拟器页「一键还原」按钮，用**同一个游戏 EXE 选择**（取它的目录），还原语义逐条照抄 SAC `SteamAutoCrack.Core/Utils/Restore.cs` 四步 —— ① 目录里存在 `SteamAPICheckBypass.json` 才递归删 `version.dll`/`winmm.dll`/`winhttp.dll`（不做哈希校验）；② 递归删 `steam_interfaces.txt`/`local_save.txt`/`SteamAPICheckBypass.json`；③ 递归把**所有** `*.bak` 换回原名（SAC 是先删原文件再改名，这里用覆盖式 `File.Move`，结果一致且失败不丢备份）；④ 递归删所有 `steam_settings` 目录。注意第 ③ 步是通配，游戏自带的 `*.bak` 也会被换回原名，这是照抄 SAC 的既定代价（曾试过"只认 `steam_api*.dll.bak` + 选定 EXE 的 `.bak`"的白名单版，被要求改掉）
+- **只动游戏目录、不解压资源**（不用 `EnsureExtracted()`）；逐项日志 + 还原后复查残留：被占用（游戏在跑）时逐条报失败并输出"还原未完成"，不报假成功；`%APPDATA%\GSE Saves\<appid>` 只提示路径不删（用户进度）；AppID Changer 写在 EXE 同目录的 `steam_appid.txt` 归它自己的台账管，还原不碰。幂等：无残留时输出"未发现模拟器残留（可能已还原）"
+- 实测：夹具两轮（完整产物正常还原；`.bak` 被独占锁定时只该项失败、其余照做、报"还原未完成"）+ **用户真机 Ib 部署 → 还原后正常**
 
 ## 7. 联机（三条路线）
 
@@ -125,7 +128,7 @@
 | `LuaBuilder` / `LuaConfigService` | Lua 生成（补全 depot/key/token/DLC/固定版本）；Lua 读写与版本模式切换 |
 | `SudamaKeyCache` | 密钥/令牌缓存（存在即用不自动过期、并行下载、手动刷新与本地导入）|
 | `LibraryScanner` | 扫描 Lua 目录、检测错误 |
-| `NoSteamLauncherService` / `NoSteamLaunchOrchestrator` | 免 Steam 部署封装 / 编排（Steamless + GBE + Bypass）|
+| `NoSteamLauncherService` / `NoSteamLaunchOrchestrator` | 免 Steam 部署封装 / 编排（Steamless + GBE + Bypass）+ 一键还原（照抄 SAC `Restore` 四步，见 §6）|
 | `OnlineFixService` | 联机三条路线（§7）：内核原生（`steam.exe -applaunch <appid> -onlinefix=<session>` + PEB 读命令行检测/停止）、宿主 480（拉起 `OnlineHost.exe`、按 AppID 解析游戏 exe、从宿主命令行反查游戏进程后结束）、AppID Changer 文件法（`--appid-txt` + 台账还原 + 启动时补还原巡检）|
 | `SteamDllService` | 三 DLL 是否已注入 / 内核 `opensteamtool.toml` 读写（`[denuvo] mode`、`[lua] paths`）/ **内核版本读取**（读已部署 `OpenSteamTool.dll` 的 Windows 版本资源）|
 | `TicketService` / `OstFileService` / `SteamTicketExtractor` | Denuvo 授权管理 / .ost 导入导出 / 在线提取 |
