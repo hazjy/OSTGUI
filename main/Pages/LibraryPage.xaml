@@ -26,6 +26,14 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
+        <!-- 画刷取样点：代码里搭「入库信息」弹窗内容时按应用主题取画刷用。
+             Application.Current.Resources[...] 走的是系统主题（浅色应用 + 深色系统会把弹窗染深）。 -->
+        <Grid x:Name="BrushProbe" Grid.Row="0" Visibility="Collapsed" Width="1" Height="1">
+            <Border x:Name="ProbeCard" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+            <TextBlock x:Name="ProbeSecondary" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <TextBlock x:Name="ProbeSuccess" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+        </Grid>
+
         <StackPanel Grid.Row="0" Margin="40,32,40,12" Spacing="16">
             <Grid>
                 <Grid.ColumnDefinitions>

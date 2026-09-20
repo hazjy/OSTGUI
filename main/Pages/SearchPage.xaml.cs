@@ -97,6 +97,7 @@ public sealed partial class SearchPage : Page
             CloseButtonText = "关闭"
         };
 
+        Helpers.PopupTheme.Apply(dialog);
         var resultDialog = await dialog.ShowAsync();
         if (resultDialog == ContentDialogResult.Primary)
         {

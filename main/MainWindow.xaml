@@ -28,6 +28,17 @@
         <Border x:Name="SolidBackdrop" Grid.Row="0" Grid.RowSpan="2" Visibility="Collapsed"
                 Background="{ThemeResource SolidBackgroundFillColorBaseBrush}" />
 
+        <!-- 画刷取样点：代码里搭弹窗内容时需要"按应用主题解析"的画刷。
+             Application.Current.Resources[...] 走的是**系统**主题（浅色应用 + 深色系统会取到深色画刷，
+             账号弹窗曾因此整片发暗），所以改成在 XAML 树里用 {ThemeResource} 取好、代码直接读。 -->
+        <Grid x:Name="BrushProbe" Grid.Row="0" Grid.RowSpan="2" Visibility="Collapsed" Width="1" Height="1">
+            <Border x:Name="ProbeCard" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+            <Border x:Name="ProbeStroke" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" />
+            <TextBlock x:Name="ProbeSecondary" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <TextBlock x:Name="ProbeSuccess" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+            <Border x:Name="ProbeAccent" Background="{ThemeResource AccentFillColorDefaultBrush}" />
+        </Grid>
+
         <!-- 全局焦点锚点：点击任意页面空白时收回焦点（取消输入框激活）；1×1 透明不可见 -->
         <Grid x:Name="GlobalFocusAnchor" IsTabStop="True" TabIndex="0" Width="1" Height="1"
               HorizontalAlignment="Left" VerticalAlignment="Top" Opacity="0" />

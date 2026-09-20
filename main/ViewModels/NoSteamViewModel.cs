@@ -185,6 +185,7 @@ public partial class NoSteamViewModel : ObservableObject
                 Content = panel
             };
 
+            Helpers.PopupTheme.Apply(dialog);
             var result = await dialog.ShowAsync();
 
             if (result == ContentDialogResult.Primary)
@@ -299,6 +300,7 @@ public partial class NoSteamViewModel : ObservableObject
             MinWidth = 750
         };
 
+        Helpers.PopupTheme.Apply(dialog);
         var result = await dialog.ShowAsync();
 
         if (result == ContentDialogResult.Primary)
@@ -401,6 +403,7 @@ public partial class NoSteamViewModel : ObservableObject
             Content = "请选择游戏的主程序 EXE 文件\n\n请确保选择的是正确的游戏启动程序"
         };
 
+        Helpers.PopupTheme.Apply(tipDialog);
         var tipResult = await tipDialog.ShowAsync();
         if (tipResult != ContentDialogResult.Primary) return;
 

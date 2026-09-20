@@ -451,10 +451,12 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
             return;
         }
 
-        var secondaryBrush = Application.Current.Resources["TextFillColorSecondaryBrush"] as Microsoft.UI.Xaml.Media.Brush;
-        var cardBrush = Application.Current.Resources["CardBackgroundFillColorDefaultBrush"] as Microsoft.UI.Xaml.Media.Brush;
-        var strokeBrush = Application.Current.Resources["CardStrokeColorDefaultBrush"] as Microsoft.UI.Xaml.Media.Brush;
-        var accentBrush = Application.Current.Resources["AccentFillColorDefaultBrush"] as Microsoft.UI.Xaml.Media.Brush;
+        // 画刷从 XAML 取样点读（{ThemeResource} 按应用主题解析）。
+        // 不能再用 Application.Current.Resources[...]：那个走系统主题，浅色应用 + 深色系统会把弹窗染成深色。
+        var secondaryBrush = ProbeSecondary.Foreground;
+        var cardBrush = ProbeCard.Background;
+        var strokeBrush = ProbeStroke.BorderBrush;
+        var accentBrush = ProbeAccent.Background;
 
         var panel = new StackPanel { Spacing = 8 };
         var scroll = new ScrollViewer
@@ -505,13 +507,8 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
                     b.BorderBrush = isSelected ? accentBrush : strokeBrush;
                     b.BorderThickness = new Thickness(isSelected ? 2 : 1);
                 }
-                // 现场染色：与卡片高亮描边同源的强调色（AccentFillColorDefaultBrush，跟随系统主题）
-                if (accentBrush != null)
-                    confirmBtn.Background = accentBrush;
-                confirmBtn.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(
-                    RootGrid.ActualTheme == ElementTheme.Dark
-                        ? Microsoft.UI.Colors.Black
-                        : Microsoft.UI.Colors.White);
+                // 选中即用框架自带的强调按钮样式（填充/前景色都由框架按当前主题处理）
+                confirmBtn.Style = (Microsoft.UI.Xaml.Style)Application.Current.Resources["AccentButtonStyle"];
                 confirmBtn.IsEnabled = true;
             };
 
@@ -564,9 +561,9 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
             XamlRoot = RootGrid.XamlRoot,
             Title = "选择要登录的账号",
             Content = rootPanel
-            // 注意：此处刻意不设置 RequestedTheme。
-            // ContentDialog 在弹出层不继承应用主题，浅色模式下会渲染为深色——
-            // 这是刻意保留的效果（WinUI 浅色弹窗对比度差、观感不佳），勿当 bug 修复
+            // 不显式设 RequestedTheme：2026-09-20 实测（Windows 深色 + 应用浅色）弹层**本来就跟随应用主题**
+            // （弹窗 浅 #E7E7E7 / 深 #393939，菜单 浅 #F7F7F7 / 深 #362C2F），显式再设一遍数值完全一致，
+            // 所以按"走框架默认"的原则不再干预。旧注释「弹窗不继承主题、刻意保留深色」与实测不符，已作废。
         };
         dialog.PrimaryButtonClick += (s, args) =>
         {
@@ -574,6 +571,7 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
                 _ = RestartToAccountAsync(selected);
         };
 
+        Helpers.PopupTheme.Apply(dialog);
         await dialog.ShowAsync();
     }
 

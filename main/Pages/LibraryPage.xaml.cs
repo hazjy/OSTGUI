@@ -116,6 +116,7 @@ public sealed partial class LibraryPage : Page
             }}
         };
 
+        Helpers.PopupTheme.Apply(dialog);
         var result = await dialog.ShowAsync();
         if (result == ContentDialogResult.Primary)
         {
@@ -155,10 +156,11 @@ public sealed partial class LibraryPage : Page
         var dlcLoading = true;
         var dlcSpinner = new ProgressRing { IsActive = true, Width = 24, Height = 24, Margin = new Thickness(0, 8, 0, 0) };
 
-        var secondaryBrush = Application.Current.Resources["TextFillColorSecondaryBrush"] as Microsoft.UI.Xaml.Media.Brush;
-        var cardBrush = Application.Current.Resources["CardBackgroundFillColorDefaultBrush"] as Microsoft.UI.Xaml.Media.Brush;
-        var successBrush = Application.Current.Resources["SystemFillColorSuccessBrush"] as Microsoft.UI.Xaml.Media.Brush
-            ?? new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(255, 0, 150, 80));
+        // 画刷从本页 XAML 取样点读（{ThemeResource} 按应用主题解析）；
+        // 不能再用 Application.Current.Resources[...]：那个走系统主题，浅色应用 + 深色系统会把弹窗染深
+        var secondaryBrush = ProbeSecondary.Foreground;
+        var cardBrush = ProbeCard.Background;
+        var successBrush = ProbeSuccess.Foreground;
 
         void RebuildDlcPanel()
         {
@@ -250,6 +252,7 @@ public sealed partial class LibraryPage : Page
             SecondaryButtonText = "SteamDB"
         };
 
+        Helpers.PopupTheme.Apply(dialog);
         var result = await dialog.ShowAsync();
         if (result == ContentDialogResult.Primary)
         {

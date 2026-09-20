@@ -44,6 +44,7 @@ public sealed partial class DenuvoPage : Page
             PrimaryButtonText = "继续导出",
             CloseButtonText = "取消"
         };
+        Helpers.PopupTheme.Apply(confirmDialog);
         var confirmResult = await confirmDialog.ShowAsync();
         if (confirmResult != ContentDialogResult.Primary)
             return;

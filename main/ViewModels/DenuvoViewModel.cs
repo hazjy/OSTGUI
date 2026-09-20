@@ -115,6 +115,7 @@ public partial class DenuvoViewModel : ObservableObject
                 PrimaryButtonText = "仍要导入",
                 CloseButtonText = "取消"
             };
+            Helpers.PopupTheme.Apply(expiredDialog);
             var expiredResult = await expiredDialog.ShowAsync();
             if (expiredResult != ContentDialogResult.Primary)
                 return (false, "已取消导入");
@@ -134,6 +135,7 @@ public partial class DenuvoViewModel : ObservableObject
                 SecondaryButtonText = "仅导入授权",
                 CloseButtonText = "取消"
             };
+            Helpers.PopupTheme.Apply(libDialog);
             var libResult = await libDialog.ShowAsync();
             if (libResult == ContentDialogResult.None)
                 return (false, "已取消导入");

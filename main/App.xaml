@@ -7,13 +7,6 @@
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
-            <SolidColorBrush x:Key="OstAccentBrush" Color="#0078d4" />
-            <SolidColorBrush x:Key="StatusSuccessBrush" Color="#10893e" />
-            <SolidColorBrush x:Key="StatusErrorBrush" Color="#e81123" />
-            <SolidColorBrush x:Key="StatusWarningBrush" Color="#ff8c00" />
-            <SolidColorBrush x:Key="StatusInfoBrush" Color="#0078d4" />
-            <SolidColorBrush x:Key="FixedVersionBrush" Color="#e81123" />
-            <SolidColorBrush x:Key="AutoVersionBrush" Color="#10893e" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>
