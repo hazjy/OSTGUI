@@ -10,8 +10,11 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 
 // 文件法（联机页「AppID Changer」）：OnlineHost.exe --appid-txt "<游戏 exe 路径>" <AppID>
-// 只写 <游戏 exe 同目录>\steam_appid.txt，刻意不设环境变量、不加载垫片——身份只由文件给；
-// 游戏退出后按台账还原。宿主被杀时台账留在 %LOCALAPPDATA%\OSTGUI，由 GUI 下次启动补还原。
+// 写 <游戏 exe 同目录>\steam_appid.txt + 设同一套 Steam 环境变量；游戏退出后按台账还原。
+// ⚠️ 2026-09-20 对照实测修正：只写文件、不设环境变量**不够**（Steam 会把这个进程登记成 480，
+// 但不给它叠加层/真大厅身份）。闭源工具 CaIInstallNext 的做法是给子进程带上
+// SteamAppId/SteamGameId/SteamOverlayGameId=480（+ SteamEnv/SteamAppUser/STEAM_COMPAT_*），
+// 我们跟进这一套；文件保留给"只认文件"的游戏。
 if (args.Length >= 3 && args[0] == "--appid-txt")
     return AppIdFileMode(args[1], args[2]);
 
@@ -25,36 +28,48 @@ if (gameDir is null || !File.Exists(gameExe))
 
 Environment.SetEnvironmentVariable("SteamAppId", appId.ToString());
 Environment.SetEnvironmentVariable("SteamGameId", appId.ToString());
+// 叠加层身份必须跟着会话 AppID：不带这个，客户端拿到的是"真 AppID"的叠加层身份，
+// 邀请对话框会从 480 大厅降级成普通好友列表（内核 v3 那轮的教训；闭源工具也带这一项）
+Environment.SetEnvironmentVariable("SteamOverlayGameId", appId.ToString());
 
 // best-effort：垫片用游戏目录里自带的 steam_api64.dll（找不到/位数不符就跳过，
 // 环境变量才是关键，游戏侧自己也会初始化）。宿主保持加载状态直到游戏退出。
-var shim = FindShim(gameDir);
-var hShim = IntPtr.Zero;
-if (shim is not null)
-{
-    try { hShim = NativeLibrary.Load(shim); } catch { }
-    if (hShim != IntPtr.Zero)
-    {
-        try
-        {
-            var flat = GetExport<InitFlat>(hShim, "SteamAPI_InitFlat");
-            var safe = GetExport<InitSafe>(hShim, "SteamAPI_InitSafe");
-            if (flat is not null) flat(IntPtr.Zero);
-            else safe?.Invoke();
-        }
-        catch { }
-    }
-}
+var hShim = InitShim(gameDir);
 
 using var game = Process.Start(new ProcessStartInfo(gameExe) { WorkingDirectory = gameDir });
 if (game is null) return 4;
 game.WaitForExit();
 
-if (hShim != IntPtr.Zero)
-{
-    try { GetExport<Shutdown>(hShim, "SteamAPI_Shutdown")?.Invoke(); } catch { }
-}
+ShutdownShim(hShim);
 return 0;
+
+// 用游戏自带的 steam_api64.dll 让宿主自己先以会话身份注册一次（Steam 日志里那条
+// "App ID <n> adding PID <宿主>" 就是它），闭源工具同样先做这一步再拉游戏
+static IntPtr InitShim(string gameDir)
+{
+    var shim = FindShim(gameDir);
+    if (shim is null) return IntPtr.Zero;
+
+    var h = IntPtr.Zero;
+    try { h = NativeLibrary.Load(shim); } catch { }
+    if (h == IntPtr.Zero) return IntPtr.Zero;
+
+    try
+    {
+        var flat = GetExport<InitFlat>(h, "SteamAPI_InitFlat");
+        var safe = GetExport<InitSafe>(h, "SteamAPI_InitSafe");
+        if (flat is not null) flat(IntPtr.Zero);
+        else safe?.Invoke();
+    }
+    catch { }
+    return h;
+}
+
+static void ShutdownShim(IntPtr h)
+{
+    if (h == IntPtr.Zero) return;
+    try { GetExport<Shutdown>(h, "SteamAPI_Shutdown")?.Invoke(); } catch { }
+}
 
 // 游戏目录里找 steam_api64.dll（广度优先 ≤3 层，够覆盖 Unity 的 Data\Plugins\x86_64）
 static string? FindShim(string root)
@@ -109,6 +124,15 @@ static int AppIdFileMode(string exeArg, string appIdText)
         return 5;                   // 目录只读 / 文件被占：原样退出，不启动游戏
     }
 
+    // 环境变量才是关键（对照闭源工具的实测）：子进程带着这三个才被当成 480 的真启动；
+    // 文件同时写着，给"只认 steam_appid.txt"的游戏兜底
+    Environment.SetEnvironmentVariable("SteamAppId", appIdText);
+    Environment.SetEnvironmentVariable("SteamGameId", appIdText);
+    Environment.SetEnvironmentVariable("SteamOverlayGameId", appIdText);
+
+    // 宿主也先以该身份注册一次，做法与闭源工具一致（它先起一个带环境的自身副本注册，再拉游戏）
+    var hShim = InitShim(dir);
+
     try
     {
         using var game = Process.Start(new ProcessStartInfo(exe) { WorkingDirectory = dir });
@@ -124,6 +148,7 @@ static int AppIdFileMode(string exeArg, string appIdText)
     {
         // 还原失败就留着台账，由 GUI 下次启动补（不抛：宿主没有日志，抛出去只会弹系统错误框）
         try { RestoreAppIdFile(target, original); } catch { }
+        ShutdownShim(hShim);
     }
     return 0;
 }

@@ -96,8 +96,10 @@ public class OnlineFixService
     /// <summary>
     /// 宿主启动（不依赖内核 -onlinefix）：由 OnlineHost.exe 以会话身份初始化 Steam，
     /// 再把游戏作为子进程拉起，游戏自身的 appid / 大厅 / P2P 证书天然一致。
-    /// viaAppIdFile = true 时走文件法（AppID Changer）：宿主只写游戏 exe 同目录的
-    /// steam_appid.txt，不设环境变量、不加载垫片，游戏退出后由宿主还原原文件。
+    /// viaAppIdFile = true 时走文件法（AppID Changer）：宿主写游戏 exe 同目录的
+    /// steam_appid.txt **并**设同一套 Steam 环境变量（SteamAppId/SteamGameId/SteamOverlayGameId）、
+    /// 自己也先以该身份注册一次，游戏退出后由宿主还原原文件。
+    /// （2026-09-20 对照闭源工具实测修正：只写文件不设环境变量拿不到 480 的叠加层/真大厅身份。）
     /// </summary>
     public (bool success, string message) StartViaHost(string gameExe, string sessionAppId, bool viaAppIdFile = false)
     {
