@@ -4,7 +4,7 @@
 
 ## 特别说明：请配套内核 ZSteamTool v1.1.3+
 
-本版**要求内核 [ZSteamTool v1.1.3](https://github.com/hazjy/ZSteamTool/releases) 及以上**。原因：联机相关的改动依赖它自 v1.1.3 起的行为——`-onlinefix` 会话状态随游戏进程退出即清空；另外「信息」页读内核版本号也要求 v1.1.3 及以后（更早的内核 DLL 没带版本信息）。**后续版本的更新说明也会带上这条最低内核版本要求。**
+本版**要求内核 [ZSteamTool v1.1.3](https://github.com/hazjy/ZSteamTool/releases) 及以上**。原因：联机相关的改动依赖它自 v1.1.3 起的行为——`-onlinefix` 会话状态随游戏进程退出即清空；另外「信息」页读内核版本号也要求 v1.1.3 及以后（更早的内核 DLL 没带版本信息）。
 
 ## 视觉：亚克力效果
 
