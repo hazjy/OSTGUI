@@ -73,6 +73,9 @@
 - 由独立进程 `OnlineHost.exe "<游戏 exe>" <会话 AppID>` 完成（源码 `OnlineHost/Program.cs`，随 GUI 发布、与主程序同目录）。宿主行为：设 `SteamAppId`/`SteamGameId`/**`SteamOverlayGameId`** 环境变量 → best-effort 加载**游戏目录里自带的** `steam_api64.dll`（BFS ≤3 层，覆盖 Unity 的 `*_Data\Plugins\x86_64`）并调 `SteamAPI_InitFlat`（拿不到就退 `InitSafe`；连 DLL 都没有就跳过——**环境变量才是关键**）→ 把游戏**作为子进程**拉起 → 等它退出 → `SteamAPI_Shutdown`。
 - 原理：游戏进程自己以该身份初始化 Steam（appid / 大厅 / P2P 证书 / 叠加层天然一致），**完全不需要内核改写**。代价是它不经过内核的 `-onlinefix` 路径，所以内核那份会话状态必须已经清干净（v1.1.3 起随游戏进程退出即清，见内核 DEV-NOTES §2）。
 - 游戏 exe 由 GUI 按 AppID 自动解析：`libraryfolders.vdf` 找库 → `appmanifest_<appid>.acf` 的 `installdir` → 目录同名 exe，否则取目录里最大的 exe（排除 CrashHandler / vcredist / unins）。
+- **宿主日志 `%LOCALAPPDATA%\OSTGUI\logs\onlinehost.log`**（与 `ostgui.log` 同目录，设置页「打开日志文件」会落在同一个文件夹）：每次会话写会话头（身份 + 游戏 exe）→ 垫片路径 → 自注册结果；文件法另写写入/还原两行。
+  - `SteamAPI_InitFlat` 已改传 `SteamErrMsg` 缓冲区，失败会打印结果码 + 错误串：**0=OK / 1=FailedGeneric / 2=NoSteamClient（Steam 没跑或没登录）/ 3=VersionMismatch（垫片与客户端版本不匹配）**——"联机点了没反应"先看这行。
+  - 回退链是 **`SteamAPI_InitFlat` → `SteamAPI_InitSafe`**：2026-09-21 实测有些游戏自带的垫片只导出 `InitSafe`（星露谷那份），只认 InitFlat 会白白跳过自注册；两个都没有的老垫片才会打"跳过自注册"。
 - 停止：先从宿主命令行里取**最后一个带引号的 `.exe`**（第一个可能是宿主自身）→ 按进程名结束游戏 → 再结束宿主。
 - 实测（2026-09-17）：这条路走的是**真大厅**——内核日志出现 `Recv k_EMsgClientMMSUserJoinedLobby(6619)` 与 `LobbyChatMsg(6614)`，PEAK 好友邀请**由用户与好友实测成功进房**；对照 09-02 用内核原生路线测 PEAK，纯好友邀请是死路（能弹邀请界面但进不去）。
 
