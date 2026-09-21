@@ -41,7 +41,7 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Spacing="4">
-                    <TextBlock Text="入库管理" FontSize="24" FontWeight="Bold" />
+                    <TextBlock Text="{Binding TitleText}" FontSize="24" FontWeight="Bold" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                     <AutoSuggestBox Width="240" QueryIcon="Find"

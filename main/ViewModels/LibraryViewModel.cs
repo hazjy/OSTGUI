@@ -32,8 +32,14 @@ public partial class LibraryViewModel : ObservableObject
 
     public bool IsBusy => IsLoading;
 
+    /// <summary>页面标题：入库管理•游戏总数（WinUI 的 {Binding} 不支持 StringFormat，故在 VM 里拼）。
+    /// 计数还是 0 时只显示「入库管理」，免得首次进页面闪一下「•0」</summary>
+    public string TitleText => TotalCount > 0 ? $"入库管理•{TotalCount}" : "入库管理";
+
     [ObservableProperty] private string _searchFilter = "";
-    [ObservableProperty] private int _totalCount;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(TitleText))]
+    private int _totalCount;
     [ObservableProperty] private int _fixedCount;
     [ObservableProperty] private int _autoCount;
     [ObservableProperty] private double _progressValue;

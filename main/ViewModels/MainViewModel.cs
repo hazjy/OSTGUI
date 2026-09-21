@@ -45,22 +45,10 @@ public partial class MainViewModel : ObservableObject
             }
         }
     }
-    private int _totalGames;
-    public int TotalGames
-    {
-        get => _totalGames;
-        set
-        {
-            if (SetProperty(ref _totalGames, value))
-            {
-                OnPropertyChanged(nameof(Title));
-            }
-        }
-    }
+    [ObservableProperty] private int _totalGames;
     [ObservableProperty] private int _fixedVersionCount;
     [ObservableProperty] private int _autoVersionCount;
     [ObservableProperty] private string _steamPathDisplay = "未检测到";
-    [ObservableProperty] private string _title = "OSTGUI";
     public string OstStatusText => IsOstInjected ? "已注入" : "未注入";
     public string SteamRunningText => IsSteamRunning ? "运行中" : "未运行";
 
@@ -219,7 +207,6 @@ public partial class MainViewModel : ObservableObject
         TotalGames = games.Count;
         FixedVersionCount = games.Count(i => i.VersionMode == "fixed");
         AutoVersionCount = games.Count(i => i.VersionMode == "auto");
-        Title = $"已入库游戏：{TotalGames}";
     }
 
     /// <summary>

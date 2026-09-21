@@ -35,13 +35,6 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
         // 配置已在窗口创建前完整加载，直接应用侧边栏/窗口状态，避免启动闪烁
         ApplyWindowStateFromConfig();
 
-        // 监听标题变化
-        _mainVM.PropertyChanged += (s, e) =>
-        {
-            if (e.PropertyName == nameof(MainViewModel.Title))
-                AppTitleBarText.Text = _mainVM.Title;
-        };
-
         // 窗口激活时初始化应用
         this.Activated += OnWindowActivated;
         // 窗口关闭时清理临时资源
