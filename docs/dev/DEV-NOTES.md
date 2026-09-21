@@ -174,6 +174,9 @@
 - 取值链（`CoverImageService`，信号量并发 4）：① `cdn.cloudflare.steamstatic.com/steam/apps/<id>/header.jpg` ② 新布局 `shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/<id>/header.jpg` ③ 同两处的 `capsule_616x353.jpg` ④ **官方 appdetails** 的 `header_image` → `capsule_image` → `capsule_imagev5`（仅对 ①–③ 全失败的条目调用，8s 超时，`SteamGameInfoService.GetHeaderImageUrlAsync`）
 - ⚠️ **2024+ 新上架游戏在旧布局下没有 `header.jpg`**（2026-09-21 实测 PEAK/3527290 及 3548580/4001890 全部 404，静态猜不出来）→ 只有官方接口能拿到；官方返回的 URL 若落在 `*.akamai.steamstatic.com` / `steamcdn-a.akamaihd.net` / `media.steampowered.com`（本机 hosts 指向 127.0.0.1），自动换成等价 cloudflare 主机重试一次
 - 缓存：`%LOCALAPPDATA%\OSTGUI\covers\<appid>.jpg`（命中不联网）；确无图的写 `<appid>.miss2`（TTL 1 天）。已知本来就无封面：`1716751`（育碧组件）——出现这类 `.miss2` 属正常，不是故障。**改 URL 链/兜底源时必须把 `MissSuffix` +1**，否则旧标记会在 TTL 内挡住新逻辑——2026-09-21 的"封面永远出不来"就是这么来的
+- **存储尺寸 = 240×112**（`StoreWidth`）+ JPEG q85：卡片是 120×56 逻辑像素，200% DPI 的解码上限正好 240×112，存原始 460×215 等于 4/5 的字节白存。实测（2026-09-21）：迁移后 39 张 **1,921 KB → 361 KB**（平均 49.2 → 9.3 KB，最大 14 KB），1000 个游戏约 9 MB（原来约 48 MB）。编码用 `System.Drawing.Common`（已在 csproj 里，此前未被使用）。⚠️ **卡片调大时改 `StoreWidth`，并把 `MigrationMarker`（`.v2`）改名**触发一次性重编码
+- 迁移：`covers\.v2` 标记 + 首次取图时后台**就地重编码**（不联网、不丢图；顺带遵守"改格式就 +1"的规则）
+- **评估过但没采用：优先读 Steam 本地 `appcache\librarycache\<appid>\header.jpg`**——实测本地那份与 CDN 下的是**同一张图、逐字节完全相同**（12/12 命中样本），且覆盖率只有 **12/39（31%）**：它省网络请求、**省不了硬盘**，收益不值得再加一条取值路径
 - 判定语义：只有 404/403 才算"确实没有"；超时/5xx/网络异常**不写标记**，下次重试（避免把"网络不通"记成"没有封面"）
 - 诊断：每个失败条目往**日志文件**写一行带原因（`[Cover] 封面缺失（1 天内不再重试）: <id>（官方接口无图片字段）`）——"为什么这个游戏没封面"看这行
 - **按需加载**：列表用 `ListView`（虚拟化），页面在 `ContainerContentChanging` 里对刚实体化的卡片调 `LibraryViewModel.EnsureCoverAsync` → 滚进视口才取图/建位图，滚出去回收后不重复取。实测：进页面只取 20 张（视口+缓冲），滚到底累计 33 张，而全量预加载是进来就 40 张一起发请求。⚠️ **换成 `ItemsControl` 等非虚拟化容器会让这条机制彻底失效**（40 张卡片会一次性全实体化）
