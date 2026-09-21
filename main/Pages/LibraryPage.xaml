@@ -41,29 +41,8 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Spacing="4">
-                    <StackPanel Orientation="Horizontal" Spacing="12">
-                        <TextBlock Text="入库管理" FontSize="24" FontWeight="Bold" />
-                        <!-- 游戏数量角标（⌈40⌋ 那个形状）：**两个只画两条边的 10×10 小方块**贴在网格的左上角
-                             和右下角 —— 左上块画「左+上」、右下块画「右+下」，右上/左下留空，正好是敞口的角标。
-                             不直接用 U+2308/U+230B 字形：它们落在**回退字体**里、粗体请求不生效，笔画比加粗标题
-                             细一档（实测截图偏细）；自画则粗细/臂长/留白全可控、也不依赖字体 -->
-                        <Grid VerticalAlignment="Center"
-                              Visibility="{Binding HasCount, Converter={StaticResource BoolToVis}}">
-                            <TextBlock Text="{Binding TotalCount}" FontSize="20" FontWeight="Bold"
-                                       Margin="14,2,14,2"
-                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-                            <!-- 两个角标一起下移 1.5：按实测墨迹，两根横臂到数字墨迹的间距原本是"上 18 下 11"物理 px
-                                 （框偏上），下移 (18-11)/2 = 3.5 物理 px = 1.5 DIP 后上下各 ~14.5，两根横线才与数字等距 -->
-                            <Border Width="10" Height="10" HorizontalAlignment="Left" VerticalAlignment="Top"
-                                    Margin="0,1.5,0,0"
-                                    BorderThickness="2,2,0,0"
-                                    BorderBrush="{ThemeResource TextFillColorSecondaryBrush}" />
-                            <Border Width="10" Height="10" HorizontalAlignment="Right" VerticalAlignment="Bottom"
-                                    Margin="0,0,0,-1.5"
-                                    BorderThickness="0,0,2,2"
-                                    BorderBrush="{ThemeResource TextFillColorSecondaryBrush}" />
-                        </Grid>
-                    </StackPanel>
+                    <!-- 游戏数量挂在标题里，计数用 CJK 角括号「」（U+300C / U+300D）括住 -->
+                    <TextBlock Text="{Binding TitleText}" FontSize="24" FontWeight="Bold" />
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                     <AutoSuggestBox Width="240" QueryIcon="Find"

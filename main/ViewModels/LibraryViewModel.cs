@@ -32,12 +32,13 @@ public partial class LibraryViewModel : ObservableObject
 
     public bool IsBusy => IsLoading;
 
-    /// <summary>是否有可显示的游戏数量。0 = 还没扫完，角标不显示，免得刚进页面闪一下</summary>
-    public bool HasCount => TotalCount > 0;
+    /// <summary>页面标题：入库管理 + 游戏总数，计数用 CJK 角括号「」括住（U+300C / U+300D）。
+    /// WinUI 的 {Binding} 不支持 StringFormat，故按惯例在 VM 里拼；0（还没扫完）时只显示"入库管理"，免得闪一下</summary>
+    public string TitleText => TotalCount > 0 ? $"入库管理 「{TotalCount}」" : "入库管理";
 
     [ObservableProperty] private string _searchFilter = "";
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(HasCount))]
+    [NotifyPropertyChangedFor(nameof(TitleText))]
     private int _totalCount;
     [ObservableProperty] private int _fixedCount;
     [ObservableProperty] private int _autoCount;
