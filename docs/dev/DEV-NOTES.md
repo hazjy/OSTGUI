@@ -30,6 +30,8 @@
 - 入库勾选"下载 Manifest"（默认开）：MHub → Sudama(仅密钥) 级联；不勾则跳过清单直接生成 Lua，由内核运行时兜底取清单，成功提示注明兜底
 - `LuaBuilder`：Sudama 密钥/令牌 → `MergeAllDepotsAsync` 用全量 depot 列表补全（防止只写有 manifest 的 depot 漏密钥）→ 缺密钥收集并通知。DLC 段也对每个 DLC AppID 查 `keys[dlcId]`，Sudama 收录的独立 DLC depot key 会自动写入 `addappid(dlcId, 1, "<key>")`
 - 缺解密密钥警告在两种模式下都保留（无 key 无法解密下载加密内容）
+- **搜索页卡片（2026-09-21）**：与入库管理同构——左侧 120×56 缩略图 + 名称 + `AppID:` 行 + 右侧「入库」与「信息」（`&#xE946;` Info 图标）；**不放版本模式行**（搜索结果没有版本状态）
+- **搜索结果缩略图只走内存、不落盘**（结果是一次性的，缓存反而占盘）：`CoverImageService.FetchThumbnailBytesAsync(appId, imageUrl)` 取值链 = ① 搜索结果自带的 `ImageUrl` → ② **官方 `GetHeaderImageUrlAsync`** → ③ null（显示占位图标）；失败时按同一套 akamai→cloudflare 主机改写重试一次。⚠️ ② 是必需的：按 AppID 搜索走 `SearchByAppIdAsync`，那条路径**不填 `ImageUrl`**，少了它按 AppID 搜出来永远没图。上屏用 `SetSourceAsync(MemoryStream.AsRandomAccessStream())`、`DecodePixelWidth=120`；并发 4；**不调用 `EnsureCoverFileAsync`**（那条会落盘）
 
 ## 4. Sudama 缓存（v1.3.0 现状）
 
