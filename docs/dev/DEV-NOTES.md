@@ -1,7 +1,7 @@
 # OSTGUI 开发笔记（DEV-NOTES）
 
 > 本文合并自原 plan1.md / plan2.md 两份沉淀文档，并更新至 2026-09-18 现状（GUI v1.4.1 + 配套内核 v1.1.3）。
-> 收录原则：**项目结构与工程现状长期保留**；领域事实/机制查证/调研结论提取至工作区根 `doc/` 下的事实考证（GUI 侧）（Lua 语义、depot/manifest/key 关系、Denuvo 授权、480 联机调研等）；工程状态快照（构建命令产物、临时数字、"待提交"类状态）不再收录，避免过时。
+> 收录原则：**项目结构与工程现状长期保留**；领域事实/机制查证/调研结论提取至工作区根 `doc/` 下的事实考证（GUI 侧）（Lua 语义、depot/manifest/key 关系、Denuvo 授权、480 联机调研等）；**环境 / 工具链 / 打包类坑不收录**（本机 DPI、沙箱、构建命令、git 行尾、验证手法等一律写工作区 `doc/开发踩坑.md`）；工程状态快照（构建命令产物、临时数字、"待提交"类状态）不再收录，避免过时。
 
 ## 1. 架构总览
 
@@ -54,7 +54,6 @@
 - 对齐 SAC（SteamAutoCrack）的部署逻辑与 ini 配置格式；无壳游戏自动跳过脱壳不中断
 - 老游戏（2016 前 SDK）会额外生成 `steam_settings/steam_interfaces.txt`，gbe_fork 需要
 - **资源嵌入机制**：所有二进制（Steamless CLI/插件、GSE 模板、Bypass）以 EmbeddedResource 打进 NoSteamLauncher.dll，运行时解压到 `%TEMP%\OSTGUI_NoSteamLauncher\<版本>\` 并做关键文件完整性校验，缺失自动重解压
-- ⚠️ **教训**：.gitignore 里全局 `*.dll/*.exe` 曾差点把这些资源挡在版本控制外——凡"运行必需的二进制"入库时务必显式反向规则确认
 - 已知冲突：自带 winmm 依赖或反作弊的游戏对 Bypass 可能不适配（默认关闭）
 - **一键还原（2026-09-20，用户要求"照抄 SAC"）**：模拟器页「一键还原」按钮，用**同一个游戏 EXE 选择**（取它的目录），还原语义逐条照抄 SAC `SteamAutoCrack.Core/Utils/Restore.cs` 四步 —— ① 目录里存在 `SteamAPICheckBypass.json` 才递归删 `version.dll`/`winmm.dll`/`winhttp.dll`（不做哈希校验）；② 递归删 `steam_interfaces.txt`/`local_save.txt`/`SteamAPICheckBypass.json`；③ 递归把**所有** `*.bak` 换回原名（SAC 是先删原文件再改名，这里用覆盖式 `File.Move`，结果一致且失败不丢备份）；④ 递归删所有 `steam_settings` 目录。注意第 ③ 步是通配，游戏自带的 `*.bak` 也会被换回原名，这是照抄 SAC 的既定代价（曾试过"只认 `steam_api*.dll.bak` + 选定 EXE 的 `.bak`"的白名单版，被要求改掉）
 - **只动游戏目录、不解压资源**（不用 `EnsureExtracted()`）；逐项日志 + 还原后复查残留：被占用（游戏在跑）时逐条报失败并输出"还原未完成"，不报假成功；`%APPDATA%\GSE Saves\<appid>` 只提示路径不删（用户进度）；AppID Changer 写在 EXE 同目录的 `steam_appid.txt` 归它自己的台账管，还原不碰。幂等：无残留时输出"未发现模拟器残留（可能已还原）"
@@ -114,7 +113,6 @@
   - ⚠️ 历史记录"PointerPressed/Tapped 失焦方案全部无效"**作废**：当年失败根因是**没有可聚焦的焦点目标**；引入"可聚焦锚点"后主动拉焦成立。
 - 浅色主题下按钮图标/文字需适配 `TextFillColorPrimaryBrush` 等 ThemeResource
 - **RadioButton 的分组语义（09-17 踩到）**：有 `GroupName` 时分组根取**整个视觉树**（XamlRoot 范围，源码 `dxaml/xcp/dxaml/lib/RadioButton_Partial.cpp:519-522`：`groupNameExists ? VisualRelativeKind_Root : VisualRelativeKind_Parent`），**没有 GroupName 才按直接父容器分组**。两个页面/视图各用一组同名 `GroupName` 会串成一组，组内自动取消会把共享的布尔写空（症状：两个圈都不选中）。修法是**不写 GroupName**、靠隐式分组各成一组；`RadioButtons` 容器虽然忽略 GroupName，但它的布局盒与圆圈行有 4px 偏差，做左对齐时不要用。
-- **打包时 `Views\` 下的 `.xbf` 也要拷**（09-17 差点发出去）：`CopyWinUIResourcesToPublish` 原先只拷 `Pages\*.xbf`，新增视图资源的包在别人机器上一打开该页就 `XamlParseException`——本机 Debug 目录里有文件，**本机测不出来**。现改为递归 `$(TargetDir)**\*.xbf`（并 `Exclude` publish 自身，否则会复制出 `publish\publish`）。
 - ⚠️ 强调色的主题陷阱：`SystemAccentColor` 基础色**不随应用深浅主题翻转**；深色模式下需要"提亮版强调填充"的场景应使用 `AccentFillColorDefaultBrush` 等画刷
 - **弹层主题（2026-09-20，两轮才查对，含一次错误结论）**：① **XAML 里声明**的 ContentDialog 挂在页面树里 → 继承 `RootGrid.RequestedTheme`（浅色应用 + 深色系统下「使用说明」弹窗实测浅色 `#E7E7E7`——我先只测了这一个就断言"弹层本来就跟随"，是错的）；② **代码 `new` 出来**的 ContentDialog 不在 XAML 树里 → 主题落到**系统主题**，浅色应用 + 深色系统下整片发黑（用户截图确认；10 个代码弹窗全中，账号弹窗为例）→ 现在统一在 `ShowAsync` 前调 `Helpers.PopupTheme.Apply(dialog)`，**只设 `RequestedTheme`，背景/画刷仍走框架默认**。旧记录「ContentDialog 恒为深色是刻意行为」只对第 ② 类成立，已作废
 - **代码搭的弹窗内容取画刷**：不能用 `Application.Current.Resources[...]`——同样走**系统主题**。改成在页面/窗口 XAML 里放"取样点"（`BrushProbe`：`{ThemeResource CardBackgroundFillColorDefaultBrush}` 等），代码读它的 `Background`/`BorderBrush`/`Foreground`。已改 `MainWindow`（账号弹窗）与 `LibraryPage`（入库信息弹窗）；账号弹窗的"确认重启"改用框架 `AccentButtonStyle`，不再手工染色
@@ -122,8 +120,7 @@
 - **`App.xaml` 自定义画刷已清空**（2026-09-20）：`OstAccentBrush`/`Status*Brush`/`FixedVersionBrush`/`AutoVersionBrush` 七个键实测**零引用**，已删，现在只挂 `XamlControlsResources`
 - **窗口状态持久化（2026-09-20 修，用户报"最小化/最大化关窗后下次启动显示效果异常"）**：真因是**两套状态存储打架 + 存了非还原态尺寸**。① 第三方库 `WindowStateSaver.WinUi3`（v0.0.1）会在 **exe 目录**落 `WindowStateSaveData.json`（`{Width,Height,X,Y,IsMaximized}`），与自家 `config.json` 的 `WindowWidth/Height` **双写**；它恢复"最大化"标志时用的却是自己那份过期尺寸 → 窗口以"最大化"标志配小矩形出现。② 自家代码用 `AppWindow.Size` 存尺寸：**最小化关闭存的是 353x56**（图标态矩形）、**最大化关闭存 3868x2080**（工作区尺寸，比屏幕还"满"）→ 下次启动 `AppWindow.Resize` 成"非最大化但铺满/过小"的窗口，亚克力/云母看起来就不对。**修法**：删掉那个库（连同 PackageReference，顺带不再污染 exe 目录）+ 统一改用 Win32 `GetWindowPlacement().rcNormalPosition`（**永远是还原态矩形**，与最小化/最大化无关）存尺寸/位置、`IsZoomed()` 存最大化标志；恢复用 `SetWindowPos`（物理像素）并夹到当前显示器工作区，`IsWindowMaximized` 时再调 `OverlappedPresenter.Maximize()`。**验证**：正常/最大化/最小化三种关闭方式写进配置的尺寸完全一致 + 最大化标志正确；三种重启截图（亚克力正常、内容渲染正常）；exe 目录不再产出 `WindowStateSaveData.json`
 - **启动初始化不能只挂一次性 `Activated`（2026-09-20 修，用户报"最大化关窗后重启是空白页、主页里 Steam 路径/DLL 都为空"）**：`OverlappedPresenter.Maximize()` 对尚未显示的窗口等价于 `ShowWindow(SW_MAXIMIZE)`——**当场显示并激活窗口**并同步抛出 `Activated`；当时订阅还没注册（构造函数里 `Maximize()` 在前、`this.Activated +=` 在后）→ 事件永久丢失；`App` 随后调用的 `Activate()` 对已激活窗口是 no-op，不会补发 → `InitializeAppAsync` 从未执行（不导航 = 空白页，`MainViewModel.InitializeAsync` 没跑 = Steam 路径/DLL 状态为空，两个定时器也没起）。**纪律**：① 窗口状态施加（最大化等会显示/激活窗口的动作）必须在窗口激活之后（现由 `App.OnLaunched` 在 `Activate()` 之后调 `ApplyStartupMaximizeIfNeeded()`）；② 初始化用**幂等入口** `EnsureInitialized()`，`Activated` 只是兜底，`Activate()` 之后也显式调一次；③ 初始化失败必须留日志（原来 `catch { }` 静默，导致"没跑"和"跑了但失败"无法区分，现打 `[Init] 初始化失败: …` + 成功时一行 `[Init] page=…, steam=…`）
-- ⚠️ **量尺寸、截图都别用 DPI 不感知的进程**：本机 **3840x2160 @ 216 DPI（225%）**，DPI 不感知的 PowerShell 看到的是虚拟化值（1707x960 / 800x560），会把"最小尺寸"误读成"尺寸漂移"；**截图同理**——不感知的进程 `CopyFromScreen` 在 225% 下抓到的是错乱合成画面（最大化时看起来"卡片巨大、横向溢出"，其实布局完全正常，用户实测否定）。要截图/量尺寸先 `SetProcessDpiAwarenessContext(PER_MONITOR_AWARE_V2 = -4)`。同理 `MinWindowWidth/MinWindowHeight = 800x560` 是**逻辑值**，在 225% 下对应的物理最小值是 **1800x1260** —— 恢复尺寸时若按物理像素夹取，必须先 `ScaleLogical()`，否则会把合理的窗口压到最小值。（本次排查第一版结论"AppWindow 与 Win32 单位不一致导致每次重启长大 1.44×"**是错的**：那其实是尺寸低于物理最小值被夹到 min 的表现）
-- **构建**：只能用 VS MSBuild（`dotnet build/publish` 缺 PRI 任务必挂）；首次 Release 自包含发布需先带 RID Restore（运行时包要从源下载，直连 nuget.org 失败时可切国内镜像）；旧实例不关会 MSB3021 锁 exe
+- **窗口尺寸一律是逻辑值**：`MinWindowWidth/MinWindowHeight = 800x560` 在 225% DPI 下对应物理最小值 **1800x1260** —— 恢复尺寸时若按物理像素夹取，必须先 `ScaleLogical()`，否则会把合理的窗口压到最小值。（排查中"AppWindow 与 Win32 单位不一致、每次重启长大 1.44×"的结论**是错的**：那是尺寸低于物理最小值被夹到 min 的表现。本机 DPI 与截图手法相关的环境坑见工作区 `doc/开发踩坑.md`）
 - 版本号只在 csproj 维护三处（Version/AssemblyVersion/FileVersion），运行时从程序集读取
 
 ## 9. 服务索引（当前）
