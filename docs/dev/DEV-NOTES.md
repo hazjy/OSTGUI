@@ -31,6 +31,7 @@
 - `LuaBuilder`：Sudama 密钥/令牌 → `MergeAllDepotsAsync` 用全量 depot 列表补全（防止只写有 manifest 的 depot 漏密钥）→ 缺密钥收集并通知。DLC 段也对每个 DLC AppID 查 `keys[dlcId]`，Sudama 收录的独立 DLC depot key 会自动写入 `addappid(dlcId, 1, "<key>")`
 - 缺解密密钥警告在两种模式下都保留（无 key 无法解密下载加密内容）
 - **搜索页卡片（2026-09-21）**：与入库管理同构——左侧 120×56 缩略图 + 名称 + `AppID:` 行 + 右侧两个**纯图标按钮**（32×32 透明底）：**入库**是**自绘 `Path`**（16×16 描边 = "箭头落进托盘"；Segoe Fluent Icons 里没有这个形状——`E896` 只是"箭头 + 一条直横线"，`E78C` 是软盘+圆形角标，`EBD3` 是云+圆圈箭头，`E8B5` 是"→|"），**信息**用 `U+E946`（Info）；两者 tooltip 分别是「入库」「信息」。**不放版本模式行**（搜索结果没有版本状态）
+- ⚠️ **自绘图标与字体图标的对齐：坐标要算，不能手调**（2026-09-22 用户指出"视觉上不齐"后定下）。自绘 `Path` 不继承 `Foreground`（描边色显式给 `TextFillColorPrimaryBrush`）；它的"版心"与字形不同（字形有行高、Path 盒子由几何范围推出），所以**必须给显式 `Width/Height="16"` + `Stretch="None"`**，否则几何一平移盒子就被重新居中、怎么调都不齐。做法：真机（本机 225% DPI，`SetProcessDpiAwarenessContext(PMv2)`）用 UIA 取两个按钮的物理矩形 → 截图 → 阈值 110 扫出各自的墨迹框 → 把自绘件平移到字形 `E946` 的墨迹中心、按墨迹高度等比缩放、描边厚度对齐字形笔画（实测字形 `E946` @FontSize16：墨迹 **15.11×15.11** 逻辑、中心相对按钮中心 **(−0.44,−0.44)**、描边 **1.06**）。修后复量：两者墨迹 **中心 y=34.5、高 34 物理 px 完全一致**
 - **搜索结果缩略图：与入库封面同一套来源，只走内存不落盘**——`FetchThumbnailBytesAsync(appId)` 走 `HeaderTemplates`（两条 header 布局）→ **官方 `GetHeaderImageUrlAsync`** → null（占位图标）。**不再用 `SearchResult.ImageUrl`**：那是 storesearch 的 `tiny_image`（231×87 小胶囊，≈2.66:1），塞进 2.14:1 的卡片会被裁掉两侧——2026-09-21 用户报的"搜索页缩略图缺一块"就是它。上屏用 `SetSourceAsync(MemoryStream.AsRandomAccessStream())`、`DecodePixelWidth=120`；并发 4；卡片 `Stretch="Uniform"` 作保险（宁愿留边也不裁）；**不调用 `EnsureCoverFileAsync`**（那条会落盘）
 
 ## 4. Sudama 缓存（v1.3.0 现状）

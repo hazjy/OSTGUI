@@ -107,16 +107,26 @@
                                                 VerticalAlignment="Center">
                                         <!-- 纯图标按钮（icon-only Button）。字形是自绘的"箭头落进托盘"：
                                              Segoe Fluent Icons 里没有这个形状（E896 只是"箭头+一条直横线"，
-                                             E78C 是软盘+圆形角标、EBD3 是云+圆圈箭头），所以用 16×16 描边路径画一个。
-                                             Path 不继承 Foreground，描边色显式给主题画刷（与 FontIcon 默认一致） -->
+                                             E78C 是软盘+圆形角标、EBD3 是云+圆圈箭头），所以用 16×16 描边路径画。
+                                             坐标是**算出来的**，不是手调：真机 225% DPI 实测两者的墨迹框 ——
+                                               字形 E946（FontSize=16）：墨迹 34×34 物理 = 15.11×15.11 逻辑，
+                                                 中心相对按钮中心 (−0.44,−0.44) 逻辑；描边 1.06 逻辑
+                                               自绘 Path（原坐标）：墨迹 30×34 物理 = 13.33×15.11 逻辑，
+                                                 中心相对按钮中心 (+0.44,+0.89) 逻辑；描边 1.6 逻辑
+                                             → 需要平移 (−0.88,−1.33) 使中心重合、按 15.11 高度等比放大 1.064、
+                                               描边由 1.6 收到 1.1（对齐字形笔画粗细）；
+                                               并给 Path 显式 16×16 盒子 + Stretch=None，
+                                               否则盒子由几何范围推出、平移不生效（盒子会被重新居中）
+                                             ⚠️ 改这里的坐标要重新量（阈值 110 扫墨迹框），别手调 -->
                                         <Button Click="ListAddGame_Click" Tag="{Binding}"
                                                 ToolTipService.ToolTip="入库"
                                                 Width="32" Height="32" MinWidth="0" Padding="0"
                                                 Background="Transparent" BorderThickness="0">
-                                            <Path Stroke="{ThemeResource TextFillColorPrimaryBrush}"
-                                                  StrokeThickness="1.6"
+                                            <Path Width="16" Height="16" Stretch="None"
+                                                  Stroke="{ThemeResource TextFillColorPrimaryBrush}"
+                                                  StrokeThickness="1.1"
                                                   StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                                                  Data="M8,1.8 L8,9.4 M4.7,6.3 L8,9.6 L11.3,6.3 M2.3,11.3 L2.3,13.2 A1.7,1.7 0 0 0 4,14.9 L12,14.9 A1.7,1.7 0 0 0 13.7,13.2 L13.7,11.3" />
+                                                  Data="M7.56,0.59 L7.56,8.68 M4.05,5.38 L7.56,8.89 L11.07,5.38 M1.5,10.7 L1.5,12.72 A1.81,1.81 0 0 0 3.3,14.53 L11.82,14.53 A1.81,1.81 0 0 0 13.62,12.72 L13.62,10.7" />
                                         </Button>
                                         <Button Click="InfoButton_Click" Tag="{Binding}"
                                                 ToolTipService.ToolTip="信息"
