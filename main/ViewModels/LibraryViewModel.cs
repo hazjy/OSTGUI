@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.UI.Xaml.Media.Imaging;
 using OSTGUI.Models;
 using OSTGUI.Services;
 
@@ -18,6 +19,7 @@ public partial class LibraryViewModel : ObservableObject
     private readonly SteamService _steamService;
     private readonly ConfigService _configService;
     private readonly GameNameCacheService _nameCache;
+    private readonly CoverImageService _coverService;
 
     [ObservableProperty] private ObservableCollection<LibraryItem> _libraryItems = new();
     [ObservableProperty] private ObservableCollection<LibraryItem> _selectedItems = new();
@@ -42,7 +44,8 @@ public partial class LibraryViewModel : ObservableObject
         SteamGameInfoService gameInfoService,
         SteamService steamService,
         ConfigService configService,
-        GameNameCacheService nameCache)
+        GameNameCacheService nameCache,
+        CoverImageService coverService)
     {
         _luaService = luaService;
         _searchService = searchService;
@@ -50,6 +53,7 @@ public partial class LibraryViewModel : ObservableObject
         _steamService = steamService;
         _configService = configService;
         _nameCache = nameCache;
+        _coverService = coverService;
     }
 
     /// <summary>
@@ -102,6 +106,9 @@ public partial class LibraryViewModel : ObservableObject
             // 刷新视图（应用搜索过滤）
             RefreshView();
 
+            // 封面不在这里预加载：由页面在卡片实体化时逐条调 EnsureCoverAsync（懒加载）
+            // （全量预加载会在进页面时给每个 appid 都发请求/读盘/建位图，库大了就是白等）
+
             ProgressValue = 100;
         }
         catch { }
@@ -121,6 +128,38 @@ public partial class LibraryViewModel : ObservableObject
             await _searchService.GetGameNamesBatchAsync(mainIds);
         }
         catch { }
+    }
+
+    /// <summary>
+    /// 按需加载单条封面：由页面在卡片实体化（滚进视口）时调用，不预先全量加载。
+    /// 并发上限在 CoverImageService（信号量）里；这里只把拿到的文件变成 BitmapImage——
+    /// 必须在 UI 线程调用/赋值（BitmapImage 是 DependencyObject）。
+    /// </summary>
+    public async Task EnsureCoverAsync(LibraryItem item)
+    {
+        if (item.Cover != null) return;
+        try
+        {
+            var path = await _coverService.EnsureCoverFileAsync(item.AppId);
+            if (path != null)
+                item.Cover = CreateBitmap(path);
+        }
+        catch { }
+    }
+
+    /// <summary>
+    /// 由本地封面文件构造位图。DecodePixelWidth 必须先于 UriSource 设置，
+    /// 否则按原图 460×215 全量解码，几十张就是几十 MB
+    /// </summary>
+    private static BitmapImage CreateBitmap(string path)
+    {
+        var bitmap = new BitmapImage
+        {
+            DecodePixelType = DecodePixelType.Logical,
+            DecodePixelWidth = 120
+        };
+        bitmap.UriSource = new Uri(path);
+        return bitmap;
     }
 
     /// <summary>

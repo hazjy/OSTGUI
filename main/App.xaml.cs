@@ -67,6 +67,7 @@ public partial class App : Application
         services.AddSingleton<LibraryScanner>();
         services.AddSingleton<LuaConfigService>();
         services.AddSingleton<SudamaKeyCache>();
+        services.AddSingleton<CoverImageService>();   // 入库管理卡片封面（磁盘缓存，见 CoverImageService）
         services.AddSingleton<SteamGameInfoService>();
         services.AddSingleton<LuaBuilder>();
         services.AddSingleton<ManifestFileService>();

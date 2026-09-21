@@ -34,6 +34,47 @@ public class SteamGameInfoService
     }
 
     /// <summary>
+    /// 取官方封面 URL（appdetails 的 header_image → capsule_image → capsule_imagev5）。
+    /// 只对静态 CDN 链失败的 appid 调用：2024+ 新上架游戏在旧布局（steam/apps/&lt;id&gt;/header.jpg）
+    /// 下是 404，静态猜不出来，只能问官方（无需 API key）。8s 超时，任何失败返回 null。
+    /// </summary>
+    public async Task<string?> GetHeaderImageUrlAsync(string appId)
+    {
+        if (string.IsNullOrEmpty(appId)) return null;
+        try
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+            var resp = await _http.GetAsync(
+                $"https://store.steampowered.com/api/appdetails?appids={appId}&filters=basic&cc=us&l=en", cts.Token);
+            if (!resp.IsSuccessStatusCode)
+            {
+                Log($"封面 API 响应: {(int)resp.StatusCode}");
+                return null;
+            }
+
+            var json = await resp.Content.ReadAsStringAsync(cts.Token);
+            var doc = JsonDocument.Parse(json);
+            if (!doc.RootElement.TryGetProperty(appId, out var appData)) return null;
+            if (!appData.TryGetProperty("success", out var success) || !success.GetBoolean()) return null;
+            if (!appData.TryGetProperty("data", out var data)) return null;
+
+            foreach (var field in new[] { "header_image", "capsule_image", "capsule_imagev5" })
+            {
+                if (data.TryGetProperty(field, out var elem))
+                {
+                    var url = elem.GetString();
+                    if (!string.IsNullOrWhiteSpace(url)) return url;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Log($"封面 API 失败: {ex.Message}");
+        }
+        return null;
+    }
+
+    /// <summary>
     /// 从 SteamCMD API 获取游戏详情（含完整 depots + manifest gid）
     /// 格式: {"data": {"<appid>": {"name": ..., "depots": {"<depotid>": {"manifests": {"public": {"gid": ..., "download": ...}}, "dlcappid": ...}}}}}
     /// </summary>

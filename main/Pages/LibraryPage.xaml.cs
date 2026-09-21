@@ -28,6 +28,17 @@ public sealed partial class LibraryPage : Page
         await VM.LoadLibraryCommand.ExecuteAsync(null);
     }
 
+    /// <summary>
+    /// 卡片被实体化时才加载封面（ListView 虚拟化：滚进视口才走到这里，滚出去回收后不再重复加载）。
+    /// 这是框架自带的"按需内容"钩子，不需要给卡片包一层 UserControl
+    /// </summary>
+    private void LibraryList_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
+    {
+        if (args.InRecycleQueue) return;
+        if (args.Item is LibraryItem item && item.Cover == null)
+            _ = VM.EnsureCoverAsync(item);
+    }
+
     private async void ToggleVersion_Click(object sender, RoutedEventArgs e)
     {
         if (sender is Button btn && btn.Tag is LibraryItem item)

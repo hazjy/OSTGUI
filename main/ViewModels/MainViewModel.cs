@@ -87,7 +87,8 @@ public partial class MainViewModel : ObservableObject
         OstFileService ostFileService,
         SteamGameInfoService steamGameInfoService,
         SteamDllService steamDllService,
-        SudamaKeyCache sudamaCache)
+        SudamaKeyCache sudamaCache,
+        CoverImageService coverImageService)
     {
         ConfigService = configService;
         SteamService = steamService;
@@ -98,7 +99,7 @@ public partial class MainViewModel : ObservableObject
 
         // 初始化子 ViewModel
         SearchVM = new SearchViewModel(searchService, manifestService, steamService, configService);
-        LibraryVM = new LibraryViewModel(luaService, searchService, gameInfoService, steamService, configService, gameNameCacheService);
+        LibraryVM = new LibraryViewModel(luaService, searchService, gameInfoService, steamService, configService, gameNameCacheService, coverImageService);
         DenuvoVM = new DenuvoViewModel(
             ticketService, luaService, ostFileService,
             steamGameInfoService, steamService);

@@ -58,67 +58,91 @@
         <ProgressBar Grid.Row="1" IsIndeterminate="{Binding IsBusy}" Margin="40,0"
                      Visibility="{Binding IsBusy, Converter={StaticResource BoolToVis}}" />
 
-        <ScrollViewer Grid.Row="2">
-            <ItemsControl Margin="40,12" ItemsSource="{Binding LibraryItems}">
-                <ItemsControl.ItemTemplate>
+        <!-- ListView 而不是 ItemsControl：前者虚拟化（卡片滚进视口才实体化），
+             配合 code-behind 的 ContainerContentChanging 才能做到"封面按需加载"。
+             不虚拟化的话 40 张卡片与图片会在进页面时一次性全建出来，懒加载等于没做 -->
+        <ListView x:Name="LibraryList" Grid.Row="2" Margin="40,12"
+                  ItemsSource="{Binding LibraryItems}"
+                  Background="Transparent"
+                  SelectionMode="None"
+                  IsItemClickEnabled="False"
+                  ContainerContentChanging="LibraryList_ContainerContentChanging">
+            <ListView.ItemContainerStyle>
+                <!-- 抹掉 ListViewItem 自带的容器内边距/最小高度，卡片自己的 Padding/Margin 说了算 -->
+                <Style TargetType="ListViewItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    <Setter Property="Padding" Value="0" />
+                    <Setter Property="Margin" Value="0" />
+                    <Setter Property="MinHeight" Value="0" />
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
                     <DataTemplate x:DataType="models:LibraryItem">
-                        <Border Margin="0,4" Padding="12"
+                        <Border Margin="0,4" Padding="15,12" MinHeight="80"
                                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                 CornerRadius="6">
-                            <Grid>
+                            <Grid ColumnSpacing="15">
                                 <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
 
-                                <Grid Grid.Column="0" ColumnSpacing="8" VerticalAlignment="Center">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="250" />
-                                        <ColumnDefinition Width="70" />
-                                        <ColumnDefinition Width="Auto" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <StackPanel Orientation="Horizontal" Spacing="4">
-                                            <TextBlock Text="{Binding GameName}" FontSize="14" FontWeight="SemiBold"
-                                                       VerticalAlignment="Center" TextTrimming="CharacterEllipsis" MaxWidth="200"
-                                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-                                        </StackPanel>
-                                    </StackPanel>
-                                    <TextBlock Grid.Column="1" Text="{Binding AppId}" FontSize="12"
-                                               VerticalAlignment="Center"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                    <TextBlock Grid.Column="2" Text="{Binding VersionModeText}" FontSize="12"
-                                               VerticalAlignment="Center"
-                                               Foreground="{Binding VersionMode, Converter={StaticResource VersionModeToBrushConverter}}" />
-                                </Grid>
+                                <!-- 封面：120×56 即 Steam header.jpg 原生比例（460×215）。
+                                     底色是无封面时的占位，必须走 ThemeResource —— 用 Application.Current.Resources
+                                     取到的是系统主题，浅色应用 + 深色系统会把底色染错 -->
+                                <Border Grid.Column="0" Width="120" Height="56" CornerRadius="4"
+                                        Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                                    <!-- 无封面时露出底下的图标占位（空框看着像坏了）。
+                                         Image 直接盖在图标上，不引入 null 判断转换器 -->
+                                    <Grid>
+                                        <FontIcon Glyph="&#xE7FC;" FontSize="24"
+                                                  Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                  HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <Image Source="{Binding Cover}" Stretch="UniformToFill" />
+                                    </Grid>
+                                </Border>
 
-                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="2">
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                                    <TextBlock Text="{Binding GameName}" FontSize="15" FontWeight="SemiBold"
+                                               TextTrimming="CharacterEllipsis"
+                                               Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                    <TextBlock Text="{Binding AppIdDisplay}" FontSize="12"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="{Binding VersionModeText}" FontSize="12"
+                                               Foreground="{Binding VersionMode, Converter={StaticResource VersionModeToBrushConverter}}" />
+                                </StackPanel>
+
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2"
+                                            VerticalAlignment="Center">
                                     <Button Click="ToggleVersion_Click" Tag="{Binding}"
                                             ToolTipService.ToolTip="切换版本模式"
-                                            Background="Transparent" BorderThickness="0" Padding="8,4">
-                                        <FontIcon Glyph="&#xE895;" FontSize="14" />
+                                            Width="32" Height="32" MinWidth="0" Padding="0"
+                                            Background="Transparent" BorderThickness="0">
+                                        <FontIcon Glyph="&#xE895;" FontSize="16" />
                                     </Button>
                                     <Button Click="Info_Click" Tag="{Binding}"
                                             ToolTipService.ToolTip="信息"
-                                            Background="Transparent" BorderThickness="0" Padding="8,4">
-                                        <FontIcon Glyph="&#xE946;" FontSize="14" />
+                                            Width="32" Height="32" MinWidth="0" Padding="0"
+                                            Background="Transparent" BorderThickness="0">
+                                        <FontIcon Glyph="&#xE946;" FontSize="16" />
                                     </Button>
                                     <Button Click="More_Click" Tag="{Binding}"
                                             ToolTipService.ToolTip="更多"
-                                            Background="Transparent" BorderThickness="0" Padding="8,4">
-                                        <FontIcon Glyph="&#xE712;" FontSize="14" />
+                                            Width="32" Height="32" MinWidth="0" Padding="0"
+                                            Background="Transparent" BorderThickness="0">
+                                        <FontIcon Glyph="&#xE712;" FontSize="16" />
                                     </Button>
                                     <Button Click="Delete_Click" Tag="{Binding}"
                                             ToolTipService.ToolTip="删除"
-                                            Background="Transparent" BorderThickness="0" Padding="8,4">
-                                        <FontIcon Glyph="&#xE74D;" FontSize="14" />
+                                            Width="32" Height="32" MinWidth="0" Padding="0"
+                                            Background="Transparent" BorderThickness="0">
+                                        <FontIcon Glyph="&#xE74D;" FontSize="16" />
                                     </Button>
                                 </StackPanel>
                             </Grid>
                         </Border>
                     </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
-    </Grid>
-</Page>
+            </ListView.ItemTemplate>
+        </ListView>
+    </Grid></Page>

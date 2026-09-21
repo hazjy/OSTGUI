@@ -19,6 +19,10 @@ public class LibraryItem : ObservableObject
     public string AppId { get; set; } = string.Empty;
     public string GameName { get; set; } = "未知游戏";
     public string FileName { get; set; } = string.Empty;
+
+    /// <summary>卡片次级行（WinUI 的 {Binding} 不支持 StringFormat，故在此拼好）</summary>
+    public string AppIdDisplay => $"AppID: {AppId}";
+
     public string UnlockerType { get; set; } = "ost"; // ost = OpenSteamTool
     private string _versionMode = "auto";
     public string VersionMode // auto, fixed
@@ -39,6 +43,18 @@ public class LibraryItem : ObservableObject
     public int DlcCount => DlcList.Count;
     public DateTime AddedTime { get; set; }
     public DateTime LastModified { get; set; }
+
+    private Microsoft.UI.Xaml.Media.Imaging.BitmapImage? _cover;
+
+    /// <summary>
+    /// 卡片封面（由 LibraryViewModel 在 UI 线程从 CoverImageService 给的本地文件路径构造；
+    /// 必须在 UI 线程赋值——BitmapImage 是 DependencyObject）
+    /// </summary>
+    public Microsoft.UI.Xaml.Media.Imaging.BitmapImage? Cover
+    {
+        get => _cover;
+        set => SetProperty(ref _cover, value);
+    }
 
     /// <summary>
     /// 获取版本模式显示文本（无 emoji）
