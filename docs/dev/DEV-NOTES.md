@@ -1,7 +1,7 @@
 # OSTGUI 开发笔记（DEV-NOTES）
 
 > 本文合并自原 plan1.md / plan2.md 两份沉淀文档，并更新至 2026-09-18 现状（GUI v1.4.1 + 配套内核 v1.1.3）。
-> 收录原则：**项目结构与工程现状长期保留**；领域事实/机制查证/调研结论提取至工作区根 `doc/` 下的事实考证（GUI 侧）（Lua 语义、depot/manifest/key 关系、Denuvo 授权、480 联机调研等）；**环境 / 工具链 / 打包类坑不收录**（本机 DPI、沙箱、构建命令、git 行尾、验证手法等一律写工作区 `doc/开发踩坑.md`）；工程状态快照（构建命令产物、临时数字、"待提交"类状态）不再收录，避免过时。
+> 收录原则：**项目结构与工程现状长期保留**；领域事实/机制查证/调研结论提取至工作区根 `doc/` 下的事实考证（GUI 侧）（Lua 语义、depot/manifest/key 关系、Denuvo 授权、480 联机调研等）；**环境 / 工具链 / 打包类坑不收录**（本机 DPI、沙箱、构建命令、git 行尾、验证手法等一律写工作区 `doc/开发踩坑.md`）；**UI 尺寸 / 文案 / 图标 / 标点这类细碎细节与用户偏好不收录**（一律写工作区 `doc/细节与偏好.md`）；工程状态快照（构建命令产物、临时数字、"待提交"类状态）不再收录，避免过时。
 
 ## 1. 架构总览
 
@@ -30,8 +30,7 @@
 - 入库勾选"下载 Manifest"（默认开）：MHub → Sudama(仅密钥) 级联；不勾则跳过清单直接生成 Lua，由内核运行时兜底取清单，成功提示注明兜底
 - `LuaBuilder`：Sudama 密钥/令牌 → `MergeAllDepotsAsync` 用全量 depot 列表补全（防止只写有 manifest 的 depot 漏密钥）→ 缺密钥收集并通知。DLC 段也对每个 DLC AppID 查 `keys[dlcId]`，Sudama 收录的独立 DLC depot key 会自动写入 `addappid(dlcId, 1, "<key>")`
 - 缺解密密钥警告在两种模式下都保留（无 key 无法解密下载加密内容）
-- **搜索页卡片（2026-09-21）**：与入库管理同构——左侧 120×56 缩略图 + 名称 + `AppID:` 行 + 右侧两个**纯图标按钮**（32×32 透明底）：**入库**是**自绘 `Path`**（16×16 描边 = "箭头落进托盘"；Segoe Fluent Icons 里没有这个形状——`E896` 只是"箭头 + 一条直横线"，`E78C` 是软盘+圆形角标，`EBD3` 是云+圆圈箭头，`E8B5` 是"→|"），**信息**用 `U+E946`（Info）；两者 tooltip 分别是「入库」「信息」。**不放版本模式行**（搜索结果没有版本状态）
-- ⚠️ **自绘图标与字体图标的对齐：坐标要算，不能手调**（2026-09-22 用户指出"视觉上不齐"后定下）。自绘 `Path` 不继承 `Foreground`（描边色显式给 `TextFillColorPrimaryBrush`）；它的"版心"与字形不同（字形有行高、Path 盒子由几何范围推出），所以**必须给显式 `Width/Height="16"` + `Stretch="None"`**，否则几何一平移盒子就被重新居中、怎么调都不齐。做法：真机（本机 225% DPI，`SetProcessDpiAwarenessContext(PMv2)`）用 UIA 取两个按钮的物理矩形 → 截图 → 阈值 110 扫出各自的墨迹框 → 把自绘件平移到字形 `E946` 的墨迹中心、按墨迹高度等比缩放、描边厚度对齐字形笔画（实测字形 `E946` @FontSize16：墨迹 **15.11×15.11** 逻辑、中心相对按钮中心 **(−0.44,−0.44)**、描边 **1.06**）。修后复量：两者墨迹 **中心 y=34.5、高 34 物理 px 完全一致**
+- **搜索页卡片**：与入库管理同构（左侧 120×56 缩略图 + 名称 + `AppID:` 行 + 右侧图标按钮区），**不放版本模式行**；尺寸 / 图标 / tooltip / 标点等细碎选择见工作区 `doc/细节与偏好.md`
 - **搜索结果缩略图：与入库封面同一套来源，只走内存不落盘**——`FetchThumbnailBytesAsync(appId)` 走 `HeaderTemplates`（两条 header 布局）→ **官方 `GetHeaderImageUrlAsync`** → null（占位图标）。**不再用 `SearchResult.ImageUrl`**：那是 storesearch 的 `tiny_image`（231×87 小胶囊，≈2.66:1），塞进 2.14:1 的卡片会被裁掉两侧——2026-09-21 用户报的"搜索页缩略图缺一块"就是它。上屏用 `SetSourceAsync(MemoryStream.AsRandomAccessStream())` + **刻意不设 `DecodePixelWidth`**（流解码不认 `Logical`，设了反而首拍发糊——见 §8）；并发 4；卡片 `Stretch="Uniform"` 作保险（宁愿留边也不裁）；**不调用 `EnsureCoverFileAsync`**（那条会落盘）
 
 ## 4. Sudama 缓存（v1.3.0 现状）
@@ -105,7 +104,6 @@
 - 桌面应用没有 `Windows.UI.Colors` → 用 `Microsoft.UI.Colors`
 - 附加属性 C# 侧用 `ToolTipService.SetToolTip()`，对象初始化器赋值编译不过
 - ContentDialog 必须设 `XamlRoot`（Page 用 `this.XamlRoot`，Window 用 `RootGrid.XamlRoot`）
-- 纯图标透明按钮：`Background=Transparent` + `BorderThickness=0` + `Padding=8,4`
 - **点击空白取消输入框激活（09-02 起有解，此前结论作废）**：两个 WinUI 已知 bug 叠加——① [#4364](https://github.com/microsoft/microsoft-ui-xaml/issues/4364) 点击空白把焦点投给 ScrollViewer 内第一个可聚焦控件（→ 误激活首个输入框）；② [#10051](https://github.com/microsoft/microsoft-ui-xaml/issues/10051) 输入框已聚焦时点空白不转移焦点（→ 无法取消激活）。**方案=两层兜底**：
   - **页面锚点**：每个含输入框页面的 ScrollViewer 内容首位放 1×1 透明可聚焦 Grid（`IsTabStop=True, TabIndex=0, Opacity=0`）→ 拦截 #4364 的 fallback。已覆盖：设置页、联机页、D加密页(Transfer 面板)、S.A.C 页。
   - **全局回收**：`MainWindow.RootGrid` 挂 `PointerPressed`（`handledEventsToo:true`），点击处不在交互控件内时 `DispatcherQueue.TryEnqueue` 把焦点拉回全局锚点 `GlobalFocusAnchor`——排队保证晚于框架指针处理，从而覆盖 #10051 与 #4364。
@@ -123,7 +121,6 @@
 - **启动初始化不能只挂一次性 `Activated`（2026-09-20 修，用户报"最大化关窗后重启是空白页、主页里 Steam 路径/DLL 都为空"）**：`OverlappedPresenter.Maximize()` 对尚未显示的窗口等价于 `ShowWindow(SW_MAXIMIZE)`——**当场显示并激活窗口**并同步抛出 `Activated`；当时订阅还没注册（构造函数里 `Maximize()` 在前、`this.Activated +=` 在后）→ 事件永久丢失；`App` 随后调用的 `Activate()` 对已激活窗口是 no-op，不会补发 → `InitializeAppAsync` 从未执行（不导航 = 空白页，`MainViewModel.InitializeAsync` 没跑 = Steam 路径/DLL 状态为空，两个定时器也没起）。**纪律**：① 窗口状态施加（最大化等会显示/激活窗口的动作）必须在窗口激活之后（现由 `App.OnLaunched` 在 `Activate()` 之后调 `ApplyStartupMaximizeIfNeeded()`）；② 初始化用**幂等入口** `EnsureInitialized()`，`Activated` 只是兜底，`Activate()` 之后也显式调一次；③ 初始化失败必须留日志（原来 `catch { }` 静默，导致"没跑"和"跑了但失败"无法区分，现打 `[Init] 初始化失败: …` + 成功时一行 `[Init] page=…, steam=…`）
 - **窗口尺寸一律是逻辑值**：`MinWindowWidth/MinWindowHeight = 800x560` 在 225% DPI 下对应物理最小值 **1800x1260** —— 恢复尺寸时若按物理像素夹取，必须先 `ScaleLogical()`，否则会把合理的窗口压到最小值。（排查中"AppWindow 与 Win32 单位不一致、每次重启长大 1.44×"的结论**是错的**：那是尺寸低于物理最小值被夹到 min 的表现。本机 DPI 与截图手法相关的环境坑见工作区 `doc/开发踩坑.md`）
 - **`DecodePixelType=Logical` 对「流解码」不生效（2026-09-22 踩到，用户报"搜索页缩略图糊、切到入库管理再切回来就清楚"）**：搜索缩略图是**字节 → `SetSourceAsync(MemoryStream.AsRandomAccessStream())`**，入库封面是**文件 → `UriSource`**；同一个 `DecodePixelWidth=120`，文件路径按逻辑像素解、2.25× DPI 下拿到 ≈270px 表面，**流路径却把它当物理像素用** → 首拍上屏用的是 ≈120px 表面，被 270px 的卡片放大 2.25 倍 → 发糊。切页回来会**重建 `Image` 元素**、按真实布局尺寸重新取表面 → 变清楚（**`BitmapImage` 实例没换、只是重新挂载**，所以"位图是同一个、画面却变了"）。**实测**（225% DPI，`PrintWindow` 截同一张卡同一 270×126 矩形算梯度能量 `mean(|dL/dx|+|dL/dy|)`）：改前首拍 **13.6**、切页回来 **19.5**；**去掉 `DecodePixelWidth` 后首拍 19.6 / 切页回来 19.6**（不再随切页变化）。修法就一句：**流路径别设 `DecodePixelWidth`**，按原生尺寸解码、由 `Image` 缩下来（内存上限与升级路径写在 `SearchViewModel.CreateBitmapAsync` 的 `ponytail:` 注释里）。⚠️ 中途用 `bitmap.PixelWidth` 探针读到 **460**（原图尺寸，不是上屏表面），一度导出"解码是满尺寸、不该糊"的错误方向——**判据只能是屏幕**。⚠️ 严谨性：「≈120px 表面」是按"糊成 2.25 倍放大的观感"**反推**的机制，没直接量到；这条的**硬证据是 A/B**——只删掉这一个设置、首拍就从 13.6 跳到 19.6
-- **数量角标直接用 CJK 角括号「」（2026-09-22，绕了三圈才落地）**：入库管理标题要的"数字带角标"就是 `U+300C` / `U+300D`（`「` / `」`）这两个**字符** —— 中文字体里有、粗体生效、与标题同字号天然对齐，一句 `$"入库管理 「{n}」"` 完事，**不需要自绘**。⚠️ 我走过的弯路（别再走）：① 先试 `U+2308`/`U+230B`（`⌈`/`⌋`）—— 它在 Segoe UI 里没有、走**字体回退**且**粗体请求不生效**，笔画比标题细一档 → 据此改成**自绘两个 10×10 `Border` 角标**，结果形状根本不是用户要的（用户给我画的示意图里就是 `「」`，我却没认出来）；② 之后又在自绘件上做"按墨迹对齐"的微调（实测横臂到数字墨迹上 18 / 下 11 物理 px → 下移 1.5 DIP），**整段都是白做的**。**教训：用户说"这个形状"时先看**能不能直接用字符**（尤其 CJK 标点：`「」『』（）〔〕` 字体里都有），别一上来自绘几何；形状没确认前不要做像素级微调**
 - 版本号只在 csproj 维护三处（Version/AssemblyVersion/FileVersion），运行时从程序集读取
 
 ## 9. 服务索引（当前）
