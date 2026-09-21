@@ -26,6 +26,7 @@ var gameDir = Path.GetDirectoryName(gameExe);
 if (gameDir is null || !File.Exists(gameExe))
     return 3;
 
+Log($"—— 宿主会话身份 {appId}，游戏 {gameExe}");
 Environment.SetEnvironmentVariable("SteamAppId", appId.ToString());
 Environment.SetEnvironmentVariable("SteamGameId", appId.ToString());
 // 叠加层身份必须跟着会话 AppID：不带这个，客户端拿到的是"真 AppID"的叠加层身份，
@@ -44,25 +45,93 @@ ShutdownShim(hShim);
 return 0;
 
 // 用游戏自带的 steam_api64.dll 让宿主自己先以会话身份注册一次（Steam 日志里那条
-// "App ID <n> adding PID <宿主>" 就是它），闭源工具同样先做这一步再拉游戏
+// "App ID <n> adding PID <宿主>" 就是它），闭源工具同样先做这一步再拉游戏。
+//
+// 日志：%LOCALAPPDATA%\OSTGUI\logs\onlinehost.log —— 宿主是独立进程、且没有 GUI，
+// "联机点了没反应"时这里是唯一线索。现代 Valve 垫片只导出 SteamAPI_InitFlat / InitSafe
+// （老 SteamAPI_Init 已不存在），InitFlat 会用出参给回结果码 + 一句错误串，必须打出来。
 static IntPtr InitShim(string gameDir)
 {
     var shim = FindShim(gameDir);
-    if (shim is null) return IntPtr.Zero;
+    if (shim is null)
+    {
+        Log("垫片: 游戏目录里没找到 steam_api64.dll → 跳过自注册（只剩环境变量这一半）");
+        return IntPtr.Zero;
+    }
 
+    Log($"垫片: {shim}");
     var h = IntPtr.Zero;
-    try { h = NativeLibrary.Load(shim); } catch { }
-    if (h == IntPtr.Zero) return IntPtr.Zero;
+    try { h = NativeLibrary.Load(shim); }
+    catch (Exception ex)
+    {
+        Log($"垫片加载失败: {ex.Message}");
+        return IntPtr.Zero;
+    }
 
     try
     {
         var flat = GetExport<InitFlat>(h, "SteamAPI_InitFlat");
+        if (flat is not null)
+        {
+            // SteamErrMsg = char[1024]；传缓冲区才有失败原因（不传就只能拿到个结果码）
+            var err = Marshal.AllocHGlobal(1024);
+            try
+            {
+                Marshal.WriteByte(err, 0);
+                var result = flat(err);
+                var msg = Marshal.PtrToStringAnsi(err)?.Trim() ?? "";
+                if (result == 0)
+                {
+                    Log("自注册成功: SteamAPI_InitFlat = OK");
+                }
+                else
+                {
+                    Log($"自注册失败: SteamAPI_InitFlat = {ResultText(result)}"
+                        + (msg.Length > 0 ? $"（{msg}）" : ""));
+                }
+            }
+            finally { Marshal.FreeHGlobal(err); }
+
+            return h;   // 失败也保持加载：游戏侧自己还会初始化一次
+        }
+
         var safe = GetExport<InitSafe>(h, "SteamAPI_InitSafe");
-        if (flat is not null) flat(IntPtr.Zero);
-        else safe?.Invoke();
+        if (safe is not null)
+            Log(safe.Invoke() ? "自注册成功: SteamAPI_InitSafe" : "自注册失败: SteamAPI_InitSafe 返回 false");
+        else
+            Log("垫片里既没有 SteamAPI_InitFlat 也没有 InitSafe（老的第三方垫片？）→ 跳过自注册");
+    }
+    catch (Exception ex)
+    {
+        // 垫片内部抛 C++ 异常时这里会拿到 0xE06D7363 一类的 HRESULT
+        Log($"自注册异常: {ex.GetType().Name} {ex.Message}");
+    }
+    return h;
+}
+
+// ESteamAPIInitResult：0=OK 1=FailedGeneric 2=NoSteamClient 3=VersionMismatch
+static string ResultText(int result) => result switch
+{
+    0 => "OK",
+    1 => "FailedGeneric（通用失败）",
+    2 => "NoSteamClient（Steam 客户端没运行或没登录）",
+    3 => "VersionMismatch（垫片与客户端版本不匹配）",
+    _ => $"未知({result})"
+};
+
+static void Log(string message)
+{
+    try
+    {
+        var dir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "OSTGUI", "logs");
+        Directory.CreateDirectory(dir);
+        File.AppendAllText(
+            Path.Combine(dir, "onlinehost.log"),
+            $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}{Environment.NewLine}");
     }
     catch { }
-    return h;
 }
 
 static void ShutdownShim(IntPtr h)
@@ -104,6 +173,7 @@ static int AppIdFileMode(string exeArg, string appIdText)
     var dir = Path.GetDirectoryName(exe);
     if (dir is null || !File.Exists(exe)) return 3;
 
+    Log($"—— 文件法会话身份 {appIdText}，游戏 {exe}");
     var target = Path.Combine(dir, "steam_appid.txt");
     var journal = AppIdJournalPath();
 
@@ -117,10 +187,12 @@ static int AppIdFileMode(string exeArg, string appIdText)
         Directory.CreateDirectory(Path.GetDirectoryName(journal)!);
         File.WriteAllText(journal, $"{dir}\n{(original is null ? "0" : "1")}\n{original}");
         File.WriteAllText(target, appIdText);
+        Log($"已写 {target}（原本{(original is null ? "无此文件" : "有，原内容已记台账")}）");
     }
-    catch
+    catch (Exception ex)
     {
         try { RestoreAppIdFile(target, original); } catch { }
+        Log($"写 {target} 失败，已回滚并退出（游戏未启动）: {ex.Message}");
         return 5;                   // 目录只读 / 文件被占：原样退出，不启动游戏
     }
 
@@ -146,8 +218,9 @@ static int AppIdFileMode(string exeArg, string appIdText)
     }
     finally
     {
-        // 还原失败就留着台账，由 GUI 下次启动补（不抛：宿主没有日志，抛出去只会弹系统错误框）
-        try { RestoreAppIdFile(target, original); } catch { }
+        // 还原失败就留着台账，由 GUI 下次启动补（不抛：宿主是后台进程，抛出去只会弹系统错误框）
+        try { RestoreAppIdFile(target, original); Log("已还原 steam_appid.txt"); }
+        catch (Exception ex) { Log($"还原失败，台账留在 %LOCALAPPDATA%\\OSTGUI\\appid-changer.txt: {ex.Message}"); }
         ShutdownShim(hShim);
     }
     return 0;
