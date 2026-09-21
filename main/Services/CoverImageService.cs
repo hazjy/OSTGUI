@@ -1,3 +1,6 @@
+using System.Drawing;
+using System.Drawing.Drawing2D;
+using System.Drawing.Imaging;
 using System.Net;
 
 namespace OSTGUI.Services;
@@ -20,6 +23,18 @@ public class CoverImageService
     private readonly SemaphoreSlim _gate = new(4);
 
     private const int MissTtlDays = 1;
+
+    /// <summary>
+    /// 落盘宽度（像素）。卡片是 120×56 逻辑像素，200% DPI 的解码上限正好 240×112——
+    /// 存原始 460×215 等于 4/5 的字节白存（实测最大一张 125 KB → 10 KB）。
+    /// ⚠️ 卡片尺寸改大时：这里改大，并把 <see cref="MigrationMarker"/> 名字 +1（触发重编码）
+    /// </summary>
+    private const int StoreWidth = 240;
+
+    private const int JpegQuality = 85;
+
+    /// <summary>迁移标记：做过一次就不再重编码（改名 = 触发重编码）</summary>
+    private const string MigrationMarker = ".v2";
 
     /// <summary>
     /// 缺失标记后缀。⚠️ 改动 URL 链或兜底来源时必须 +1（.miss3 …），
@@ -60,12 +75,54 @@ public class CoverImageService
         _gameInfo = gameInfo;
     }
 
+    private readonly object _migrationLock = new();
+    private Task? _migration;
+
+    /// <summary>
+    /// 一次性迁移：把旧版按原始尺寸（460×215）存的封面重编码成 <see cref="StoreWidth"/>。
+    /// 惰性跑一次、跑在后台线程；不联网、不丢数据（就地重写）。
+    /// </summary>
+    private Task EnsureMigratedAsync()
+    {
+        if (_migration is not null) return _migration;
+        lock (_migrationLock)
+            return _migration ??= Task.Run(MigrateOldCoversAsync);
+    }
+
+    private async Task MigrateOldCoversAsync()
+    {
+        var marker = Path.Combine(CacheDir, MigrationMarker);
+        try
+        {
+            if (File.Exists(marker)) return;
+
+            var files = Directory.Exists(CacheDir) ? Directory.GetFiles(CacheDir, "*.jpg") : Array.Empty<string>();
+            var done = 0;
+            foreach (var file in files)
+            {
+                try
+                {
+                    var bytes = await File.ReadAllBytesAsync(file).ConfigureAwait(false);
+                    if (TrySaveDownscaled(file, bytes)) done++;
+                }
+                catch { }
+            }
+
+            Directory.CreateDirectory(CacheDir);
+            await File.WriteAllBytesAsync(marker, Array.Empty<byte>()).ConfigureAwait(false);
+            Log($"封面已迁移为 {StoreWidth}px 宽: 重编码 {done}/{files.Length} 张");
+        }
+        catch { }
+    }
+
     /// <summary>
     /// 取封面本地路径；判定为"无封面"时返回 null
     /// </summary>
     public async Task<string?> EnsureCoverFileAsync(string appId)
     {
         if (!IsAppId(appId)) return null;
+
+        await EnsureMigratedAsync().ConfigureAwait(false);
 
         var file = Path.Combine(CacheDir, appId + ".jpg");
         if (File.Exists(file)) return file;
@@ -153,8 +210,12 @@ public class CoverImageService
             if (bytes.Length == 0) return (false, "empty");
 
             Directory.CreateDirectory(CacheDir);
-            try { await File.WriteAllBytesAsync(file, bytes).ConfigureAwait(false); }
-            catch (IOException) { }   // 并发写同一文件：字节相同，忽略
+            // 按显示尺寸重编码后落盘；编码失败就原样存（至少能显示，不因压缩把图丢了）
+            if (!TrySaveDownscaled(file, bytes))
+            {
+                try { await File.WriteAllBytesAsync(file, bytes).ConfigureAwait(false); }
+                catch (IOException) { }   // 并发写同一文件：字节相同，忽略
+            }
 
             return (true, "");
         }
@@ -164,9 +225,44 @@ public class CoverImageService
         }
     }
 
-    /// <summary>把不可达镜像主机换成等价主机；无需改写时返回 false</summary>
-    private static bool TryRewriteHost(string url, out string rewritten)
+    private static readonly ImageCodecInfo JpegCodec =
+        ImageCodecInfo.GetImageEncoders().First(c => c.MimeType == "image/jpeg");
+
+    /// <summary>
+    /// 解码 → 等比缩到 <see cref="StoreWidth"/> → JPEG q85 落盘（只缩不放）。
+    /// 失败返回 false，由调用方决定是否原样存。
+    /// </summary>
+    private static bool TrySaveDownscaled(string path, byte[] bytes)
     {
+        try
+        {
+            using var stream = new MemoryStream(bytes);   // 必须活到 DrawImage 之后
+            using var source = Image.FromStream(stream);
+
+            var width = Math.Min(StoreWidth, source.Width);
+            var height = Math.Max(1, (int)Math.Round(source.Height * (double)width / source.Width));
+
+            using var target = new Bitmap(width, height);
+            using (var graphics = Graphics.FromImage(target))
+            {
+                graphics.InterpolationMode = InterpolationMode.HighQualityBicubic;
+                graphics.DrawImage(source, 0, 0, width, height);
+            }
+
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+            using var quality = new EncoderParameters(1);
+            quality.Param[0] = new EncoderParameter(System.Drawing.Imaging.Encoder.Quality, (long)JpegQuality);
+            target.Save(path, JpegCodec, quality);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>把不可达镜像主机换成等价主机；无需改写时返回 false</summary>
+    private static bool TryRewriteHost(string url, out string rewritten)    {
         rewritten = url;
         foreach (var (from, to) in HostRewrites)
         {
