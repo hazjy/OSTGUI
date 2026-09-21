@@ -52,10 +52,14 @@
                             <TextBlock Text="{Binding TotalCount}" FontSize="20" FontWeight="Bold"
                                        Margin="14,2,14,2"
                                        Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            <!-- 两个角标一起下移 1.5：按实测墨迹，两根横臂到数字墨迹的间距原本是"上 18 下 11"物理 px
+                                 （框偏上），下移 (18-11)/2 = 3.5 物理 px = 1.5 DIP 后上下各 ~14.5，两根横线才与数字等距 -->
                             <Border Width="10" Height="10" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    Margin="0,1.5,0,0"
                                     BorderThickness="2,2,0,0"
                                     BorderBrush="{ThemeResource TextFillColorSecondaryBrush}" />
                             <Border Width="10" Height="10" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                    Margin="0,0,0,-1.5"
                                     BorderThickness="0,0,2,2"
                                     BorderBrush="{ThemeResource TextFillColorSecondaryBrush}" />
                         </Grid>
