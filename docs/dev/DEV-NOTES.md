@@ -31,7 +31,7 @@
 - `LuaBuilder`：Sudama 密钥/令牌 → `MergeAllDepotsAsync` 用全量 depot 列表补全（防止只写有 manifest 的 depot 漏密钥）→ 缺密钥收集并通知。DLC 段也对每个 DLC AppID 查 `keys[dlcId]`，Sudama 收录的独立 DLC depot key 会自动写入 `addappid(dlcId, 1, "<key>")`
 - 缺解密密钥警告在两种模式下都保留（无 key 无法解密下载加密内容）
 - **搜索页卡片（2026-09-21）**：与入库管理同构——左侧 120×56 缩略图 + 名称 + `AppID:` 行 + 右侧「入库」与「信息」（`&#xE946;` Info 图标）；**不放版本模式行**（搜索结果没有版本状态）
-- **搜索结果缩略图只走内存、不落盘**（结果是一次性的，缓存反而占盘）：`CoverImageService.FetchThumbnailBytesAsync(appId, imageUrl)` 取值链 = ① 搜索结果自带的 `ImageUrl` → ② **官方 `GetHeaderImageUrlAsync`** → ③ null（显示占位图标）；失败时按同一套 akamai→cloudflare 主机改写重试一次。⚠️ ② 是必需的：按 AppID 搜索走 `SearchByAppIdAsync`，那条路径**不填 `ImageUrl`**，少了它按 AppID 搜出来永远没图。上屏用 `SetSourceAsync(MemoryStream.AsRandomAccessStream())`、`DecodePixelWidth=120`；并发 4；**不调用 `EnsureCoverFileAsync`**（那条会落盘）
+- **搜索结果缩略图：与入库封面同一套来源，只走内存不落盘**——`FetchThumbnailBytesAsync(appId)` 走 `HeaderTemplates`（两条 header 布局）→ **官方 `GetHeaderImageUrlAsync`** → null（占位图标）。**不再用 `SearchResult.ImageUrl`**：那是 storesearch 的 `tiny_image`（231×87 小胶囊，≈2.66:1），塞进 2.14:1 的卡片会被裁掉两侧——2026-09-21 用户报的"搜索页缩略图缺一块"就是它。上屏用 `SetSourceAsync(MemoryStream.AsRandomAccessStream())`、`DecodePixelWidth=120`；并发 4；卡片 `Stretch="Uniform"` 作保险（宁愿留边也不裁）；**不调用 `EnsureCoverFileAsync`**（那条会落盘）
 
 ## 4. Sudama 缓存（v1.3.0 现状）
 
@@ -180,6 +180,7 @@
 - 迁移：`covers\.v2` 标记 + 首次取图时后台**就地重编码**（不联网、不丢图；顺带遵守"改格式就 +1"的规则）
 - **评估过但没采用：优先读 Steam 本地 `appcache\librarycache\<appid>\header.jpg`**——实测本地那份与 CDN 下的是**同一张图、逐字节完全相同**（12/12 命中样本），且覆盖率只有 **12/39（31%）**：它省网络请求、**省不了硬盘**，收益不值得再加一条取值路径
 - 判定语义：只有 404/403 才算"确实没有"；超时/5xx/网络异常**不写标记**，下次重试（避免把"网络不通"记成"没有封面"）
+- **官方接口的两种失败必须分开**：`GetHeaderImageUrlAsync` 内部重试 1 次，仍失败就**抛异常**（调用方按"接口暂时不可用"处理 → **不写标记**）；只有"应答正常但没有图片字段"才返回 null（= 确实没有 → 写 `.miss2`）。原实现把两者都当 null，一次偶发失败就把该游戏变成 1 天空白——2026-09-21 修（同一类坑的第二次）
 - 诊断：每个失败条目往**日志文件**写一行带原因（`[Cover] 封面缺失（1 天内不再重试）: <id>（官方接口无图片字段）`）——"为什么这个游戏没封面"看这行
 - **按需加载**：列表用 `ListView`（虚拟化），页面在 `ContainerContentChanging` 里对刚实体化的卡片调 `LibraryViewModel.EnsureCoverAsync` → 滚进视口才取图/建位图，滚出去回收后不重复取。实测：进页面只取 20 张（视口+缓冲），滚到底累计 33 张，而全量预加载是进来就 40 张一起发请求。⚠️ **换成 `ItemsControl` 等非虚拟化容器会让这条机制彻底失效**（40 张卡片会一次性全实体化）
 - 线程：`CoverImageService` 只返回文件路径（不碰 WinUI 类型）；`BitmapImage` 由 VM 在 UI 线程构造，`DecodePixelWidth=120` + `DecodePixelType=Logical`（不设就是按 460×215 全量解码，几十张几十 MB）
