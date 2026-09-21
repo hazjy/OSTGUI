@@ -1,7 +1,7 @@
 # OSTGUI 开发笔记（DEV-NOTES）
 
 > 本文合并自原 plan1.md / plan2.md 两份沉淀文档，并更新至 2026-09-18 现状（GUI v1.4.1 + 配套内核 v1.1.3）。
-> 收录原则：**项目结构与工程现状长期保留**；领域事实/机制查证/调研结论提取至工作区根 `doc/` 下的事实考证（GUI 侧）（Lua 语义、depot/manifest/key 关系、Denuvo 授权、480 联机调研等）；**环境 / 工具链 / 打包类坑不收录**（本机 DPI、沙箱、构建命令、git 行尾、验证手法等一律写工作区 `doc/开发踩坑.md`）；**UI 尺寸 / 文案 / 图标 / 标点这类细碎细节与用户偏好不收录**（一律写工作区 `doc/细节与偏好.md`）；工程状态快照（构建命令产物、临时数字、"待提交"类状态）不再收录，避免过时。
+> 收录原则：**项目结构与工程现状长期保留**；领域事实/机制查证/调研结论提取至工作区根 `doc/` 下的事实考证（GUI 侧）（Lua 语义、depot/manifest/key 关系、Denuvo 授权、480 联机调研等）；**环境 / 工具链 / 打包类坑不收录**（本机 DPI、沙箱、构建命令、git 行尾、验证手法等一律写工作区 `doc/开发踩坑.md`）；**框架 / 桌面应用踩坑与绕法同样不收录**（WinUI 3 等的坑、怎么绕、怎么一眼验出来 —— 同上那份；本文件只留**框架 / API 语义**，即"怎么用对"）；**UI 尺寸 / 文案 / 图标 / 标点这类细碎细节与用户偏好不收录**（一律写工作区 `doc/细节与偏好.md`）；工程状态快照（构建命令产物、临时数字、"待提交"类状态）不再收录，避免过时。
 
 ## 1. 架构总览
 
@@ -31,7 +31,7 @@
 - `LuaBuilder`：Sudama 密钥/令牌 → `MergeAllDepotsAsync` 用全量 depot 列表补全（防止只写有 manifest 的 depot 漏密钥）→ 缺密钥收集并通知。DLC 段也对每个 DLC AppID 查 `keys[dlcId]`，Sudama 收录的独立 DLC depot key 会自动写入 `addappid(dlcId, 1, "<key>")`
 - 缺解密密钥警告在两种模式下都保留（无 key 无法解密下载加密内容）
 - **搜索页卡片**：与入库管理同构（左侧 120×56 缩略图 + 名称 + `AppID:` 行 + 右侧图标按钮区），**不放版本模式行**；尺寸 / 图标 / tooltip / 标点等细碎选择见工作区 `doc/细节与偏好.md`
-- **搜索结果缩略图：与入库封面同一套来源，只走内存不落盘**——`FetchThumbnailBytesAsync(appId)` 走 `HeaderTemplates`（两条 header 布局）→ **官方 `GetHeaderImageUrlAsync`** → null（占位图标）。**不再用 `SearchResult.ImageUrl`**：那是 storesearch 的 `tiny_image`（231×87 小胶囊，≈2.66:1），塞进 2.14:1 的卡片会被裁掉两侧——2026-09-21 用户报的"搜索页缩略图缺一块"就是它。上屏用 `SetSourceAsync(MemoryStream.AsRandomAccessStream())` + **刻意不设 `DecodePixelWidth`**（流解码不认 `Logical`，设了反而首拍发糊——见 §8）；并发 4；卡片 `Stretch="Uniform"` 作保险（宁愿留边也不裁）；**不调用 `EnsureCoverFileAsync`**（那条会落盘）
+- **搜索结果缩略图：与入库封面同一套来源，只走内存不落盘**——`FetchThumbnailBytesAsync(appId)` 走 `HeaderTemplates`（两条 header 布局）→ **官方 `GetHeaderImageUrlAsync`** → null（占位图标）。**不再用 `SearchResult.ImageUrl`**：那是 storesearch 的 `tiny_image`（231×87 小胶囊，≈2.66:1），塞进 2.14:1 的卡片会被裁掉两侧——2026-09-21 用户报的"搜索页缩略图缺一块"就是它。上屏用 `SetSourceAsync(MemoryStream.AsRandomAccessStream())` + **刻意不设 `DecodePixelWidth`**（流解码不认 `Logical`，设了反而首拍发糊——见工作区 `doc/开发踩坑.md` 的 WinUI 小节）；并发 4；卡片 `Stretch="Uniform"` 作保险（宁愿留边也不裁）；**不调用 `EnsureCoverFileAsync`**（那条会落盘）
 
 ## 4. Sudama 缓存（v1.3.0 现状）
 
@@ -98,30 +98,9 @@
 
 内核侧的会话状态只有一份（`-onlinefix` 语义），所以同一时间只能有一个 480 会话；宿主路线的并发由 GUI 按 `OnlineHost` 进程数管理（`IsHostRunning`，路线 B 与 C 共用）。
 
-## 8. WinUI 3 踩坑合集（两轮合并）
+## 8. WinUI 3 踩坑合集（已整节迁出）
 
-- 分段切换用 CommunityToolkit **Segmented**（Pivot/TabView 效果不对）；`SymbolIcon` 无 FontSize 属性（WMC0011），统一 `FontIcon Glyph`
-- 桌面应用没有 `Windows.UI.Colors` → 用 `Microsoft.UI.Colors`
-- 附加属性 C# 侧用 `ToolTipService.SetToolTip()`，对象初始化器赋值编译不过
-- ContentDialog 必须设 `XamlRoot`（Page 用 `this.XamlRoot`，Window 用 `RootGrid.XamlRoot`）
-- **点击空白取消输入框激活（09-02 起有解，此前结论作废）**：两个 WinUI 已知 bug 叠加——① [#4364](https://github.com/microsoft/microsoft-ui-xaml/issues/4364) 点击空白把焦点投给 ScrollViewer 内第一个可聚焦控件（→ 误激活首个输入框）；② [#10051](https://github.com/microsoft/microsoft-ui-xaml/issues/10051) 输入框已聚焦时点空白不转移焦点（→ 无法取消激活）。**方案=两层兜底**：
-  - **页面锚点**：每个含输入框页面的 ScrollViewer 内容首位放 1×1 透明可聚焦 Grid（`IsTabStop=True, TabIndex=0, Opacity=0`）→ 拦截 #4364 的 fallback。已覆盖：设置页、联机页、D加密页(Transfer 面板)、S.A.C 页。
-  - **全局回收**：`MainWindow.RootGrid` 挂 `PointerPressed`（`handledEventsToo:true`），点击处不在交互控件内时 `DispatcherQueue.TryEnqueue` 把焦点拉回全局锚点 `GlobalFocusAnchor`——排队保证晚于框架指针处理，从而覆盖 #10051 与 #4364。
-  - **交互判定** `IsInteractive` 白名单：输入控件 + ComboBox/Slider/ToggleSwitch/ListViewBase/ScrollBar/ButtonBase；`ponytail:` 注释标注——新增交互控件类型需补清单。
-  - **已知副作用**：点交互控件后键盘焦点回全局锚点（键盘 Tab 从头开始，鼠标无感）；ContentDialog 等弹层不冒泡到 RootGrid 故不生效；仅指针触发，键盘操作不受影响。
-  - ⚠️ 历史记录"PointerPressed/Tapped 失焦方案全部无效"**作废**：当年失败根因是**没有可聚焦的焦点目标**；引入"可聚焦锚点"后主动拉焦成立。
-- 浅色主题下按钮图标/文字需适配 `TextFillColorPrimaryBrush` 等 ThemeResource
-- **RadioButton 的分组语义（09-17 踩到）**：有 `GroupName` 时分组根取**整个视觉树**（XamlRoot 范围，源码 `dxaml/xcp/dxaml/lib/RadioButton_Partial.cpp:519-522`：`groupNameExists ? VisualRelativeKind_Root : VisualRelativeKind_Parent`），**没有 GroupName 才按直接父容器分组**。两个页面/视图各用一组同名 `GroupName` 会串成一组，组内自动取消会把共享的布尔写空（症状：两个圈都不选中）。修法是**不写 GroupName**、靠隐式分组各成一组；`RadioButtons` 容器虽然忽略 GroupName，但它的布局盒与圆圈行有 4px 偏差，做左对齐时不要用。
-- ⚠️ 强调色的主题陷阱：`SystemAccentColor` 基础色**不随应用深浅主题翻转**；深色模式下需要"提亮版强调填充"的场景应使用 `AccentFillColorDefaultBrush` 等画刷
-- **弹层主题（2026-09-20，两轮才查对，含一次错误结论）**：① **XAML 里声明**的 ContentDialog 挂在页面树里 → 继承 `RootGrid.RequestedTheme`（浅色应用 + 深色系统下「使用说明」弹窗实测浅色 `#E7E7E7`——我先只测了这一个就断言"弹层本来就跟随"，是错的）；② **代码 `new` 出来**的 ContentDialog 不在 XAML 树里 → 主题落到**系统主题**，浅色应用 + 深色系统下整片发黑（用户截图确认；10 个代码弹窗全中，账号弹窗为例）→ 现在统一在 `ShowAsync` 前调 `Helpers.PopupTheme.Apply(dialog)`，**只设 `RequestedTheme`，背景/画刷仍走框架默认**。旧记录「ContentDialog 恒为深色是刻意行为」只对第 ② 类成立，已作废
-- **代码搭的弹窗内容取画刷**：不能用 `Application.Current.Resources[...]`——同样走**系统主题**。改成在页面/窗口 XAML 里放"取样点"（`BrushProbe`：`{ThemeResource CardBackgroundFillColorDefaultBrush}` 等），代码读它的 `Background`/`BorderBrush`/`Foreground`。已改 `MainWindow`（账号弹窗）与 `LibraryPage`（入库信息弹窗）；账号弹窗的"确认重启"改用框架 `AccentButtonStyle`，不再手工染色
-- **弹层背景不走「显示效果」**：试过给弹层换纯色/亚克力画刷 → 浅色+亚克力下弹窗背景变近黑 `#171719`、深色菜单变浅灰 `#A3A3A3`，比框架默认难看，已回退（框架默认背景本身就是亚克力质感）
-- **`App.xaml` 自定义画刷已清空**（2026-09-20）：`OstAccentBrush`/`Status*Brush`/`FixedVersionBrush`/`AutoVersionBrush` 七个键实测**零引用**，已删，现在只挂 `XamlControlsResources`
-- **窗口状态持久化（2026-09-20 修，用户报"最小化/最大化关窗后下次启动显示效果异常"）**：真因是**两套状态存储打架 + 存了非还原态尺寸**。① 第三方库 `WindowStateSaver.WinUi3`（v0.0.1）会在 **exe 目录**落 `WindowStateSaveData.json`（`{Width,Height,X,Y,IsMaximized}`），与自家 `config.json` 的 `WindowWidth/Height` **双写**；它恢复"最大化"标志时用的却是自己那份过期尺寸 → 窗口以"最大化"标志配小矩形出现。② 自家代码用 `AppWindow.Size` 存尺寸：**最小化关闭存的是 353x56**（图标态矩形）、**最大化关闭存 3868x2080**（工作区尺寸，比屏幕还"满"）→ 下次启动 `AppWindow.Resize` 成"非最大化但铺满/过小"的窗口，亚克力/云母看起来就不对。**修法**：删掉那个库（连同 PackageReference，顺带不再污染 exe 目录）+ 统一改用 Win32 `GetWindowPlacement().rcNormalPosition`（**永远是还原态矩形**，与最小化/最大化无关）存尺寸/位置、`IsZoomed()` 存最大化标志；恢复用 `SetWindowPos`（物理像素）并夹到当前显示器工作区，`IsWindowMaximized` 时再调 `OverlappedPresenter.Maximize()`。**验证**：正常/最大化/最小化三种关闭方式写进配置的尺寸完全一致 + 最大化标志正确；三种重启截图（亚克力正常、内容渲染正常）；exe 目录不再产出 `WindowStateSaveData.json`
-- **启动初始化不能只挂一次性 `Activated`（2026-09-20 修，用户报"最大化关窗后重启是空白页、主页里 Steam 路径/DLL 都为空"）**：`OverlappedPresenter.Maximize()` 对尚未显示的窗口等价于 `ShowWindow(SW_MAXIMIZE)`——**当场显示并激活窗口**并同步抛出 `Activated`；当时订阅还没注册（构造函数里 `Maximize()` 在前、`this.Activated +=` 在后）→ 事件永久丢失；`App` 随后调用的 `Activate()` 对已激活窗口是 no-op，不会补发 → `InitializeAppAsync` 从未执行（不导航 = 空白页，`MainViewModel.InitializeAsync` 没跑 = Steam 路径/DLL 状态为空，两个定时器也没起）。**纪律**：① 窗口状态施加（最大化等会显示/激活窗口的动作）必须在窗口激活之后（现由 `App.OnLaunched` 在 `Activate()` 之后调 `ApplyStartupMaximizeIfNeeded()`）；② 初始化用**幂等入口** `EnsureInitialized()`，`Activated` 只是兜底，`Activate()` 之后也显式调一次；③ 初始化失败必须留日志（原来 `catch { }` 静默，导致"没跑"和"跑了但失败"无法区分，现打 `[Init] 初始化失败: …` + 成功时一行 `[Init] page=…, steam=…`）
-- **窗口尺寸一律是逻辑值**：`MinWindowWidth/MinWindowHeight = 800x560` 在 225% DPI 下对应物理最小值 **1800x1260** —— 恢复尺寸时若按物理像素夹取，必须先 `ScaleLogical()`，否则会把合理的窗口压到最小值。（排查中"AppWindow 与 Win32 单位不一致、每次重启长大 1.44×"的结论**是错的**：那是尺寸低于物理最小值被夹到 min 的表现。本机 DPI 与截图手法相关的环境坑见工作区 `doc/开发踩坑.md`）
-- **`DecodePixelType=Logical` 对「流解码」不生效（2026-09-22 踩到，用户报"搜索页缩略图糊、切到入库管理再切回来就清楚"）**：搜索缩略图是**字节 → `SetSourceAsync(MemoryStream.AsRandomAccessStream())`**，入库封面是**文件 → `UriSource`**；同一个 `DecodePixelWidth=120`，文件路径按逻辑像素解、2.25× DPI 下拿到 ≈270px 表面，**流路径却把它当物理像素用** → 首拍上屏用的是 ≈120px 表面，被 270px 的卡片放大 2.25 倍 → 发糊。切页回来会**重建 `Image` 元素**、按真实布局尺寸重新取表面 → 变清楚（**`BitmapImage` 实例没换、只是重新挂载**，所以"位图是同一个、画面却变了"）。**实测**（225% DPI，`PrintWindow` 截同一张卡同一 270×126 矩形算梯度能量 `mean(|dL/dx|+|dL/dy|)`）：改前首拍 **13.6**、切页回来 **19.5**；**去掉 `DecodePixelWidth` 后首拍 19.6 / 切页回来 19.6**（不再随切页变化）。修法就一句：**流路径别设 `DecodePixelWidth`**，按原生尺寸解码、由 `Image` 缩下来（内存上限与升级路径写在 `SearchViewModel.CreateBitmapAsync` 的 `ponytail:` 注释里）。⚠️ 中途用 `bitmap.PixelWidth` 探针读到 **460**（原图尺寸，不是上屏表面），一度导出"解码是满尺寸、不该糊"的错误方向——**判据只能是屏幕**。⚠️ 严谨性：「≈120px 表面」是按"糊成 2.25 倍放大的观感"**反推**的机制，没直接量到；这条的**硬证据是 A/B**——只删掉这一个设置、首拍就从 13.6 跳到 19.6
-- 版本号只在 csproj 维护三处（Version/AssemblyVersion/FileVersion），运行时从程序集读取
+已整节迁至工作区 `doc/开发踩坑.md`（2026-09-22）。边界：**本文件只留框架 / API 语义（怎么用对）**；**踩坑与绕法（踩过什么、怎么绕、怎么一眼验出来）一律写那份**，细碎 UI 偏好写工作区 `doc/细节与偏好.md`。
 
 ## 9. 服务索引（当前）
 
@@ -165,7 +144,7 @@
 - ⚠️ **`SystemBackdrop = null` 时窗口底色跟的是系统主题，不是应用主题**：浅色应用主题 + 深色系统时背景会露成灰/黑（实测采样 `#808080`、导航栏处 `#000000`）。所以「无」档由 `SolidBackdrop`（`RootGrid` 第一层的 Border，`{ThemeResource SolidBackgroundFillColorBaseBrush}`）自己铺底，云母/亚克力时隐藏让 backdrop 透出来
 - 诊断：每次切换往应用日志写一行 `[Backdrop] <mode> -> <类名>`——"选了没效果"时先看这行在不在、类名对不对
 - 系统要求：云母 Win11 22000+、亚克力 Win11 22621+；不支持时框架静默回落纯色底（不崩），设置页有一行小字说明
-- 弹层（弹窗/菜单）**不**跟着这个设置换背景，只跟随深浅主题——实测与理由见 §8 那条「弹层走框架默认」
+- 弹层（弹窗/菜单）**不**跟着这个设置换背景，只跟随深浅主题——实测与理由见工作区 `doc/开发踩坑.md` 的「弹层背景不要跟随显示效果」
 
 ## 13. 封面图（入库管理卡片）
 
@@ -180,7 +159,7 @@
 - **官方接口的两种失败必须分开**：`GetHeaderImageUrlAsync` 内部重试 1 次，仍失败就**抛异常**（调用方按"接口暂时不可用"处理 → **不写标记**）；只有"应答正常但没有图片字段"才返回 null（= 确实没有 → 写 `.miss2`）。原实现把两者都当 null，一次偶发失败就把该游戏变成 1 天空白——2026-09-21 修（同一类坑的第二次）
 - 诊断：每个失败条目往**日志文件**写一行带原因（`[Cover] 封面缺失（1 天内不再重试）: <id>（官方接口无图片字段）`）——"为什么这个游戏没封面"看这行
 - **按需加载**：列表用 `ListView`（虚拟化），页面在 `ContainerContentChanging` 里对刚实体化的卡片调 `LibraryViewModel.EnsureCoverAsync` → 滚进视口才取图/建位图，滚出去回收后不重复取。实测：进页面只取 20 张（视口+缓冲），滚到底累计 33 张，而全量预加载是进来就 40 张一起发请求。⚠️ **换成 `ItemsControl` 等非虚拟化容器会让这条机制彻底失效**（40 张卡片会一次性全实体化）
-- 线程：`CoverImageService` 只返回文件路径（不碰 WinUI 类型）；`BitmapImage` 由 VM 在 UI 线程构造，`DecodePixelWidth=120` + `DecodePixelType=Logical`（不设就是按 460×215 全量解码，几十张几十 MB）。⚠️ 这套只对**文件路径**（`UriSource`）成立；**流解码**路径（搜索页缩略图）设它会失效并发糊，见 §8
+- 线程：`CoverImageService` 只返回文件路径（不碰 WinUI 类型）；`BitmapImage` 由 VM 在 UI 线程构造，`DecodePixelWidth=120` + `DecodePixelType=Logical`（不设就是按 460×215 全量解码，几十张几十 MB）。⚠️ 这套只对**文件路径**（`UriSource`）成立；**流解码**路径（搜索页缩略图）设它会失效并发糊，见工作区 `doc/开发踩坑.md` 的 WinUI 小节
 
 ## 14. 文档索引
 
