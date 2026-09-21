@@ -30,7 +30,7 @@
 - 入库勾选"下载 Manifest"（默认开）：MHub → Sudama(仅密钥) 级联；不勾则跳过清单直接生成 Lua，由内核运行时兜底取清单，成功提示注明兜底
 - `LuaBuilder`：Sudama 密钥/令牌 → `MergeAllDepotsAsync` 用全量 depot 列表补全（防止只写有 manifest 的 depot 漏密钥）→ 缺密钥收集并通知。DLC 段也对每个 DLC AppID 查 `keys[dlcId]`，Sudama 收录的独立 DLC depot key 会自动写入 `addappid(dlcId, 1, "<key>")`
 - 缺解密密钥警告在两种模式下都保留（无 key 无法解密下载加密内容）
-- **搜索页卡片（2026-09-21）**：与入库管理同构——左侧 120×56 缩略图 + 名称 + `AppID:` 行 + 右侧「入库」与「信息」（`&#xE946;` Info 图标）；**不放版本模式行**（搜索结果没有版本状态）
+- **搜索页卡片（2026-09-21）**：与入库管理同构——左侧 120×56 缩略图 + 名称 + `AppID:` 行 + 右侧两个**纯图标按钮**（32×32 透明底）：**入库**用 `U+E896`（Download：↓ + 横线，表示导入到库里；字体里字面叫 Import 的 `U+E8B5` 画出来是"→|"，不像导入，别用错）、**信息**用 `U+E946`（Info）；两者 tooltip 分别是「入库」「信息」。**不放版本模式行**（搜索结果没有版本状态）
 - **搜索结果缩略图：与入库封面同一套来源，只走内存不落盘**——`FetchThumbnailBytesAsync(appId)` 走 `HeaderTemplates`（两条 header 布局）→ **官方 `GetHeaderImageUrlAsync`** → null（占位图标）。**不再用 `SearchResult.ImageUrl`**：那是 storesearch 的 `tiny_image`（231×87 小胶囊，≈2.66:1），塞进 2.14:1 的卡片会被裁掉两侧——2026-09-21 用户报的"搜索页缩略图缺一块"就是它。上屏用 `SetSourceAsync(MemoryStream.AsRandomAccessStream())`、`DecodePixelWidth=120`；并发 4；卡片 `Stretch="Uniform"` 作保险（宁愿留边也不裁）；**不调用 `EnsureCoverFileAsync`**（那条会落盘）
 
 ## 4. Sudama 缓存（v1.3.0 现状）

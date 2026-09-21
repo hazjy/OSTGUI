@@ -105,8 +105,15 @@
 
                                     <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8"
                                                 VerticalAlignment="Center">
+                                        <!-- 纯图标按钮（icon-only Button）：字体里叫 Import 的是 U+E8B5，
+                                             但图形是"→|"不像导入；这里用大家认得的 Download(↓+横线) 表示"入库/导入到库里"。
+                                             字号/尺寸与入库管理右侧那排图标按钮一致 -->
                                         <Button Click="ListAddGame_Click" Tag="{Binding}"
-                                                Content="入库" FontSize="12" Padding="14,8" />
+                                                ToolTipService.ToolTip="入库"
+                                                Width="32" Height="32" MinWidth="0" Padding="0"
+                                                Background="Transparent" BorderThickness="0">
+                                            <FontIcon Glyph="&#xE896;" FontSize="16" />
+                                        </Button>
                                         <Button Click="InfoButton_Click" Tag="{Binding}"
                                                 ToolTipService.ToolTip="信息"
                                                 Width="32" Height="32" MinWidth="0" Padding="0"
