@@ -73,27 +73,46 @@
                     </ItemsControl.ItemsPanel>
                     <ItemsControl.ItemTemplate>
                         <DataTemplate x:DataType="models:SearchResult">
-                            <Border Padding="16" CornerRadius="12"
-                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                                <Grid ColumnSpacing="12">
+                            <Border Padding="15,12" MinHeight="80" CornerRadius="6"
+                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                                <Grid ColumnSpacing="15">
                                     <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
-                                        <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                                        <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold" TextWrapping="Wrap" />
-                                        <TextBlock Text="{Binding AppId}" FontSize="12" Margin="0,2,0,0"
+
+                                    <!-- 缩略图：只走内存、不落缓存；没图时露出手柄占位
+                                         （Image 直接盖在 FontIcon 上，不需要 null 判断转换器） -->
+                                    <Border Grid.Column="0" Width="120" Height="56" CornerRadius="4"
+                                            Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                                        <Grid>
+                                            <FontIcon Glyph="&#xE7FC;" FontSize="24"
+                                                      Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                                      HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                            <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
+                                        </Grid>
+                                    </Border>
+
+                                    <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="4">
+                                        <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis"
+                                                   Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                        <TextBlock Text="{Binding AppIdDisplay}" FontSize="12"
                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     </StackPanel>
-                                    <Button Grid.Column="1" Click="ListAddGame_Click" Tag="{Binding}"
-                                            Content="入库" FontSize="12" Padding="14,8" VerticalAlignment="Center" />
-                                    <Button Grid.Column="2" Click="ListShareButton_Click" Tag="{Binding}"
-                                            ToolTipService.ToolTip="跳转" VerticalAlignment="Center"
-                                            Background="Transparent" BorderThickness="0" Padding="8,4">
-                                        <FontIcon Glyph="&#xE72D;" FontSize="14" />
-                                    </Button>
+
+                                    <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8"
+                                                VerticalAlignment="Center">
+                                        <Button Click="ListAddGame_Click" Tag="{Binding}"
+                                                Content="入库" FontSize="12" Padding="14,8" />
+                                        <Button Click="InfoButton_Click" Tag="{Binding}"
+                                                ToolTipService.ToolTip="信息"
+                                                Width="32" Height="32" MinWidth="0" Padding="0"
+                                                Background="Transparent" BorderThickness="0">
+                                            <FontIcon Glyph="&#xE946;" FontSize="16" />
+                                        </Button>
+                                    </StackPanel>
                                 </Grid>
                             </Border>
                         </DataTemplate>

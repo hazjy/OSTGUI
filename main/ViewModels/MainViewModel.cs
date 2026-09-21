@@ -98,7 +98,7 @@ public partial class MainViewModel : ObservableObject
         _steamDllService = steamDllService;
 
         // 初始化子 ViewModel
-        SearchVM = new SearchViewModel(searchService, manifestService, steamService, configService);
+        SearchVM = new SearchViewModel(searchService, manifestService, steamService, configService, coverImageService);
         LibraryVM = new LibraryViewModel(luaService, searchService, gameInfoService, steamService, configService, gameNameCacheService, coverImageService);
         DenuvoVM = new DenuvoViewModel(
             ticketService, luaService, ostFileService,

@@ -192,6 +192,54 @@ public class CoverImageService
     }
 
     /// <summary>
+    /// 取搜索结果缩略图的字节：**只走内存、不落盘**（搜索结果是临时的，缓存反而占盘）。
+    /// 取值链：① 搜索结果自带的 ImageUrl → ② 官方 appdetails 的权威 URL（按 AppID 搜索那条路径
+    /// 根本不填 ImageUrl，不补这一步就永远没图）→ ③ null（调用方显示占位图标）
+    /// </summary>
+    public async Task<byte[]?> FetchThumbnailBytesAsync(string appId, string? imageUrl)
+    {
+        if (!string.IsNullOrWhiteSpace(imageUrl))
+        {
+            var bytes = await TryGetBytesAsync(imageUrl).ConfigureAwait(false);
+            if (bytes is not null) return bytes;
+        }
+
+        if (!IsAppId(appId)) return null;
+
+        var officialUrl = await _gameInfo.GetHeaderImageUrlAsync(appId).ConfigureAwait(false);
+        return string.IsNullOrWhiteSpace(officialUrl)
+            ? null
+            : await TryGetBytesAsync(officialUrl).ConfigureAwait(false);
+    }
+
+    /// <summary>GET 字节；非 2xx / 异常 / 空响应都返回 null。失败时按主机改写规则重试一次</summary>
+    private async Task<byte[]?> TryGetBytesAsync(string url)
+    {
+        var bytes = await GetBytesOnceAsync(url).ConfigureAwait(false);
+        if (bytes is null && TryRewriteHost(url, out var altUrl))
+            bytes = await GetBytesOnceAsync(altUrl).ConfigureAwait(false);
+        return bytes;
+    }
+
+    private async Task<byte[]?> GetBytesOnceAsync(string url)
+    {
+        try
+        {
+            using var resp = await _http
+                .GetAsync(url, HttpCompletionOption.ResponseHeadersRead)
+                .ConfigureAwait(false);
+            if (!resp.IsSuccessStatusCode) return null;
+
+            var bytes = await resp.Content.ReadAsByteArrayAsync().ConfigureAwait(false);
+            return bytes.Length == 0 ? null : bytes;
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
     /// 下载到目标文件。失败类别：404/403 = 确实没这张图；net = 网络异常；
     /// status/empty = 非 200 或空响应（不确定，但本轮不再试）
     /// </summary>

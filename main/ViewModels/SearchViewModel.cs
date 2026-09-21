@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Microsoft.UI.Xaml.Media.Imaging;
 using OSTGUI.Models;
 using OSTGUI.Services;
 
@@ -15,6 +16,7 @@ public partial class SearchViewModel : ObservableObject
     private readonly ManifestDownloadService _manifestService;
     private readonly SteamService _steamService;
     private readonly ConfigService _configService;
+    private readonly CoverImageService _coverService;
     private bool _isLoadingOptions;
 
     [ObservableProperty] private string _searchQuery = "";
@@ -49,12 +51,14 @@ public partial class SearchViewModel : ObservableObject
         GameSearchService searchService,
         ManifestDownloadService manifestService,
         SteamService steamService,
-        ConfigService configService)
+        ConfigService configService,
+        CoverImageService coverService)
     {
         _searchService = searchService;
         _manifestService = manifestService;
         _steamService = steamService;
         _configService = configService;
+        _coverService = coverService;
 
         // 集合内容变化时同步刷新 HasResults 与无结果提示
         SearchResults.CollectionChanged += (s, e) =>
@@ -187,6 +191,47 @@ public partial class SearchViewModel : ObservableObject
             IsSearching = false;
             HasSearched = true;
         }
+
+        // 缩略图：只走内存（不落缓存）、失败静默。先快照，免得下一次搜索把集合换掉
+        _ = LoadThumbnailsAsync(SearchResults.ToList());
+    }
+
+    /// <summary>
+    /// 拉搜索结果缩略图。**不落盘**（搜索结果是临时的，别污染 covers 缓存）；
+    /// 并发 4，失败就让卡片显示占位图标。必须在 UI 线程调用（BitmapImage 是 DependencyObject）
+    /// </summary>
+    private async Task LoadThumbnailsAsync(List<SearchResult> results)
+    {
+        using var gate = new SemaphoreSlim(4);
+        await Task.WhenAll(results.Select(async result =>
+        {
+            if (result.Thumbnail is not null || !result.AppId.All(char.IsAsciiDigit)) return;
+            await gate.WaitAsync();
+            try
+            {
+                var bytes = await _coverService.FetchThumbnailBytesAsync(result.AppId, result.ImageUrl);
+                if (bytes is not null)
+                    result.Thumbnail = await CreateBitmapAsync(bytes);
+            }
+            catch { }
+            finally { gate.Release(); }
+        }));
+    }
+
+    /// <summary>
+    /// 字节 → 位图。DecodePixelWidth 按卡片显示宽度（120 逻辑像素）解码；
+    /// 不设就是按原图 460×215 全量解码
+    /// </summary>
+    private static async Task<BitmapImage> CreateBitmapAsync(byte[] bytes)
+    {
+        var bitmap = new BitmapImage
+        {
+            DecodePixelType = DecodePixelType.Logical,
+            DecodePixelWidth = 120
+        };
+        using var stream = new MemoryStream(bytes);
+        await bitmap.SetSourceAsync(stream.AsRandomAccessStream());
+        return bitmap;
     }
 
     [RelayCommand]

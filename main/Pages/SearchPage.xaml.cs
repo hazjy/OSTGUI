@@ -44,15 +44,15 @@ public sealed partial class SearchPage : Page
         }
     }
 
-    private async void ListShareButton_Click(object sender, RoutedEventArgs e)
+    private async void InfoButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is Button btn && btn.Tag is SearchResult result)
         {
-            ShowShareDialog(result);
+            ShowInfoDialog(result);
         }
     }
 
-    private async void ShowShareDialog(SearchResult result)
+    private async void ShowInfoDialog(SearchResult result)
     {
         // AppID 行 + 透明底复制图标（横向排列，图标随 AppID 文本长度自动右移）
         var appIdText = new TextBlock
