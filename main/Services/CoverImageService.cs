@@ -42,14 +42,22 @@ public class CoverImageService
     /// </summary>
     private const string MissSuffix = ".miss2";
 
-    /// <summary>静态回退链：旧布局 → 新布局（store_item_assets）；header 为主，capsule 兜比例/缺图</summary>
-    private static readonly string[] UrlTemplates =
+    /// <summary>横版 header（460×215，比例与卡片一致）：旧布局 → 新布局。入库封面与搜索缩略图共用</summary>
+    private static readonly string[] HeaderTemplates =
     {
         "https://cdn.cloudflare.steamstatic.com/steam/apps/{0}/header.jpg",
         "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{0}/header.jpg",
+    };
+
+    /// <summary>capsule 兜底（比例 ≈1.75，只有入库封面会用；搜索缩略图不用它，免得留边）</summary>
+    private static readonly string[] CapsuleTemplates =
+    {
         "https://cdn.cloudflare.steamstatic.com/steam/apps/{0}/capsule_616x353.jpg",
         "https://shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/{0}/capsule_616x353.jpg",
     };
+
+    /// <summary>入库封面的完整回退链：header 优先，capsule 兜比例/缺图</summary>
+    private static readonly string[] UrlTemplates = HeaderTemplates.Concat(CapsuleTemplates).ToArray();
 
     /// <summary>不可达的镜像主机 → 等价可达主机（路径与查询串原样保留）。
     /// 本机 hosts 把 akamai / akamaihd / media.steampowered.com 全指向 127.0.0.1，
@@ -158,7 +166,19 @@ public class CoverImageService
             }
 
             // ② 官方 appdetails 兜底
-            var apiUrl = await _gameInfo.GetHeaderImageUrlAsync(appId).ConfigureAwait(false);
+            string? apiUrl;
+            try
+            {
+                apiUrl = await _gameInfo.GetHeaderImageUrlAsync(appId).ConfigureAwait(false);
+            }
+            catch
+            {
+                // 接口/网络暂时不可用：**不能**记成"确实没有图"，否则 1 天内不再重试
+                // （原实现就是这么把偶发失败变成一天空白的）
+                Log($"封面暂不可用（官方接口失败，不记标记）: {appId}");
+                return null;
+            }
+
             if (!string.IsNullOrEmpty(apiUrl))
             {
                 var (ok, _) = await TryDownloadAsync(apiUrl, file).ConfigureAwait(false);
@@ -192,24 +212,45 @@ public class CoverImageService
     }
 
     /// <summary>
-    /// 取搜索结果缩略图的字节：**只走内存、不落盘**（搜索结果是临时的，缓存反而占盘）。
-    /// 取值链：① 搜索结果自带的 ImageUrl → ② 官方 appdetails 的权威 URL（按 AppID 搜索那条路径
-    /// 根本不填 ImageUrl，不补这一步就永远没图）→ ③ null（调用方显示占位图标）
+    /// 取搜索结果缩略图的字节：**与入库封面同一套来源**（<see cref="HeaderTemplates"/> → 官方
+    /// appdetails 的 header_image），唯一的区别是**只走内存、不落盘**。
+    ///
+    /// 不再用搜索源自带的 `SearchResult.ImageUrl`：那是 storesearch 的 `tiny_image`（231×87 小胶囊，
+    /// ≈2.66:1），塞进 2.14:1 的卡片会被 `UniformToFill` **裁掉两侧**——2026-09-21 用户报的
+    /// "搜索页缩略图缺一块"就是它。改用同一套 header 源后两页观感一致。
     /// </summary>
-    public async Task<byte[]?> FetchThumbnailBytesAsync(string appId, string? imageUrl)
+    public async Task<byte[]?> FetchThumbnailBytesAsync(string appId)
     {
-        if (!string.IsNullOrWhiteSpace(imageUrl))
+        if (!IsAppId(appId)) return null;
+
+        foreach (var template in HeaderTemplates)
         {
-            var bytes = await TryGetBytesAsync(imageUrl).ConfigureAwait(false);
+            var bytes = await TryGetBytesAsync(string.Format(template, appId)).ConfigureAwait(false);
             if (bytes is not null) return bytes;
         }
 
-        if (!IsAppId(appId)) return null;
+        // 2024+ 新上架游戏在旧/新布局下都可能没有 header.jpg → 问官方要权威 header_image
+        string? officialUrl;
+        try
+        {
+            officialUrl = await _gameInfo.GetHeaderImageUrlAsync(appId).ConfigureAwait(false);
+        }
+        catch
+        {
+            Log($"缩略图官方接口失败（本次放弃，不落盘也不标记）: {appId}");
+            return null;
+        }
 
-        var officialUrl = await _gameInfo.GetHeaderImageUrlAsync(appId).ConfigureAwait(false);
-        return string.IsNullOrWhiteSpace(officialUrl)
-            ? null
-            : await TryGetBytesAsync(officialUrl).ConfigureAwait(false);
+        if (string.IsNullOrWhiteSpace(officialUrl))
+        {
+            Log($"缩略图无图（两条静态 header 链都没命中，官方接口也没给 URL）: {appId}");
+            return null;
+        }
+
+        var officialBytes = await TryGetBytesAsync(officialUrl).ConfigureAwait(false);
+        if (officialBytes is null)
+            Log($"缩略图官方 URL 下不动: {appId} {officialUrl}");
+        return officialBytes;
     }
 
     /// <summary>GET 字节；非 2xx / 异常 / 空响应都返回 null。失败时按主机改写规则重试一次</summary>

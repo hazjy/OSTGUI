@@ -36,42 +36,53 @@ public class SteamGameInfoService
     /// <summary>
     /// 取官方封面 URL（appdetails 的 header_image → capsule_image → capsule_imagev5）。
     /// 只对静态 CDN 链失败的 appid 调用：2024+ 新上架游戏在旧布局（steam/apps/&lt;id&gt;/header.jpg）
-    /// 下是 404，静态猜不出来，只能问官方（无需 API key）。8s 超时，任何失败返回 null。
+    /// 下是 404，静态猜不出来，只能问官方（无需 API key）。
+    ///
+    /// 语义：**接口应答正常但没有图片字段 → 返回 null**（确实没有封面）；
+    /// **HTTP/网络失败 → 抛异常**（调用方据此区分，别把"接口暂时不可用"记成"确实没有"）。
+    /// 8s 超时 + 重试 1 次（实测偶发失败重试即成功）。
     /// </summary>
     public async Task<string?> GetHeaderImageUrlAsync(string appId)
     {
         if (string.IsNullOrEmpty(appId)) return null;
-        try
+
+        Exception? lastError = null;
+        for (var attempt = 0; attempt < 2; attempt++)
         {
-            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
-            var resp = await _http.GetAsync(
-                $"https://store.steampowered.com/api/appdetails?appids={appId}&filters=basic&cc=us&l=en", cts.Token);
-            if (!resp.IsSuccessStatusCode)
+            try
             {
-                Log($"封面 API 响应: {(int)resp.StatusCode}");
-                return null;
-            }
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(8));
+                var resp = await _http.GetAsync(
+                    $"https://store.steampowered.com/api/appdetails?appids={appId}&filters=basic&cc=us&l=en", cts.Token);
+                if (!resp.IsSuccessStatusCode)
+                    throw new HttpRequestException($"appdetails 返回 HTTP {(int)resp.StatusCode}");
 
-            var json = await resp.Content.ReadAsStringAsync(cts.Token);
-            var doc = JsonDocument.Parse(json);
-            if (!doc.RootElement.TryGetProperty(appId, out var appData)) return null;
-            if (!appData.TryGetProperty("success", out var success) || !success.GetBoolean()) return null;
-            if (!appData.TryGetProperty("data", out var data)) return null;
+                var json = await resp.Content.ReadAsStringAsync(cts.Token);
+                var doc = JsonDocument.Parse(json);
+                if (!doc.RootElement.TryGetProperty(appId, out var appData)) return null;
+                if (!appData.TryGetProperty("success", out var success) || !success.GetBoolean()) return null;
+                if (!appData.TryGetProperty("data", out var data)) return null;
 
-            foreach (var field in new[] { "header_image", "capsule_image", "capsule_imagev5" })
-            {
-                if (data.TryGetProperty(field, out var elem))
+                foreach (var field in new[] { "header_image", "capsule_image", "capsule_imagev5" })
                 {
-                    var url = elem.GetString();
-                    if (!string.IsNullOrWhiteSpace(url)) return url;
+                    if (data.TryGetProperty(field, out var elem))
+                    {
+                        var url = elem.GetString();
+                        if (!string.IsNullOrWhiteSpace(url)) return url;
+                    }
                 }
+                return null;   // 应答正常但没图片字段
+            }
+            catch (Exception ex)
+            {
+                lastError = ex;
+                if (attempt == 0)
+                    await Task.Delay(400).ConfigureAwait(false);
             }
         }
-        catch (Exception ex)
-        {
-            Log($"封面 API 失败: {ex.Message}");
-        }
-        return null;
+
+        Log($"封面 API 失败: {lastError?.Message}");
+        throw lastError!;
     }
 
     /// <summary>

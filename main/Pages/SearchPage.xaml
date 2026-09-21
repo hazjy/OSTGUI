@@ -82,15 +82,16 @@
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
 
-                                    <!-- 缩略图：只走内存、不落缓存；没图时露出手柄占位
-                                         （Image 直接盖在 FontIcon 上，不需要 null 判断转换器） -->
+                                    <!-- 缩略图：来源与入库封面完全同一套（460×215 header），只走内存不落盘；
+                                         没图时露出手柄占位（Image 直接盖在 FontIcon 上，不需要 null 判断转换器）。
+                                         这里用 Uniform 是保险：万一官方给了别的比例，宁可留边也不裁切 -->
                                     <Border Grid.Column="0" Width="120" Height="56" CornerRadius="4"
                                             Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
                                         <Grid>
                                             <FontIcon Glyph="&#xE7FC;" FontSize="24"
                                                       Foreground="{ThemeResource TextFillColorTertiaryBrush}"
                                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
-                                            <Image Source="{Binding Thumbnail}" Stretch="UniformToFill" />
+                                            <Image Source="{Binding Thumbnail}" Stretch="Uniform" />
                                         </Grid>
                                     </Border>
 

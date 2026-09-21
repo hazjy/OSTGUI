@@ -209,7 +209,7 @@ public partial class SearchViewModel : ObservableObject
             await gate.WaitAsync();
             try
             {
-                var bytes = await _coverService.FetchThumbnailBytesAsync(result.AppId, result.ImageUrl);
+                var bytes = await _coverService.FetchThumbnailBytesAsync(result.AppId);
                 if (bytes is not null)
                     result.Thumbnail = await CreateBitmapAsync(bytes);
             }
