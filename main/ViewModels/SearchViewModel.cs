@@ -219,16 +219,18 @@ public partial class SearchViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 字节 → 位图。DecodePixelWidth 按卡片显示宽度（120 逻辑像素）解码；
-    /// 不设就是按原图 460×215 全量解码
+    /// 字节 → 位图。**刻意不设 `DecodePixelWidth`**（2026-09-22 实测的坑，见 DEV-NOTES §8）：
+    /// 流解码（`SetSourceAsync`）路径上 `DecodePixelType=Logical` 不生效，120 被当**物理像素**用，
+    /// 首拍上屏用的是 ≈120px 的表面、再被 225% DPI 的卡片放大 2.25 倍 → 明显发糊；
+    /// 切页重建 `Image` 后按真实布局尺寸重新取表面才变清楚（同一矩形梯度能量 13.6 → 19.5）。
+    /// ⚠️ 探针 `bitmap.PixelWidth` 读到的是 **460**（原图尺寸，不是上屏表面），别拿它当判据。
+    /// 不设即按原生 460×215 解码，显示端是缩小，任何 DPI 都清晰。
+    /// ponytail: 每个结果常驻约 400KB 位图（十来条结果 ≈ 4MB）；真嫌大再改成把页面
+    /// `XamlRoot.RasterizationScale` 传进来、用 `Physical` 解 `120×scale`。
     /// </summary>
     private static async Task<BitmapImage> CreateBitmapAsync(byte[] bytes)
     {
-        var bitmap = new BitmapImage
-        {
-            DecodePixelType = DecodePixelType.Logical,
-            DecodePixelWidth = 120
-        };
+        var bitmap = new BitmapImage();
         using var stream = new MemoryStream(bytes);
         await bitmap.SetSourceAsync(stream.AsRandomAccessStream());
         return bitmap;
