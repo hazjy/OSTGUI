@@ -130,6 +130,7 @@
 | `ManifestDownloadService` | 多源清单下载 + 生成 Lua（门面已移除）|
 | `LuaBuilder` / `LuaConfigService` | Lua 生成（补全 depot/key/token/DLC/固定版本）；Lua 读写与版本模式切换 |
 | `SudamaKeyCache` | 密钥/令牌缓存（存在即用不自动过期、并行下载、手动刷新与本地导入）|
+| `CoverImageService` | 入库卡片封面：静态 CDN 链 → 官方 appdetails 兜底 → 缺失标记（`.miss2`），落盘 `%LOCALAPPDATA%\OSTGUI\covers\`；详见 §13 |
 | `LibraryScanner` | 扫描 Lua 目录、检测错误 |
 | `NoSteamLauncherService` / `NoSteamLaunchOrchestrator` | 免 Steam 部署封装 / 编排（Steamless + GBE + Bypass）+ 一键还原（照抄 SAC `Restore` 四步，见 §6）|
 | `OnlineFixService` | 联机三条路线（§7）：内核原生（`steam.exe -applaunch <appid> -onlinefix=<session>` + PEB 读命令行检测/停止）、宿主 480（拉起 `OnlineHost.exe`、按 AppID 解析游戏 exe、从宿主命令行反查游戏进程后结束）、AppID Changer 文件法（`--appid-txt` + 台账还原 + 启动时补还原巡检）|
@@ -164,7 +165,18 @@
 - 系统要求：云母 Win11 22000+、亚克力 Win11 22621+；不支持时框架静默回落纯色底（不崩），设置页有一行小字说明
 - 弹层（弹窗/菜单）**不**跟着这个设置换背景，只跟随深浅主题——实测与理由见 §8 那条「弹层走框架默认」
 
-## 13. 文档索引
+## 13. 封面图（入库管理卡片）
+
+- 位置：卡片左侧 120×56（Steam `header.jpg` 原生比例 460×215），`Stretch="UniformToFill"` 吸收比例差；无图时露出底下的手柄图标占位（`Image` 直接盖在 `FontIcon` 上，不引入 null 判断转换器）
+- 取值链（`CoverImageService`，信号量并发 4）：① `cdn.cloudflare.steamstatic.com/steam/apps/<id>/header.jpg` ② 新布局 `shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/<id>/header.jpg` ③ 同两处的 `capsule_616x353.jpg` ④ **官方 appdetails** 的 `header_image` → `capsule_image` → `capsule_imagev5`（仅对 ①–③ 全失败的条目调用，8s 超时，`SteamGameInfoService.GetHeaderImageUrlAsync`）
+- ⚠️ **2024+ 新上架游戏在旧布局下没有 `header.jpg`**（2026-09-21 实测 PEAK/3527290 及 3548580/4001890 全部 404，静态猜不出来）→ 只有官方接口能拿到；官方返回的 URL 若落在 `*.akamai.steamstatic.com` / `steamcdn-a.akamaihd.net` / `media.steampowered.com`（本机 hosts 指向 127.0.0.1），自动换成等价 cloudflare 主机重试一次
+- 缓存：`%LOCALAPPDATA%\OSTGUI\covers\<appid>.jpg`（命中不联网）；确无图的写 `<appid>.miss2`（TTL 1 天）。已知本来就无封面：`1716751`（育碧组件）——出现这类 `.miss2` 属正常，不是故障。**改 URL 链/兜底源时必须把 `MissSuffix` +1**，否则旧标记会在 TTL 内挡住新逻辑——2026-09-21 的"封面永远出不来"就是这么来的
+- 判定语义：只有 404/403 才算"确实没有"；超时/5xx/网络异常**不写标记**，下次重试（避免把"网络不通"记成"没有封面"）
+- 诊断：每个失败条目往**日志文件**写一行带原因（`[Cover] 封面缺失（1 天内不再重试）: <id>（官方接口无图片字段）`）——"为什么这个游戏没封面"看这行
+- **按需加载**：列表用 `ListView`（虚拟化），页面在 `ContainerContentChanging` 里对刚实体化的卡片调 `LibraryViewModel.EnsureCoverAsync` → 滚进视口才取图/建位图，滚出去回收后不重复取。实测：进页面只取 20 张（视口+缓冲），滚到底累计 33 张，而全量预加载是进来就 40 张一起发请求。⚠️ **换成 `ItemsControl` 等非虚拟化容器会让这条机制彻底失效**（40 张卡片会一次性全实体化）
+- 线程：`CoverImageService` 只返回文件路径（不碰 WinUI 类型）；`BitmapImage` 由 VM 在 UI 线程构造，`DecodePixelWidth=120` + `DecodePixelType=Logical`（不设就是按 460×215 全量解码，几十张几十 MB）
+
+## 14. 文档索引
 
 - 事实考证（Lua 语义 / depot·manifest·key 关系 / Denuvo 授权 / 480 联机调研）：工作区根 `doc/` 下的事实考证（GUI 侧）
 - 重要事件与调研：`../../doc/EVENTS/`（工作区根 doc 下）
