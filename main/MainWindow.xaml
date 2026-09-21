@@ -44,11 +44,7 @@
               HorizontalAlignment="Left" VerticalAlignment="Top" Opacity="0" />
 
         <Grid x:Name="AppTitleBar" Grid.Row="0" Height="48"
-              Background="Transparent" VerticalAlignment="Top">
-            <TextBlock x:Name="AppTitleBarText" Text="OSTGUI" VerticalAlignment="Center" Margin="16,0,0,0"
-                       FontSize="14" FontWeight="SemiBold"
-                       Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
-        </Grid>
+              Background="Transparent" VerticalAlignment="Top" />
 
         <NavigationView
             x:Name="MainNavView"

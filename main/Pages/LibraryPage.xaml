@@ -41,7 +41,25 @@
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <StackPanel Grid.Column="0" Spacing="4">
-                    <TextBlock Text="{Binding TitleText}" FontSize="24" FontWeight="Bold" />
+                    <StackPanel Orientation="Horizontal" Spacing="12">
+                        <TextBlock Text="入库管理" FontSize="24" FontWeight="Bold" />
+                        <!-- 游戏数量角标（⌈40⌋ 那个形状）：**两个只画两条边的 10×10 小方块**贴在网格的左上角
+                             和右下角 —— 左上块画「左+上」、右下块画「右+下」，右上/左下留空，正好是敞口的角标。
+                             不直接用 U+2308/U+230B 字形：它们落在**回退字体**里、粗体请求不生效，笔画比加粗标题
+                             细一档（实测截图偏细）；自画则粗细/臂长/留白全可控、也不依赖字体 -->
+                        <Grid VerticalAlignment="Center"
+                              Visibility="{Binding HasCount, Converter={StaticResource BoolToVis}}">
+                            <TextBlock Text="{Binding TotalCount}" FontSize="20" FontWeight="Bold"
+                                       Margin="14,2,14,2"
+                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                            <Border Width="10" Height="10" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                    BorderThickness="2,2,0,0"
+                                    BorderBrush="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <Border Width="10" Height="10" HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                    BorderThickness="0,0,2,2"
+                                    BorderBrush="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </Grid>
+                    </StackPanel>
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
                     <AutoSuggestBox Width="240" QueryIcon="Find"
