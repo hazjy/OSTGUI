@@ -220,10 +220,11 @@
                             <ScaleTransform />
                         </Border.RenderTransform>
                         <StackPanel>
-                            <!-- 封面框 200×94 = header.jpg 原生比例（460×215），不裁不放大：
-                                 225% DPI 下要 450 物理像素，落盘的 460 宽正好 1:1。
+                            <!-- 封面框 200×93 = 比例 2.1505，**必须 ≥ 素材比例（header.jpg 460×215 = 2.1395）**，
+                                 否则 UniformToFill 会左右各裁一点：素材四边只有 3px 的细边框，裁掉 1.28px 就让
+                                 "右边没边了"（2026-09-23 用户实测 shapez 2 报的那条）。
                                  无封面时露出底下的图标占位（空框看着像坏了） -->
-                            <Border Height="94" CornerRadius="6,6,0,0"
+                            <Border Height="93" CornerRadius="6,6,0,0"
                                     Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
                                 <Grid>
                                     <FontIcon Glyph="&#xE7FC;" FontSize="24"
