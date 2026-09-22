@@ -92,6 +92,8 @@ public class SteamService
     public string? GetEffectiveLuaDir()
     {
         if (!string.IsNullOrWhiteSpace(_luaPath)) return _luaPath;
+        // 兜底 <Steam>\config\lua，与内核侧一致（见 ZSteamTool/src/dllmain.cpp 同处注释）。
+        // ⚠️ 别改回 config\stplug-in：09-13 两边默认目录不一致，全新机器上入库/DLC 全部"装了但没用"。
         return string.IsNullOrEmpty(_steamPath) ? null : Path.Combine(_steamPath, "config", "lua");
     }
 

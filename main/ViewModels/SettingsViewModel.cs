@@ -392,6 +392,9 @@ public partial class SettingsViewModel : ObservableObject
     /// <summary>
     /// 回填 Lua 路径输入框：取内核配置里写的目录，内核没写就留空
     /// （输入框显示「默认路径」，实际用的就是 &lt;Steam&gt;\config\lua）。
+    /// ⚠️ 路径框只做"检测 → 回填"，**不加校验、不搞失败回滚**：09-14 给两个路径框加过一整套
+    /// 失焦校验（去引号 / 验 steam.exe / 失败回滚），正常填的路径反而被改回去；精简时又把
+    /// "空值自动检测回填"这个正常功能一起删了 → 设置页永久空白（用户报障）。
     /// </summary>
     public void RefreshPaths()
     {
