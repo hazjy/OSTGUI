@@ -1,6 +1,10 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Text;
+using OSTGUI.Helpers;
 using OSTGUI.Models;
 using OSTGUI.ViewModels;
 
@@ -37,7 +41,12 @@ public sealed partial class LibraryPage : Page
     /// </summary>
     private void LibraryList_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
     {
-        if (args.InRecycleQueue) return;
+        if (args.InRecycleQueue)
+        {
+            // 卡片滚出视口时指针可能还压着它：不复位的话，回收后的容器会带着缩放/阴影跳到别处
+            if (args.ItemContainer is FrameworkElement container) CardHover.Reset(container);
+            return;
+        }
         if (args.Item is LibraryItem item)
             _ = VM.EnsureCoverAsync(item);   // 只加载一次；已加载的直接返回
     }
@@ -45,9 +54,51 @@ public sealed partial class LibraryPage : Page
     /// <summary>网格视图的懒加载钩子：GridView 也继承 ListViewBase，语义与列表完全一样</summary>
     private void LibraryGrid_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
     {
-        if (args.InRecycleQueue) return;
+        if (args.InRecycleQueue)
+        {
+            if (args.ItemContainer is FrameworkElement container) CardHover.Reset(container);
+            return;
+        }
         if (args.Item is LibraryItem item)
             _ = VM.EnsureCoverAsync(item);
+    }
+
+    // ==================== 卡片悬浮微交互 ====================
+    // 缩放/阴影打在**容器**上（容器稳定、回收时有东西可复位），背景高亮打在**卡片**上
+    // （容器在卡片底下，被不透明的卡片盖住）。数值与实现见 Helpers/CardHover.cs
+
+    private void ListCard_PointerEntered(object sender, PointerRoutedEventArgs e)
+        => EnterCard(sender, CardHover.ListScale, CardHover.ListShadowZ);
+
+    private void ListCard_PointerExited(object sender, PointerRoutedEventArgs e)
+        => ExitCard(sender);
+
+    private void GridCard_PointerEntered(object sender, PointerRoutedEventArgs e)
+        => EnterCard(sender, CardHover.GridScale, CardHover.GridShadowZ);
+
+    private void GridCard_PointerExited(object sender, PointerRoutedEventArgs e)
+        => ExitCard(sender);
+
+    private void EnterCard(object sender, float scale, float shadowZ)
+    {
+        if (sender is not Border card) return;
+        CardHover.Enter(ToContainer(card), card, ProbeCardHover.Background, scale, shadowZ);
+    }
+
+    private void ExitCard(object sender)
+    {
+        if (sender is not Border card) return;
+        CardHover.Exit(ToContainer(card), card);
+    }
+
+    /// <summary>从卡片往上找到它的条目容器（`GridViewItem` / `ListViewItem`）。
+    /// WinUI 3 的 `ItemsControl` 没有 UWP 那个 `ContainerFromElement`，自己往上走两步就有了</summary>
+    private static FrameworkElement ToContainer(Border card)
+    {
+        DependencyObject? current = card;
+        while (current is not null and not SelectorItem)
+            current = VisualTreeHelper.GetParent(current);
+        return current as FrameworkElement ?? card;
     }
 
     /// <summary>

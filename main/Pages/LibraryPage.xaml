@@ -33,6 +33,8 @@
             <Border x:Name="ProbeCard" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
             <TextBlock x:Name="ProbeSecondary" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
             <TextBlock x:Name="ProbeSuccess" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+            <!-- 悬浮高亮用（代码里换卡片背景时按应用主题取，见 LibraryPage.xaml.cs） -->
+            <Border x:Name="ProbeCardHover" Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" />
         </Grid>
 
         <StackPanel Grid.Row="0" Margin="40,32,40,12" Spacing="16">
@@ -90,11 +92,12 @@
                   Visibility="{Binding IsListView, Converter={StaticResource BoolToVis}}"
                   ContainerContentChanging="LibraryList_ContainerContentChanging">
             <ListView.ItemContainerStyle>
-                <!-- 抹掉 ListViewItem 自带的容器内边距/最小高度，卡片自己的 Padding/Margin 说了算 -->
+                <!-- 抹掉 ListViewItem 自带的容器内边距/最小高度，卡片自己的 Padding/Margin 说了算。
+                     左右各留 10：悬浮放大时卡片要往两边长，不留就会被控件视口边界切掉 -->
                 <Style TargetType="ListViewItem">
                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                     <Setter Property="Padding" Value="0" />
-                    <Setter Property="Margin" Value="0" />
+                    <Setter Property="Margin" Value="10,4" />
                     <Setter Property="MinHeight" Value="0" />
                 </Style>
             </ListView.ItemContainerStyle>
@@ -102,7 +105,9 @@
                     <DataTemplate x:DataType="models:LibraryItem">
                         <Border Margin="0,4" Padding="15,12" MinHeight="80"
                                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                CornerRadius="6">
+                                CornerRadius="6"
+                                PointerEntered="ListCard_PointerEntered"
+                                PointerExited="ListCard_PointerExited">
                             <Grid ColumnSpacing="15">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -192,7 +197,8 @@
                     <Setter Property="HorizontalContentAlignment" Value="Stretch" />
                     <Setter Property="VerticalContentAlignment" Value="Stretch" />
                     <Setter Property="Padding" Value="0" />
-                    <Setter Property="Margin" Value="0,0,12,12" />
+                    <!-- 6+6 = 卡片间距仍是 12；关键是四边都有了余量，悬浮放大不会被视口边界切掉 -->
+                    <Setter Property="Margin" Value="6,6,6,6" />
                     <Setter Property="MinHeight" Value="0" />
                     <Setter Property="MinWidth" Value="0" />
                 </Style>
@@ -200,7 +206,9 @@
             <GridView.ItemTemplate>
                 <DataTemplate x:DataType="models:LibraryItem">
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            CornerRadius="6">
+                            CornerRadius="6"
+                            PointerEntered="GridCard_PointerEntered"
+                            PointerExited="GridCard_PointerExited">
                         <StackPanel>
                             <!-- 封面框 200×94 = header.jpg 原生比例（460×215），不裁不放大：
                                  225% DPI 下要 450 物理像素，落盘的 460 宽正好 1:1。
