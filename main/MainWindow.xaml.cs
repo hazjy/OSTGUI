@@ -30,12 +30,12 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
         RootGrid.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(Root_PointerPressed), true);
 
         ExtendsContentIntoTitleBar = true;
-        // 拖拽区 = **整窗**（顶部不再留那条 12px）：内容顶到最上沿，框架会把交互控件从拖拽区排除
-        SetTitleBar(RootGrid);
+        // 拖拽区 = 顶部那条 48px（2026-09-23 试过 12px / 整窗拖拽，都不如这条好看 → 已恢复）
+        SetTitleBar(AppTitleBar);
 
-        // ⚠️ 延伸内容到标题栏后，系统仍按 caption 的颜色画顶上那一条 —— 不设透明，内容最上沿就会
-        // 留一条比亚克力亮的横带（2026-09-23 用户截图报"12px 留着太丑"的那个就是它）。
-        // 只把"背景"设透明；hover / pressed 保持系统默认，否则鼠标移到三个按钮上会没有反馈
+        // ⚠️ 内容延伸到标题栏后，系统仍按 caption 的颜色画顶上那一条。这里把"背景"设透明，
+        // 让标题栏区域跟窗口其余部分一样透出亚克力/云母；hover / pressed 保持系统默认，
+        // 否则鼠标移到最小化/最大化/关闭上会没有反馈
         var titleBar = AppWindow.TitleBar;
         titleBar.BackgroundColor = Microsoft.UI.Colors.Transparent;
         titleBar.InactiveBackgroundColor = Microsoft.UI.Colors.Transparent;
