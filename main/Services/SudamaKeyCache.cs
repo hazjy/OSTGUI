@@ -116,61 +116,52 @@ public class SudamaKeyCache
     }
 
     /// <summary>
-    /// 取"按键查询器"（缓存优先，缺缓存才下载）——入库链路专用。
+    /// 取"按键查询器"：**流式扫一遍缓存文件，只留下想要的 id**（缓存优先，缺缓存才下载）——入库链路专用。
     ///
-    /// 为什么不用 <c>Dictionary&lt;string,string&gt;</c>：密钥缓存是 17.5MB / 22 万条，
-    /// 物化成字典要 ~40-55MB 的字符串+字典，再叠加读文件时的 ~33MB 字符串 → **单次入库瞬时 ~110MB**，
-    /// 而且都是 LOH 大对象（峰值过后工作集退不回去）。入库其实只要点查几十个 id，
-    /// 所以这里用 <see cref="JsonDocument"/> 惰性解析：只留解析后的 UTF-8 文档（~18MB），不造 22 万条 string。
+    /// 为什么流式（17.5MB / 22 万条的缓存）：
+    ///   ① 整份物化成 Dictionary：~40-55MB（先读成字符串还要再 +33MB）→ 单次入库瞬时 ~110MB；
+    ///   ② 就算只做 JsonDocument（DOM）也要**整份驻留**：原始字节 17.5MB + 元数据表 ~5MB ≈ 23MB。
+    /// 而入库实际只要 appId + 各 depot + 各 DLC 这**几百个** id → 流式扫一遍只留命中项，
+    /// 峰值 ≈ 64KB 扫描缓冲（外加命中的几百条字符串）。
     ///
-    /// 形状兼容：老的 <c>{"Data":{…}}</c>（本程序写的）与原始明文 <c>{…}</c> 都能读。
-    /// ⚠️ 调用方必须 <c>using</c>（Dispose 才会释放那份文档）。
+    /// 形状兼容：老的 <c>{"Data":{…}}</c>（本程序写的）与原始明文 <c>{…}</c> 都能读 ——
+    /// 扫描只认"深度 ≤ 2 的键值对"，不关心套在哪一层。
     /// </summary>
-    private async Task<SudamaLookup> LoadLookupAsync(string cacheFileName, string url, string label, CancellationToken ct = default)
+    private async Task<SudamaLookup> LoadLookupAsync(
+        string cacheFileName, string url, string label, IReadOnlyCollection<string> wantedIds, CancellationToken ct)
     {
         var cachePath = CacheFilePath(cacheFileName);
 
         if (File.Exists(cachePath))
         {
-            var cached = await TryOpenLookupAsync(cachePath, label, ct).ConfigureAwait(false);
+            var cached = await TryScanLookupAsync(cachePath, wantedIds, ct).ConfigureAwait(false);
             if (cached != null) return cached;
         }
 
-        // 缓存缺失/读不动 → 下载（这条路径本来就产出字典，用它建查询器，省一次解析）
+        // 缓存缺失 / 读不动 → 下载（这条路径本来就要整份数据写盘，写完后只留想要的那几条）
         Log($"正在下载 {label}...");
         var data = await DownloadJsonAsync(url, label, ct).ConfigureAwait(false);
         if (data != null)
         {
             try { await WriteCacheAsync(cacheFileName, data).ConfigureAwait(false); } catch { }
-            return FromDictionary(data);
+            return FromDictionary(data, wantedIds);
         }
 
         // 下载失败：再试一次现有缓存（过期兜底，等价于原来的 TryLoadStaleCache）
-        return await TryOpenLookupAsync(cachePath, label, ct).ConfigureAwait(false) ?? SudamaLookup.Empty;
+        return await TryScanLookupAsync(cachePath, wantedIds, ct).ConfigureAwait(false) ?? SudamaLookup.Empty;
     }
 
-    /// <summary>惰性打开缓存文件；读不动返回 null（由调用方决定下载或降级）</summary>
-    private static async Task<SudamaLookup?> TryOpenLookupAsync(string cachePath, string label, CancellationToken ct)
+    /// <summary>流式扫描缓存文件；读不动 / 格式不对返回 null（由调用方决定下载或降级）</summary>
+    private static async Task<SudamaLookup?> TryScanLookupAsync(string cachePath, IReadOnlyCollection<string> wantedIds, CancellationToken ct)
     {
         try
         {
-            await using var fs = File.OpenRead(cachePath);
-            var doc = await JsonDocument.ParseAsync(fs, cancellationToken: ct).ConfigureAwait(false);
-            var root = doc.RootElement;
-
-            if (root.ValueKind == JsonValueKind.Object &&
-                root.TryGetProperty("Data", out var inner) && inner.ValueKind == JsonValueKind.Object)
-                return new SudamaLookup(doc, inner);      // {"Data":{…}}
-
-            if (root.ValueKind == JsonValueKind.Object)
-                return new SudamaLookup(doc, root);       // 明文 {…}
-
-            doc.Dispose();
-            return null;
+            var found = await ScanWantedAsync(cachePath, wantedIds, ct).ConfigureAwait(false);
+            return new SudamaLookup(found);
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            throw;   // 用户取消透传；读盘出错仍走"改用下载"分支
+            throw;   // 用户取消透传；读盘 / 格式出错仍走"改用下载"分支
         }
         catch
         {
@@ -178,47 +169,129 @@ public class SudamaKeyCache
         }
     }
 
-    private static SudamaLookup FromDictionary(Dictionary<string, string> data)
+    /// <summary>下载路径本来就产出整份字典（要写盘），从里面挑出想要的几条即可</summary>
+    private static SudamaLookup FromDictionary(Dictionary<string, string> data, IReadOnlyCollection<string> wantedIds)
     {
-        var doc = JsonSerializer.SerializeToDocument(data);
-        return new SudamaLookup(doc, doc.RootElement);
+        var found = new Dictionary<string, string>(wantedIds.Count, StringComparer.Ordinal);
+        foreach (var id in wantedIds)
+        {
+            if (data.TryGetValue(id, out var v) && !string.IsNullOrEmpty(v)) found[id] = v;
+        }
+        return new SudamaLookup(found);
     }
 
-    /// <summary>depot key 缓存（sudama_cache.json）</summary>
-    public Task<SudamaLookup> LoadDepotKeysAsync(CancellationToken ct = default) =>
-        LoadLookupAsync("sudama_cache.json", SudamaApiUrl, "Sudama 密钥", ct);
-
-    /// <summary>App 访问令牌缓存（token_cache.json）</summary>
-    public Task<SudamaLookup> LoadAccessTokensAsync(CancellationToken ct = default) =>
-        LoadLookupAsync("token_cache.json", SudamaTokensUrl, "App 访问令牌", ct);
+    private const int ScanBufferSize = 64 * 1024;
 
     /// <summary>
-    /// 只读的按键查询器：包一层 <see cref="JsonDocument"/>，按 id 点查。
-    /// 用完必须 Dispose（文档持有 ~18MB 缓冲）。<see cref="Empty"/> 表示"没有数据"，点查恒 false。
+    /// 流式扫 <c>{"id":"value",…}</c>（兼容外面套一层 <c>{"Data":…}</c>），只收集 <paramref name="wantedIds"/> 命中的键值对。
+    /// 64KB 分块喂 <see cref="Utf8JsonReader"/>，跨块的部分靠 <see cref="Utf8JsonReader.CurrentState"/> 续读。
+    ///
+    /// ponytail: 每个属性名都会 `GetString()` 一次（22 万次短字符串，只有 gen0 垃圾）——峰值不受影响；
+    /// 真嫌 GC 吵，再改成"按 UTF-8 字节哈希比对"（用 <c>reader.ValueSpan</c> 零分配）。
     /// </summary>
-    public sealed class SudamaLookup : IDisposable
+    private static async Task<Dictionary<string, string>> ScanWantedAsync(string path, IReadOnlyCollection<string> wantedIds, CancellationToken ct)
     {
-        private readonly JsonDocument? _doc;
-        private readonly JsonElement _map;
+        var want = wantedIds as HashSet<string> ?? new HashSet<string>(wantedIds, StringComparer.Ordinal);
+        var found = new Dictionary<string, string>(want.Count, StringComparer.Ordinal);
+        if (want.Count == 0) return found;
 
-        internal SudamaLookup(JsonDocument? doc, JsonElement map)
+        await using var fs = File.OpenRead(path);
+
+        // 粗校验：完整 JSON 对象的最后一个非空白字符必须是 '}'。
+        // 没有这一步，**截断的缓存**会静默只返回"扫描到的那部分键"→ 入库静默少密钥（最难查的一类问题）；
+        // 宁可判为坏文件，让调用方降级（重新下载 / 用旧缓存 / 空）。
+        if (!await EndsWithClosingBraceAsync(fs, ct).ConfigureAwait(false))
+            throw new JsonException("缓存文件不是完整的 JSON 对象（尾部不是 '}'）");
+
+        fs.Position = 0;
+        var buffer = new byte[ScanBufferSize];
+        var state = new JsonReaderState();
+        string? pendingKey = null;
+        int pendingKeyDepth = -1;
+        int keep = 0;   // 缓冲里"未消费"的字节数
+
+        while (true)
         {
-            _doc = doc;
-            _map = map;
+            var read = await fs.ReadAsync(buffer.AsMemory(keep), ct).ConfigureAwait(false);
+            var isFinal = read == 0;
+            var available = keep + read;
+            if (available == 0) break;
+
+            var reader = new Utf8JsonReader(buffer.AsSpan(0, available), isFinal, state);
+            while (reader.Read())
+            {
+                if (reader.TokenType == JsonTokenType.PropertyName)
+                {
+                    // 只认浅层（根对象 / Data 对象下）的键；再深的就是嵌套内容，不是我们要的形态
+                    pendingKey = reader.CurrentDepth <= 2 ? reader.GetString() : null;
+                    pendingKeyDepth = reader.CurrentDepth;
+                }
+                else if (pendingKey != null && reader.TokenType == JsonTokenType.String && reader.CurrentDepth == pendingKeyDepth)
+                {
+                    if (want.Contains(pendingKey)) found[pendingKey] = reader.GetString() ?? "";
+                    pendingKey = null;
+                }
+                else
+                {
+                    pendingKey = null;   // 值不是字符串（嵌套对象 / 数组 / 数字）→ 不是我们要的键值对
+                }
+            }
+
+            state = reader.CurrentState;
+            var consumed = (int)reader.BytesConsumed;
+            keep = available - consumed;
+            if (keep > 0) Buffer.BlockCopy(buffer, consumed, buffer, 0, keep);
+
+            if (isFinal) break;
+            if (keep == buffer.Length) Array.Resize(ref buffer, buffer.Length * 2);   // 单个 token 比缓冲还长：扩
         }
 
-        public static SudamaLookup Empty { get; } = new(null, default);
+        return found;
+    }
+
+    /// <summary>文件最后一个非空白字节是不是 '}'（判断"看起来完整的 JSON 对象"，防止截断缓存被静默采信）</summary>
+    private static async Task<bool> EndsWithClosingBraceAsync(FileStream fs, CancellationToken ct)
+    {
+        if (fs.Length == 0) return false;
+        var take = (int)Math.Min(4096, fs.Length);
+        fs.Seek(-take, SeekOrigin.End);
+        var tail = new byte[take];
+        var read = await fs.ReadAsync(tail.AsMemory(0, take), ct).ConfigureAwait(false);
+        for (var i = read - 1; i >= 0; i--)
+        {
+            var b = tail[i];
+            if (b is (byte)' ' or (byte)'\t' or (byte)'\r' or (byte)'\n') continue;
+            return b == (byte)'}';
+        }
+        return false;
+    }
+
+    /// <summary>depot key 缓存（sudama_cache.json）：只取 <paramref name="wantedIds"/> 里命中的</summary>
+    public Task<SudamaLookup> LoadDepotKeysAsync(IReadOnlyCollection<string> wantedIds, CancellationToken ct = default) =>
+        LoadLookupAsync("sudama_cache.json", SudamaApiUrl, "Sudama 密钥", wantedIds, ct);
+
+    /// <summary>App 访问令牌缓存（token_cache.json）：只取 <paramref name="wantedIds"/> 里命中的</summary>
+    public Task<SudamaLookup> LoadAccessTokensAsync(IReadOnlyCollection<string> wantedIds, CancellationToken ct = default) =>
+        LoadLookupAsync("token_cache.json", SudamaTokensUrl, "App 访问令牌", wantedIds, ct);
+
+    /// <summary>
+    /// 只读的按键查询器：内部只是"流式扫描命中的那几百条"的小字典，不持文档也不持文件。
+    /// <see cref="Empty"/> 表示"没有数据"，点查恒 false。
+    /// </summary>
+    public sealed class SudamaLookup
+    {
+        private readonly Dictionary<string, string> _found;
+
+        internal SudamaLookup(Dictionary<string, string> found) => _found = found;
+
+        public static SudamaLookup Empty { get; } = new(new Dictionary<string, string>(StringComparer.Ordinal));
 
         public bool TryGet(string id, out string value)
         {
+            if (_found.TryGetValue(id, out var v)) { value = v; return v.Length > 0; }
             value = "";
-            if (string.IsNullOrEmpty(id) || _map.ValueKind != JsonValueKind.Object) return false;
-            if (!_map.TryGetProperty(id, out var el) || el.ValueKind != JsonValueKind.String) return false;
-            value = el.GetString() ?? "";
-            return value.Length > 0;
+            return false;
         }
-
-        public void Dispose() => _doc?.Dispose();
     }
 
     /// <summary>
@@ -293,6 +366,9 @@ public class SudamaKeyCache
 
         var (keysOk, keysMsg) = keysTask.Result;
         var (tokensOk, tokensMsg) = tokensTask.Result;
+
+        // 刷新路径必然整份物化（17.5MB 的 MemoryStream + 字典 + 再序列化），干完把空洞还回去
+        OstMemory.CompactAfterLargeBuffers();
 
         if (keysOk && tokensOk)
             return (true, $"Sudama 缓存已更新：{keysMsg}；{tokensMsg}");

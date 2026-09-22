@@ -403,6 +403,8 @@ public partial class SearchViewModel : ObservableObject
             IsCancelling = false;
             _addCts?.Dispose();
             _addCts = null;
+            // 入库期间有过 17.5MB 级的整份缓存/清单缓冲，结束后压一次 LOH，把空洞还给系统
+            OstMemory.CompactAfterLargeBuffers();
         }
     }
 

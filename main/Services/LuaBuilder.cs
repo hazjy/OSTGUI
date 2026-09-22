@@ -33,16 +33,34 @@ public class LuaBuilder
         bool addAllDlc,
         CancellationToken ct = default)
     {
-        // 密钥与令牌获取失败不阻断，尽力而为。
-        // 用"按键查询器"而不是整份字典：缓存 22 万条，物化成字典单次入库要多花 ~100MB 峰值（见 SudamaKeyCache 注释）
-        using var keys = await _sudamaCache.LoadDepotKeysAsync(ct);
-        using var tokens = await _sudamaCache.LoadAccessTokensAsync(ct);
         var missingKeyDepots = new List<string>();
         var dlcCount = 0;
         var keyCount = 0;
 
         // 补全全部 depot（SteamCMD 列表），避免缺失 depot 下载时无密钥报"内容加密"
         var allDepots = await MergeAllDepotsAsync(appId, depots, ct);
+
+        // 先算出"这次入库要哪些 id"（appId + 各 depot + 各 DLC），再去缓存取键：
+        // 缓存 22 万条，流式扫描只留命中的那几百条（见 SudamaKeyCache.LoadLookupAsync）。
+        // 所以这里把 DLC 列表的获取提到前面来（原来是写完 depot 行才取）。
+        var existingIds = new HashSet<string>(StringComparer.Ordinal) { appId };
+        foreach (var (depotId, _, _) in allDepots)
+            existingIds.Add(depotId);
+
+        var newDlcs = new List<string>();
+        if (addAllDlc)
+        {
+            var dlcIds = await _gameInfoService.GetDlcIdsAsync(appId, ct);
+            newDlcs = dlcIds.Where(d => !existingIds.Contains(d)).ToList();
+            dlcCount = newDlcs.Count;
+        }
+
+        var wantedIds = new HashSet<string>(existingIds, StringComparer.Ordinal);
+        foreach (var d in newDlcs) wantedIds.Add(d);
+
+        // 密钥与令牌获取失败不阻断，尽力而为
+        var keys = await _sudamaCache.LoadDepotKeysAsync(wantedIds, ct);
+        var tokens = await _sudamaCache.LoadAccessTokensAsync(wantedIds, ct);
 
         var lines = new List<string>
         {
@@ -81,48 +99,38 @@ public class LuaBuilder
                 "（Steam depot 内容均为 AES-256 加密，缺少密钥将无法解密下载）");
         }
 
-        // 添加所有 DLC（可选）：获取 DLC 列表，跳过已在 depots 中的，逐个 addappid
-        if (addAllDlc)
+        // 添加所有 DLC（可选）：DLC 列表在上面已经拿到（流式取键要先知道 id），这里只负责写行
+        if (addAllDlc && newDlcs.Count > 0)
         {
-            var existingIds = new HashSet<string> { appId };
-            foreach (var (depotId, _, _) in allDepots)
-                existingIds.Add(depotId);
+            lines.Add("");
+            lines.Add("-- 所有 DLC");
+            foreach (var dlcId in newDlcs)
+            {
+                // DLC 自身 AppID 也可能作为独立 depot ID 在 Sudama 收录；查到 key 就带 key
+                var hasDlcKey = keys.TryGet(dlcId, out var dlcKey) && dlcKey.Length == 64;
+                if (hasDlcKey)
+                {
+                    keyCount++;
+                    lines.Add($"addappid({dlcId}, 1, \"{dlcKey}\")");
+                }
+                else
+                    lines.Add($"addappid({dlcId})");
+            }
 
-            var dlcIds = await _gameInfoService.GetDlcIdsAsync(appId, ct);
-            var newDlcs = dlcIds.Where(d => !existingIds.Contains(d)).ToList();
-            dlcCount = newDlcs.Count;
-            if (newDlcs.Count > 0)
+            // 为缓存中有 token 的 DLC 补充 addtoken（受限 DLC 获取 appinfo 需要）
+            var dlcTokenLines = newDlcs
+                .Select(d => (Id: d, Has: tokens.TryGet(d, out var t), Token: t))
+                .Where(x => x.Has && !string.IsNullOrEmpty(x.Token))
+                .Select(x => $"addtoken({x.Id}, \"{x.Token}\")")
+                .ToList();
+            if (dlcTokenLines.Count > 0)
             {
                 lines.Add("");
-                lines.Add("-- 所有 DLC");
-                foreach (var dlcId in newDlcs)
-                {
-                    // DLC 自身 AppID 也可能作为独立 depot ID 在 Sudama 收录；查到 key 就带 key
-                    var hasDlcKey = keys.TryGet(dlcId, out var dlcKey) && dlcKey.Length == 64;
-                    if (hasDlcKey)
-                    {
-                        keyCount++;
-                        lines.Add($"addappid({dlcId}, 1, \"{dlcKey}\")");
-                    }
-                    else
-                        lines.Add($"addappid({dlcId})");
-                }
-
-                // 为缓存中有 token 的 DLC 补充 addtoken（受限 DLC 获取 appinfo 需要）
-                var dlcTokenLines = newDlcs
-                    .Select(d => (Id: d, Has: tokens.TryGet(d, out var t), Token: t))
-                    .Where(x => x.Has && !string.IsNullOrEmpty(x.Token))
-                    .Select(x => $"addtoken({x.Id}, \"{x.Token}\")")
-                    .ToList();
-                if (dlcTokenLines.Count > 0)
-                {
-                    lines.Add("");
-                    lines.Add("-- DLC access token");
-                    lines.AddRange(dlcTokenLines);
-                }
-
-                Log($"已添加 {newDlcs.Count} 个 DLC");
+                lines.Add("-- DLC access token");
+                lines.AddRange(dlcTokenLines);
             }
+
+            Log($"已添加 {newDlcs.Count} 个 DLC");
         }
 
         // fixedVersion 仅决定是否预写固定版本配置（注释形式，备用不启用），
