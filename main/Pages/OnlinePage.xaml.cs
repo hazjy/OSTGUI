@@ -1,6 +1,8 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using OSTGUI.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
+
 
 namespace OSTGUI.Pages;
 
@@ -8,6 +10,9 @@ public sealed partial class OnlinePage : Page
 {
     public OnlineViewModel VM { get; }
     private DispatcherTimer? _statusTimer;
+
+    /// <summary>无参构造：`Frame.Navigate` 需要它</summary>
+    public OnlinePage() : this(App.Services.GetRequiredService<MainViewModel>().OnlineVM) { }
 
     public OnlinePage(OnlineViewModel vm)
     {

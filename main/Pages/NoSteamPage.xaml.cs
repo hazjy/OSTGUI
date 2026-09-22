@@ -11,6 +11,9 @@ public sealed partial class NoSteamPage : Page
 {
     public NoSteamViewModel VM { get; }
 
+    /// <summary>无参构造：`Frame.Navigate` 需要它（这个 VM 不挂在 MainViewModel 上，直接走 DI）</summary>
+    public NoSteamPage() : this(App.Services.GetRequiredService<NoSteamViewModel>()) { }
+
     public NoSteamPage(NoSteamViewModel vm)
     {
         this.InitializeComponent();

@@ -4,6 +4,8 @@ using OSTGUI.Models;
 using OSTGUI.Services;
 using OSTGUI.ViewModels;
 using Windows.ApplicationModel.DataTransfer;
+using Microsoft.Extensions.DependencyInjection;
+
 
 namespace OSTGUI.Pages;
 
@@ -11,6 +13,9 @@ public sealed partial class SearchPage : Page
 {
     public SearchViewModel VM { get; }
     public SearchViewModel ViewModel => VM;
+
+    /// <summary>无参构造：`Frame.Navigate` 需要它</summary>
+    public SearchPage() : this(App.Services.GetRequiredService<MainViewModel>().SearchVM) { }
 
     public SearchPage(SearchViewModel vm)
     {

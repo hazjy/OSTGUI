@@ -13,7 +13,8 @@ namespace OSTGUI;
 public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
 {
     private readonly MainViewModel _mainVM;
-    private readonly Dictionary<string, Page> _pageCache = new();
+    // 页面实例复用交给 Frame 的原生缓存（各页 XAML 里 NavigationCacheMode="Enabled"），
+    // 不再自己维护一份 Dictionary<string, Page>（那套还会绕过 Frame 的导航过渡）
 
     public MainWindow()
     {
@@ -41,6 +42,9 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
         titleBar.InactiveBackgroundColor = Microsoft.UI.Colors.Transparent;
         titleBar.ButtonBackgroundColor = Microsoft.UI.Colors.Transparent;
         titleBar.ButtonInactiveBackgroundColor = Microsoft.UI.Colors.Transparent;
+
+        // 侧边栏是"平级切换"，没有返回语义：关掉导航栈，免得每切一次都往 BackStack 里塞一个（见 GoToPage）
+        ContentFrame.IsNavigationStackEnabled = false;
 
         // 配置已在窗口创建前完整加载，直接应用侧边栏/窗口状态，避免启动闪烁
         ApplyWindowStateFromConfig();
@@ -363,7 +367,7 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
 
             var config = _mainVM.ConfigService.Config;
             var page = config.DefaultPage == "search" ? "search" : "home";
-            NavigateTo(page);
+            GoToPage(page);
 
             ApplyThemeAndChrome();
 
@@ -449,16 +453,14 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
     }
 
     /// <summary>
-    /// 库页面已加载时强制刷新列表，使前景色转换器按新主题重新求值
+    /// 库页面已加载时强制刷新列表，使前景色转换器按新主题重新求值。
+    /// 直接对 VM 发命令：页面实例现在由 Frame 的 `NavigationCacheMode` 缓存，拿不到也不该去掏页面
     /// </summary>
     private void RefreshLibraryIfLoaded()
     {
         try
         {
-            if (_pageCache.TryGetValue("library", out var page) && page is Pages.LibraryPage libPage)
-            {
-                _ = libPage.VM.LoadLibraryCommand.ExecuteAsync(null);
-            }
+            _ = _mainVM.LibraryVM.LoadLibraryCommand.ExecuteAsync(null);
         }
         catch { }
     }
@@ -480,7 +482,7 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
 
         if (!string.IsNullOrEmpty(tag))
         {
-            NavigateTo(tag);
+            GoToPage(tag);
         }
     }
 
@@ -680,32 +682,26 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
             Services.ToastService.ShowError("重启 Steam 失败", message);
     }
 
-    private void NavigateTo(string pageTag)
+    /// <summary>
+    /// 切页统一入口（公开：主页的快捷操作也走这里）。**必须走 `Frame.Navigate`**：`Frame` 会自动播
+    /// `NavigationThemeTransition`，默认动画就是 page refresh（内容上浮 + 淡入）；早先用
+    /// `ContentFrame.Content = page` 直接换内容会绕过它，于是页面上什么进场动画都没有（2026-09-23 的结论）。
+    /// 页面实例复用改由各页 XAML 的 `NavigationCacheMode="Enabled"` 负责（等价于早先那个手写字典）。
+    /// </summary>
+    public void GoToPage(string pageTag)
     {
-        Page? page = null;
-
-        if (_pageCache.TryGetValue(pageTag, out var cached))
+        var pageType = pageTag switch
         {
-            page = cached;
-        }
-        else
-        {
-            page = pageTag switch
-            {
-                "home" => new HomePage(_mainVM),
-                "search" => new SearchPage(_mainVM.SearchVM),
-                "library" => new LibraryPage(_mainVM.LibraryVM),
-                "online" => new OnlinePage(_mainVM.OnlineVM),
-                "denuvo" => new DenuvoPage(_mainVM.DenuvoVM),
-                "nosteam" => new NoSteamPage(App.Services.GetRequiredService<NoSteamViewModel>()),
-                "settings" => new SettingsPage(_mainVM.SettingsVM),
-                "info" => new InfoPage(),
-                _ => new HomePage(_mainVM),
-            };
+            "search" => typeof(Pages.SearchPage),
+            "library" => typeof(Pages.LibraryPage),
+            "online" => typeof(Pages.OnlinePage),
+            "denuvo" => typeof(Pages.DenuvoPage),
+            "nosteam" => typeof(Pages.NoSteamPage),
+            "settings" => typeof(Pages.SettingsPage),
+            "info" => typeof(Pages.InfoPage),
+            _ => typeof(Pages.HomePage),
+        };
 
-            _pageCache[pageTag] = page;
-        }
-
-        ContentFrame.Content = page;
+        ContentFrame.Navigate(pageType, null, new Microsoft.UI.Xaml.Media.Animation.EntranceNavigationTransitionInfo());
     }
 }

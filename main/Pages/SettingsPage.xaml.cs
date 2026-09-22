@@ -6,12 +6,17 @@ using OSTGUI.ViewModels;
 using Windows.Storage.Pickers;
 using Windows.ApplicationModel.DataTransfer;
 using System.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
+
 
 namespace OSTGUI.Pages;
 
 public sealed partial class SettingsPage : Page
 {
     public SettingsViewModel VM { get; }
+
+    /// <summary>无参构造：`Frame.Navigate` 需要它</summary>
+    public SettingsPage() : this(App.Services.GetRequiredService<MainViewModel>().SettingsVM) { }
 
     public SettingsPage(SettingsViewModel vm)
     {
@@ -27,8 +32,8 @@ public sealed partial class SettingsPage : Page
         // 本处理器抛出的异常会反向炸进日志调用方，掩盖真实错误
         LogService.Logs.CollectionChanged += OnLogsChanged;
 
-        // 每次进入页面（缓存页经 ContentFrame.Content 切换，Loaded 会重新触发，
-        // OnNavigatedTo 不会）同步一次当前日志：仅在无新日志事件时，日志栏不依赖事件也有内容
+        // 每次进入页面（页面被 Frame 缓存 → 复用实例，Loaded 会重新触发，OnNavigatedTo 不会）
+        // 同步一次当前日志：仅在无新日志事件时，日志栏不依赖事件也有内容
         Loaded += (s, e) =>
         {
             VM.LogsText = string.Join("\n", LogService.Logs);

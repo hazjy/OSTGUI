@@ -1,15 +1,13 @@
 <Page
     x:Class="OSTGUI.Pages.HomePage"
+    NavigationCacheMode="Enabled"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     >
     <ScrollViewer>
-        <!-- 入场"上浮"动画的初始态就写在这里（不可见 + 下移 40），加载后由 PageEntrance.Play 补间到终态。
-             ⚠️ 别把 x:Name / Opacity / TranslateTransform 去掉：动画要靠它们，去掉就会先显示再跳 -->
-        <StackPanel x:Name="EnterRoot" Margin="40,32,40,40" Spacing="24" Opacity="0">
-            <StackPanel.RenderTransform>
-                <TranslateTransform x:Name="EnterShift" Y="40" />
-            </StackPanel.RenderTransform>
+        <!-- 页面入场动画走原生导航过渡（Frame.Navigate → page refresh：上浮 + 淡入），
+             页面上不需要写任何初始态或 Storyboard；见 MainWindow.GoToPage -->
+        <StackPanel Margin="40,32,40,40" Spacing="24">
 
             <StackPanel Spacing="4">
                 <TextBlock Text="OSTGUI" FontSize="32" FontWeight="Bold" />

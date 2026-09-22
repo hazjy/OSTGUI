@@ -10,6 +10,9 @@ public sealed partial class HomePage : Page
 {
     public MainViewModel VM { get; }
 
+    /// <summary>无参构造：`Frame.Navigate` 需要它</summary>
+    public HomePage() : this(App.Services.GetRequiredService<MainViewModel>()) { }
+
     public HomePage(MainViewModel mainVM)
     {
         this.InitializeComponent();
@@ -17,8 +20,6 @@ public sealed partial class HomePage : Page
         this.DataContext = VM;
 
         Loaded += (s, e) => VM.RefreshOstStatus();
-        // 入场"上浮"动画：初始态写在 XAML（EnterRoot/EnterShift），这里只负责补间到终态
-        Loaded += (s, e) => Helpers.PageEntrance.Play(EnterRoot, EnterShift);
     }
 
     private void GoToSearch_Click(object sender, RoutedEventArgs e)
@@ -64,16 +65,8 @@ public sealed partial class HomePage : Page
 
     private void NavigateMain(string tag)
     {
-        Page page = tag switch
-        {
-            "search" => new SearchPage(App.Services.GetRequiredService<SearchViewModel>()),
-            "library" => new LibraryPage(App.Services.GetRequiredService<LibraryViewModel>()),
-            _ => new HomePage(App.Services.GetRequiredService<MainViewModel>())
-        };
-        if (this.Parent is Frame frame)
-        {
-            frame.Content = page;
-        }
+        // 统一走 MainWindow 的入口：那里用的 `Frame.Navigate` 才会播原生 page-refresh 过渡
+        if (App.MainWindow is MainWindow mainWin) mainWin.GoToPage(tag);
 
         // 同步更新侧边栏选中状态
         SyncNavigationSelection(tag);

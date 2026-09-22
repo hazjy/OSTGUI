@@ -5,12 +5,18 @@ using Microsoft.UI.Text;
 using OSTGUI.Helpers;
 using OSTGUI.Models;
 using OSTGUI.ViewModels;
+using Microsoft.Extensions.DependencyInjection;
+
 
 namespace OSTGUI.Pages;
 
 public sealed partial class LibraryPage : Page
 {
     public LibraryViewModel VM { get; }
+
+    /// <summary>无参构造：`Frame.Navigate` 需要它；VM 取单例 `MainViewModel` 上那一份（与侧边栏导航同源——
+    /// 早先主页快捷入口用 DI 另取了一个实例，两处会拿到不同 VM）</summary>
+    public LibraryPage() : this(App.Services.GetRequiredService<MainViewModel>().LibraryVM) { }
 
     public LibraryPage(LibraryViewModel vm)
     {

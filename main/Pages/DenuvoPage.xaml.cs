@@ -3,12 +3,17 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using OSTGUI.ViewModels;
 using Windows.Storage.Pickers;
+using Microsoft.Extensions.DependencyInjection;
+
 
 namespace OSTGUI.Pages;
 
 public sealed partial class DenuvoPage : Page
 {
     public DenuvoViewModel VM { get; }
+
+    /// <summary>无参构造：`Frame.Navigate` 需要它</summary>
+    public DenuvoPage() : this(App.Services.GetRequiredService<MainViewModel>().DenuvoVM) { }
 
     public DenuvoPage(DenuvoViewModel vm)
     {
