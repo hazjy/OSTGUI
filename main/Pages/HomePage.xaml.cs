@@ -17,6 +17,8 @@ public sealed partial class HomePage : Page
         this.DataContext = VM;
 
         Loaded += (s, e) => VM.RefreshOstStatus();
+        // 入场"上浮"动画：初始态写在 XAML（EnterRoot/EnterShift），这里只负责补间到终态
+        Loaded += (s, e) => Helpers.PageEntrance.Play(EnterRoot, EnterShift);
     }
 
     private void GoToSearch_Click(object sender, RoutedEventArgs e)
