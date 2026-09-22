@@ -59,24 +59,31 @@ public static class CardHover
     /// <summary>指针进入卡片</summary>
     public static void Enter(FrameworkElement container, Border card, Brush? hoverBackground, float scale, float shadowZ)
     {
+        var state = States.GetOrCreateValue(container);
+        state.NormalBackground ??= card.Background;
+
+        // ⚠️ 顺序要紧：**先设属性、再装动画**。动画只是"补间"，是锦上添花；
+        // 之前反过来写，装动画那句一旦抛异常就被 catch 吞掉，属性根本没设上 → 整个交互静默失效
         try
         {
-            var state = States.GetOrCreateValue(container);
-            state.NormalBackground ??= card.Background;
-
-            EnsureImplicitAnimations(container);
-
+            // Translation 要先在这个元素上启用（否则设了不生效，阴影也出不来）
+            ElementCompositionPreview.SetIsTranslationEnabled(container, true);
             container.Scale = new Vector3(scale, scale, 1f);
             container.Translation = new Vector3(0f, 0f, shadowZ);
+            if (hoverBackground is not null) card.Background = hoverBackground;
+
             state.Shadow ??= new ThemeShadow();
             container.Shadow = state.Shadow;
+        }
+        catch (Exception ex) { Log($"【诊断】设属性失败: {ex.GetType().Name} {ex.Message}"); }
 
-            if (hoverBackground is not null) card.Background = hoverBackground;
-        }
-        catch
+        try
         {
-            // 动画/阴影失败不能影响功能：卡片照常显示
+            EnsureImplicitAnimations(container);
         }
+        catch (Exception ex) { Log($"【诊断】装隐式动画失败: {ex.GetType().Name} {ex.Message}"); }
+
+        Log("【诊断】enter");   // 诊断期临时日志：确认事件是否触发
     }
 
     /// <summary>指针离开卡片</summary>
@@ -94,7 +101,7 @@ public static class CardHover
             container.Scale = Vector3.One;
             container.Translation = Vector3.Zero;
         }
-        catch { }
+        catch (Exception ex) { Log($"【诊断】复位失败: {ex.GetType().Name} {ex.Message}"); }
     }
 
     /// <summary>
@@ -129,4 +136,7 @@ public static class CardHover
 
         visual.ImplicitAnimations = animations;
     }
+
+    /// <summary>诊断期临时日志：写进应用日志文件（设置页也能看），定位完就撤</summary>
+    private static void Log(string message) => OSTGUI.Services.LogService.AddAppLog($"[Hover] {message}");
 }
