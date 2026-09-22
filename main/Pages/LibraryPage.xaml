@@ -216,18 +216,23 @@
                             </Border>
 
                             <StackPanel Padding="10,8,10,10" Spacing="6">
+                                <!-- 三行文本一律居中：用 TextAlignment 而不是 HorizontalAlignment ——
+                                     长名字要被 CharacterEllipsis 截断，块本身是撑满卡片宽的，
+                                     只有 TextAlignment 能让每一行文字真的居中 -->
                                 <TextBlock Text="{Binding GameName}" FontSize="15" FontWeight="SemiBold"
-                                           TextTrimming="CharacterEllipsis"
+                                           TextAlignment="Center" TextTrimming="CharacterEllipsis"
                                            Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
                                 <StackPanel Spacing="2">
                                     <TextBlock Text="{Binding AppIdDisplay}" FontSize="12"
+                                               TextAlignment="Center"
                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     <TextBlock Text="{Binding VersionModeText}" FontSize="12"
+                                               TextAlignment="Center"
                                                Foreground="{Binding VersionMode, Converter={StaticResource VersionModeToBrushConverter}}" />
                                 </StackPanel>
 
                                 <!-- 操作按钮与列表卡片完全一致（同一批 Click 处理器与 MoreMenu） -->
-                                <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Right">
+                                <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Center">
                                     <Button Click="ToggleVersion_Click" Tag="{Binding}"
                                             ToolTipService.ToolTip="切换版本模式"
                                             Width="32" Height="32" MinWidth="0" Padding="0"
