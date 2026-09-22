@@ -43,7 +43,12 @@
         <Grid x:Name="GlobalFocusAnchor" IsTabStop="True" TabIndex="0" Width="1" Height="1"
               HorizontalAlignment="Left" VerticalAlignment="Top" Opacity="0" />
 
-        <Grid x:Name="AppTitleBar" Grid.Row="0" Height="48"
+        <!-- 顶部只剩一条 12 逻辑像素的**隐形拖拽条**（窗口可拖就靠它，SetTitleBar 挂在它上面）：
+             48 → 12 是 2026-09-23 按验收要求"把上边缘截掉"改的（内容整体上移 36px，亚克力从最上沿铺起）。
+             系统的最小化/最大化/关闭按钮不在这条里（ExtendsContentIntoTitleBar=true 时由系统画在右上角），
+             各页 `Margin="40,32,…"` 的 32px 顶边距正好避开那块按钮区（约 32×138 逻辑像素）。
+             ⚠️ 别把高度改成 0 或删掉这行：那样窗口就没法用鼠标拖动了（除非改用 SetTitleBar(RootGrid) 整窗拖拽） -->
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Height="12"
               Background="Transparent" VerticalAlignment="Top" />
 
         <NavigationView
