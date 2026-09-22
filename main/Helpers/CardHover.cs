@@ -27,10 +27,15 @@ namespace OSTGUI.Helpers;
 /// </summary>
 public static class CardHover
 {
-    public const float GridScale = 1.03f;
+    // 网格卡片是窄卡，放大明显一点；列表卡片横跨整行，放大一点点就够
+    // ⚠️ 网格 1.06 已接近上限：卡片四边只有 6 逻辑像素余量（容器边距），再大就要被视口切边
+    public const float GridScale = 1.06f;
     public const float ListScale = 1.01f;
     public const float GridShadowZ = 24f;
     public const float ListShadowZ = 16f;
+
+    /// <summary>放大/回落的时长（毫秒）。调大 = 更慢更飘逸</summary>
+    private const double DurationMs = 220;
 
     private sealed class State
     {
@@ -43,7 +48,7 @@ public static class CardHover
 
     private static bool? _animationsEnabled;
     private static TimeSpan Duration =>
-        (_animationsEnabled ??= ReadAnimationsEnabled()) ? TimeSpan.FromMilliseconds(140) : TimeSpan.Zero;
+        (_animationsEnabled ??= ReadAnimationsEnabled()) ? TimeSpan.FromMilliseconds(DurationMs) : TimeSpan.Zero;
 
     /// <summary>指针进入卡片</summary>
     public static void Enter(Border card, Brush? hoverBackground, float scale, float shadowZ)
