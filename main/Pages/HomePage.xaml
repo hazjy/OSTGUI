@@ -5,6 +5,17 @@
     >
     <ScrollViewer>
         <StackPanel Margin="40,32,40,40" Spacing="24">
+            <!-- 入场动画：内容从下往上浮 + 淡入，子块依次进场（WinUI 原生主题过渡）。
+                 FromVerticalOffset = 位移距离（逻辑像素），是这里唯一可调的参数；
+                 时长与缓动由系统主题过渡决定 —— 想调就得换成手写 Storyboard。
+                 生效前提：导航过来时页面是**新建实例**（frame.Content = new HomePage(...)），
+                 所以每次切过去都重播；将来若改成缓存页面实例，这里就只在首次播了。
+                 ⚠️ 加在 ScrollViewer **里面**：加在外面会把滚动条一起带着动 -->
+            <StackPanel.Transitions>
+                <TransitionCollection>
+                    <EntranceThemeTransition FromVerticalOffset="40" IsStaggeringEnabled="True" />
+                </TransitionCollection>
+            </StackPanel.Transitions>
 
             <StackPanel Spacing="4">
                 <TextBlock Text="OSTGUI" FontSize="32" FontWeight="Bold" />
