@@ -383,10 +383,12 @@ public partial class SearchViewModel : ObservableObject
                 SetStatus(res.Message, "Error");
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             // 正常情况下 ManifestDownloadService 会把取消包成 res.Cancelled，走不到这里；
-            // 留着是防御：任何一处漏传 token 的取消也不会变成"入库失败"弹窗
+            // 留着是防御：任何一处漏传 token 的取消也不会变成"入库失败"弹窗。
+            // ⚠️ 必须带 ct.IsCancellationRequested 过滤：HttpClient 的**超时也是 OCE**，
+            // 否则一次网络超时会被显示成"已取消入库"。
             LogService.AddLog("入库已取消");
             SetStatus("已取消入库", "Info");
         }

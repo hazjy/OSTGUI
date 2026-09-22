@@ -81,9 +81,9 @@ public class SudamaKeyCache
                     return data;
                 }
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                throw;
+                throw;   // 用户取消透传；下载超时（也是 OCE）留给下面重试 + 过期缓存兜底
             }
             catch (Exception ex)
             {
@@ -269,9 +269,9 @@ public class SudamaKeyCache
                     return cache.Data;
                 }
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                throw;
+                throw;   // 读缓存被取消（用户取消）透传；读盘出错仍走下面的"改用下载"分支
             }
             catch { }
         }

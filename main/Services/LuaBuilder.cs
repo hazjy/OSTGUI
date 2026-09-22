@@ -179,6 +179,10 @@ public class LuaBuilder
                 }
             }
         }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;   // 用户取消要透传（这层原来会把所有异常吞掉，取消会在这里"消失"、链路继续跑完）
+        }
         catch (Exception ex)
         {
             Log($"补全 depot 失败: {ex.Message}");

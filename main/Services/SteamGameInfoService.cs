@@ -173,9 +173,11 @@ public class SteamGameInfoService
                 Log($"SteamCMD API 解析到 {depotCount} 个 Depot");
                 return depotCount > 0 ? game : null;
             }
-            catch (OperationCanceledException)
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
-                throw;   // 取消不是"这次请求失败"，别吞掉去重试
+                // 只有"我们自己的 token 被取消"才透传；HttpClient 的超时也是 OCE，
+                // 必须留给下面按"这次请求失败"处理（否则一次超时就把 3 次重试吃掉）
+                throw;
             }
             catch (Exception ex)
             {
@@ -296,9 +298,9 @@ public class SteamGameInfoService
 
             return game;
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            throw;
+            throw;   // 用户取消透传；HttpClient 超时不算取消
         }
         catch (Exception ex)
         {
@@ -346,9 +348,9 @@ public class SteamGameInfoService
                 }
             }
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            throw;
+            throw;   // 用户取消透传；HttpClient 超时不算取消（否则 DLC 列表会被误判成"已取消"）
         }
         catch (Exception ex)
         {

@@ -67,7 +67,7 @@ public class ManifestDownloadService
 
             // 1. 从 Steam 官方 API 获取 depot + manifest gid（不依赖 GitHub）
             Log("正在从 Steam API 获取 depot/manifest 信息...");
-            var gameDetails = await _gameInfoService.GetGameDetailsFromSteamAsync(appId);
+            var gameDetails = await _gameInfoService.GetGameDetailsFromSteamAsync(appId, ct);
             if (gameDetails == null || gameDetails.Depots.Count == 0)
                 return new AddGameResult { Success = false, Message = "无法获取游戏 Depot 信息" };
 
@@ -120,9 +120,11 @@ public class ManifestDownloadService
                         Log($"下载失败 ({(int)response.StatusCode}): Depot {depotId}");
                     }
                 }
-                catch (OperationCanceledException)
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
                 {
-                    throw;   // 取消不是"这个 depot 下载失败"，别被下面的 catch 吞掉记进 failedDepots
+                    // 只有"用户取消"才透传。⚠️ HttpClient 的**超时也是 OCE**（TaskCanceledException），
+                    // 那种必须留给下面的 catch 记成"这个 depot 下载失败"，否则一次超时会把整场入库判成"已取消"
+                    throw;
                 }
                 catch (Exception ex)
                 {
@@ -166,7 +168,7 @@ public class ManifestDownloadService
                 KeyCount = keyCount,
             };
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             return new AddGameResult { Success = false, Cancelled = true, Message = "已取消" };
         }
@@ -197,7 +199,7 @@ public class ManifestDownloadService
         {
             // 1. 获取 depot 信息（含 manifest gid）
             Log("正在获取 Depot 信息...");
-            var gameDetails = await _gameInfoService.GetGameDetailsFromSteamAsync(appId);
+            var gameDetails = await _gameInfoService.GetGameDetailsFromSteamAsync(appId, ct);
             if (gameDetails == null || gameDetails.Depots.Count == 0)
                 return new AddGameResult { Success = false, Message = "无法获取游戏 Depot 信息" };
 
@@ -232,7 +234,7 @@ public class ManifestDownloadService
                 KeyCount = keyCount,
             };
         }
-        catch (OperationCanceledException)
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
             return new AddGameResult { Success = false, Cancelled = true, Message = "已取消" };
         }
