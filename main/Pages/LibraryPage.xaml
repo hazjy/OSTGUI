@@ -4,6 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:models="using:OSTGUI.Models"
     xmlns:helpers="using:OSTGUI.Helpers"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
     >
     <Page.Resources>
         <helpers:BoolToVisibilityConverter x:Key="BoolToVis" />
@@ -52,6 +53,25 @@
                         <ToolTipService.ToolTip><ToolTip Content="刷新" /></ToolTipService.ToolTip>
                         <FontIcon Glyph="&#xE72C;" />
                     </Button>
+
+                    <!-- 视图切换：纯图标（SegmentedItem.Icon 是 IconElement，直接放 FontIcon）。
+                         没有文字 → 必须给 AutomationProperties.Name，否则 UIA 读不到这两枚按钮；
+                         不要 HorizontalAlignment="Stretch"：那是整行分页的用法，会把两枚图标拉散 -->
+                    <controls:Segmented x:Name="ViewSegmented" VerticalAlignment="Center"
+                                        SelectionChanged="ViewSegmented_SelectionChanged">
+                        <controls:SegmentedItem AutomationProperties.Name="列表视图"
+                                                ToolTipService.ToolTip="列表视图">
+                            <controls:SegmentedItem.Icon>
+                                <FontIcon Glyph="&#xE8FD;" FontSize="16" />
+                            </controls:SegmentedItem.Icon>
+                        </controls:SegmentedItem>
+                        <controls:SegmentedItem AutomationProperties.Name="网格视图"
+                                                ToolTipService.ToolTip="网格视图">
+                            <controls:SegmentedItem.Icon>
+                                <FontIcon Glyph="&#xF0E2;" FontSize="16" />
+                            </controls:SegmentedItem.Icon>
+                        </controls:SegmentedItem>
+                    </controls:Segmented>
                 </StackPanel>
             </Grid>
         </StackPanel>
@@ -67,6 +87,7 @@
                   Background="Transparent"
                   SelectionMode="None"
                   IsItemClickEnabled="False"
+                  Visibility="{Binding IsListView, Converter={StaticResource BoolToVis}}"
                   ContainerContentChanging="LibraryList_ContainerContentChanging">
             <ListView.ItemContainerStyle>
                 <!-- 抹掉 ListViewItem 自带的容器内边距/最小高度，卡片自己的 Padding/Margin 说了算 -->
@@ -146,4 +167,96 @@
                     </DataTemplate>
             </ListView.ItemTemplate>
         </ListView>
+
+        <!-- 网格视图：与列表视图共用同一个 ItemsSource，靠 Visibility 二选一。
+             固定 ItemWidth/ItemHeight + 自动换行 —— 窗口变宽只是多一列，卡片尺寸不变。
+             ⚠️ 别改成"拉伸填满一行"：最大化时卡片会涨到 350+ 逻辑像素，450 物理像素的封面就是
+             1.7× 放大、肉眼糊（跟搜索页流解码那次是同一类病） -->
+        <GridView x:Name="LibraryGrid" Grid.Row="2" Margin="40,12"
+                  ItemsSource="{Binding LibraryItems}"
+                  Background="Transparent"
+                  SelectionMode="None"
+                  IsItemClickEnabled="False"
+                  Visibility="{Binding IsGridView, Converter={StaticResource BoolToVis}}"
+                  ContainerContentChanging="LibraryGrid_ContainerContentChanging">
+            <GridView.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <!-- 212×222 = 卡片 200×210 + 右下各 12 间距 -->
+                    <ItemsWrapGrid Orientation="Horizontal" ItemWidth="212" ItemHeight="222" />
+                </ItemsPanelTemplate>
+            </GridView.ItemsPanel>
+            <GridView.ItemContainerStyle>
+                <!-- 同 ListView：抹掉 GridViewItem 自带的 Padding/MinHeight/MinWidth，
+                     否则 ItemWidth/ItemHeight 会被容器内边距吃掉，列数与间距全对不上 -->
+                <Style TargetType="GridViewItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                    <Setter Property="Padding" Value="0" />
+                    <Setter Property="Margin" Value="0,0,12,12" />
+                    <Setter Property="MinHeight" Value="0" />
+                    <Setter Property="MinWidth" Value="0" />
+                </Style>
+            </GridView.ItemContainerStyle>
+            <GridView.ItemTemplate>
+                <DataTemplate x:DataType="models:LibraryItem">
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            CornerRadius="6">
+                        <StackPanel>
+                            <!-- 封面框 200×94 = header.jpg 原生比例（460×215），不裁不放大：
+                                 225% DPI 下要 450 物理像素，落盘的 460 宽正好 1:1。
+                                 无封面时露出底下的图标占位（空框看着像坏了） -->
+                            <Border Height="94" CornerRadius="6,6,0,0"
+                                    Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                                <Grid>
+                                    <FontIcon Glyph="&#xE7FC;" FontSize="24"
+                                              Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    <Image Source="{Binding Cover}" Stretch="UniformToFill" />
+                                </Grid>
+                            </Border>
+
+                            <StackPanel Padding="10,8,10,10" Spacing="6">
+                                <TextBlock Text="{Binding GameName}" FontSize="15" FontWeight="SemiBold"
+                                           TextTrimming="CharacterEllipsis"
+                                           Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="{Binding AppIdDisplay}" FontSize="12"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="{Binding VersionModeText}" FontSize="12"
+                                               Foreground="{Binding VersionMode, Converter={StaticResource VersionModeToBrushConverter}}" />
+                                </StackPanel>
+
+                                <!-- 操作按钮与列表卡片完全一致（同一批 Click 处理器与 MoreMenu） -->
+                                <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Right">
+                                    <Button Click="ToggleVersion_Click" Tag="{Binding}"
+                                            ToolTipService.ToolTip="切换版本模式"
+                                            Width="32" Height="32" MinWidth="0" Padding="0"
+                                            Background="Transparent" BorderThickness="0">
+                                        <FontIcon Glyph="&#xE895;" FontSize="16" />
+                                    </Button>
+                                    <Button Click="Info_Click" Tag="{Binding}"
+                                            ToolTipService.ToolTip="信息"
+                                            Width="32" Height="32" MinWidth="0" Padding="0"
+                                            Background="Transparent" BorderThickness="0">
+                                        <FontIcon Glyph="&#xE946;" FontSize="16" />
+                                    </Button>
+                                    <Button Click="More_Click" Tag="{Binding}"
+                                            ToolTipService.ToolTip="更多"
+                                            Width="32" Height="32" MinWidth="0" Padding="0"
+                                            Background="Transparent" BorderThickness="0">
+                                        <FontIcon Glyph="&#xE712;" FontSize="16" />
+                                    </Button>
+                                    <Button Click="Delete_Click" Tag="{Binding}"
+                                            ToolTipService.ToolTip="删除"
+                                            Width="32" Height="32" MinWidth="0" Padding="0"
+                                            Background="Transparent" BorderThickness="0">
+                                        <FontIcon Glyph="&#xE74D;" FontSize="16" />
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </GridView.ItemTemplate>
+        </GridView>
     </Grid></Page>

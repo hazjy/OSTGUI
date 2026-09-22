@@ -32,6 +32,20 @@ public partial class LibraryViewModel : ObservableObject
 
     public bool IsBusy => IsLoading;
 
+    /// <summary>入库管理视图形态：list / grid。持久化在 config.json 的 LibraryViewMode</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsListView), nameof(IsGridView), nameof(CoverDecodeWidth))]
+    private string _viewMode = "list";
+
+    public bool IsListView => ViewMode != "grid";
+    public bool IsGridView => ViewMode == "grid";
+
+    /// <summary>列表卡片图框 120×56、网格卡片图框 200×94（逻辑像素），两者的解码宽度不同：
+    /// 225% DPI 下网格要 ~450 物理像素，按列表的 120 解就是 1.9× 放大发糊</summary>
+    private const int ListCoverDecodeWidth = 120;
+    private const int GridCoverDecodeWidth = 200;
+    public int CoverDecodeWidth => IsGridView ? GridCoverDecodeWidth : ListCoverDecodeWidth;
+
     /// <summary>页面标题：入库管理 + 游戏总数，计数用 CJK 角括号「」括住（U+300C / U+300D）。
     /// WinUI 的 {Binding} 不支持 StringFormat，故按惯例在 VM 里拼；0（还没扫完）时只显示"入库管理"，免得闪一下</summary>
     public string TitleText => TotalCount > 0 ? $"入库管理 「{TotalCount}」" : "入库管理";
@@ -60,6 +74,9 @@ public partial class LibraryViewModel : ObservableObject
         _configService = configService;
         _nameCache = nameCache;
         _coverService = coverService;
+
+        // 视图形态跟着上次选择（脏值一律归一到 list）
+        _viewMode = configService.Config.LibraryViewMode == "grid" ? "grid" : "list";
     }
 
     /// <summary>
@@ -137,18 +154,44 @@ public partial class LibraryViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 切入库管理的视图形态：list / grid。写盘失败不影响切换（内存态优先，
+    /// 下次重开最多回到上一档，不为此弹错）
+    /// </summary>
+    public async Task SetViewModeAsync(string mode)
+    {
+        mode = mode == "grid" ? "grid" : "list";
+        if (ViewMode == mode) return;
+
+        ViewMode = mode;
+        try { await _configService.UpdateAndSaveAsync(c => c.LibraryViewMode = mode); }
+        catch { }
+
+        // 切档会把已实体化卡片的封面位图按新宽度重建（列表 120 / 网格 200），旧的 WinRT 图像表面
+        // 要等 GC 才释放——空闲时 GC 不会自己跑，来回切几轮就白白多占几十 MB。这里主动压一次
+        // （与入库结束、刷新缓存后同一套做法，见 OstMemory）
+        OstMemory.CompactAfterLargeBuffers();
+    }
+
+    /// <summary>
     /// 按需加载单条封面：由页面在卡片实体化（滚进视口）时调用，不预先全量加载。
     /// 并发上限在 CoverImageService（信号量）里；这里只把拿到的文件变成 BitmapImage——
     /// 必须在 UI 线程调用/赋值（BitmapImage 是 DependencyObject）。
+    ///
+    /// 解码宽度按**当前视图**取（列表 120 / 网格 200）：已经按当前宽度解好的直接返回，
+    /// 否则重建一份（切视图时用到，旧位图随之可回收，内存不翻倍）
     /// </summary>
     public async Task EnsureCoverAsync(LibraryItem item)
     {
-        if (item.Cover != null) return;
+        var wanted = CoverDecodeWidth;
+        if (item.Cover != null && item.CoverDecodeWidth == wanted) return;
         try
         {
             var path = await _coverService.EnsureCoverFileAsync(item.AppId);
             if (path != null)
-                item.Cover = CreateBitmap(path);
+            {
+                item.Cover = CreateBitmap(path, wanted);
+                item.CoverDecodeWidth = wanted;
+            }
         }
         catch { }
     }
@@ -157,12 +200,12 @@ public partial class LibraryViewModel : ObservableObject
     /// 由本地封面文件构造位图。DecodePixelWidth 必须先于 UriSource 设置，
     /// 否则按原图 460×215 全量解码，几十张就是几十 MB
     /// </summary>
-    private static BitmapImage CreateBitmap(string path)
+    private static BitmapImage CreateBitmap(string path, int decodeWidth)
     {
         var bitmap = new BitmapImage
         {
             DecodePixelType = DecodePixelType.Logical,
-            DecodePixelWidth = 120
+            DecodePixelWidth = decodeWidth
         };
         bitmap.UriSource = new Uri(path);
         return bitmap;

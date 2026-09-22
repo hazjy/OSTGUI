@@ -163,18 +163,20 @@
 
 ## 13. 封面图（入库管理卡片）
 
-- 位置：卡片左侧 120×56（Steam `header.jpg` 原生比例 460×215），`Stretch="UniformToFill"` 吸收比例差；无图时露出底下的手柄图标占位（`Image` 直接盖在 `FontIcon` 上，不引入 null 判断转换器）
+- 两种形态（页头切换控件切「列表 / 网格」）：**列表卡片左侧 120×56**、**网格卡片顶部 200×94**，都是 Steam `header.jpg` 的原生比例（460×215），`Stretch="UniformToFill"` 吸收比例差；无图时露出底下的手柄图标占位（`Image` 直接盖在 `FontIcon` 上，不引入 null 判断转换器）
 - 取值链（`CoverImageService`，信号量并发 4）：① `cdn.cloudflare.steamstatic.com/steam/apps/<id>/header.jpg` ② 新布局 `shared.cloudflare.steamstatic.com/store_item_assets/steam/apps/<id>/header.jpg` ③ 同两处的 `capsule_616x353.jpg` ④ **官方 appdetails** 的 `header_image` → `capsule_image` → `capsule_imagev5`（仅对 ①–③ 全失败的条目调用，8s 超时，`SteamGameInfoService.GetHeaderImageUrlAsync`）
 - ⚠️ **2024+ 新上架游戏在旧布局下没有 `header.jpg`**（2026-09-21 实测 PEAK/3527290 及 3548580/4001890 全部 404，静态猜不出来）→ 只有官方接口能拿到；官方返回的 URL 若落在 `*.akamai.steamstatic.com` / `steamcdn-a.akamaihd.net` / `media.steampowered.com`（本机 hosts 指向 127.0.0.1），自动换成等价 cloudflare 主机重试一次
 - 缓存：`%LOCALAPPDATA%\OSTGUI\covers\<appid>.jpg`（命中不联网）；确无图的写 `<appid>.miss2`（TTL 1 天）。已知本来就无封面：`1716751`（育碧组件）——出现这类 `.miss2` 属正常，不是故障。**改 URL 链/兜底源时必须把 `MissSuffix` +1**，否则旧标记会在 TTL 内挡住新逻辑——2026-09-21 的"封面永远出不来"就是这么来的
-- **存储尺寸 = 240×112**（`StoreWidth`）+ JPEG q85：卡片是 120×56 逻辑像素，200% DPI 的解码上限正好 240×112，存原始 460×215 等于 4/5 的字节白存。实测（2026-09-21）：迁移后 39 张 **1,921 KB → 361 KB**（平均 49.2 → 9.3 KB，最大 14 KB），1000 个游戏约 9 MB（原来约 48 MB）。编码用 `System.Drawing.Common`（已在 csproj 里，此前未被使用）。⚠️ **卡片调大时改 `StoreWidth`，并把 `MigrationMarker`（`.v2`）改名**触发一次性重编码
-- 迁移：`covers\.v2` 标记 + 首次取图时后台**就地重编码**（不联网、不丢图；顺带遵守"改格式就 +1"的规则）
+- **存储尺寸 = 460×215**（`StoreWidth` = `header.jpg` 原生尺寸）+ JPEG q85。**不能再按列表尺寸存**：225% DPI 下网格图框要 ~450 物理像素，曾经的 240×112 塞进网格就是 1.9× 放大发糊（与搜索页流解码那次同源）。实测 39 张：240 时代 361 KB / 平均 9.3 KB → **改后 1,103 KB / 平均 29.0 KB / 最大 45.6 KB**，1000 个游戏约 29 MB。编码用 `System.Drawing.Common`。⚠️ **卡片再调大时改 `StoreWidth`，并把 `MigrationMarker`（当前 `.v3`）改名**触发一次性迁移
+- 迁移：`covers\.v3` 标记 + 首次取图时后台**删掉比 `StoreWidth` 窄的旧图**（读宽度判定，读不出来的也删），之后按需重下——**只删不放大**，把 240 插值到 460 是伪造清晰度（旧 `.v2` 标记同时清掉）
 - **评估过但没采用：优先读 Steam 本地 `appcache\librarycache\<appid>\header.jpg`**——实测本地那份与 CDN 下的是**同一张图、逐字节完全相同**（12/12 命中样本），且覆盖率只有 **12/39（31%）**：它省网络请求、**省不了硬盘**，收益不值得再加一条取值路径
 - 判定语义：只有 404/403 才算"确实没有"；超时/5xx/网络异常**不写标记**，下次重试（避免把"网络不通"记成"没有封面"）
 - **官方接口的两种失败必须分开**：`GetHeaderImageUrlAsync` 内部重试 1 次，仍失败就**抛异常**（调用方按"接口暂时不可用"处理 → **不写标记**）；只有"应答正常但没有图片字段"才返回 null（= 确实没有 → 写 `.miss2`）。原实现把两者都当 null，一次偶发失败就把该游戏变成 1 天空白——2026-09-21 修（同一类坑的第二次）
 - 诊断：每个失败条目往**日志文件**写一行带原因（`[Cover] 封面缺失（1 天内不再重试）: <id>（官方接口无图片字段）`）——"为什么这个游戏没封面"看这行
-- **按需加载**：列表用 `ListView`（虚拟化），页面在 `ContainerContentChanging` 里对刚实体化的卡片调 `LibraryViewModel.EnsureCoverAsync` → 滚进视口才取图/建位图，滚出去回收后不重复取。实测：进页面只取 20 张（视口+缓冲），滚到底累计 33 张，而全量预加载是进来就 40 张一起发请求。⚠️ **换成 `ItemsControl` 等非虚拟化容器会让这条机制彻底失效**（40 张卡片会一次性全实体化）
-- 线程：`CoverImageService` 只返回文件路径（不碰 WinUI 类型）；`BitmapImage` 由 VM 在 UI 线程构造，`DecodePixelWidth=120` + `DecodePixelType=Logical`（不设就是按 460×215 全量解码，几十张几十 MB）。⚠️ 这套只对**文件路径**（`UriSource`）成立；**流解码**路径（搜索页缩略图）设它会失效并发糊，见工作区 `doc/开发踩坑.md` 的 WinUI 小节
+- **按需加载**：列表用 `ListView`、网格用 `GridView`（**同一个钩子** `ContainerContentChanging`，`GridView` 也继承 `ListViewBase`），页面在钩子里对刚实体化的卡片调 `LibraryViewModel.EnsureCoverAsync` → 滚进视口才取图/建位图，滚出去回收后不重复取。实测：进页面只取 20 张（视口+缓冲），滚到底累计 33 张，而全量预加载是进来就 40 张一起发请求。⚠️ **换成 `ItemsControl` 等非虚拟化容器会让这条机制彻底失效**（40 张卡片会一次性全实体化）
+- **两档宿主并存的代价**（网格实现方式）：`ListView` 与 `GridView` 同在一个页面、靠 `Visibility` 二选一；**两档都实体化过之后**会各留一份容器——实测冷启动 128MB → 进页面 156MB（列表）/ 161MB（网格，比列表只贵 6MB，就是 450px 位图的差）→ **两档都切过再 +46MB**（此后每轮切换只再涨 ~1MB，是平台期不是泄漏）。切档时调 `OstMemory.CompactAfterLargeBuffers()` 压掉被替换的位图，否则静置还会继续往上涨（实测 226MB → 稳定 207MB）
+- 网格的 `ItemsWrapGrid` 用**固定 `ItemWidth/ItemHeight`**（212×222 物理含 12 间距 → 卡片 200×210 逻辑），窗口变宽只是多一列。⚠️ **别改成"拉伸填满一行"**：最大化时卡片会涨到 350+ 逻辑像素，450 物理像素的封面就是 1.7× 放大发糊
+- 线程与解码宽度：`CoverImageService` 只返回文件路径（不碰 WinUI 类型）；`BitmapImage` 由 VM 在 UI 线程构造，`DecodePixelWidth` 按**当前视图**取（列表 120 / 网格 200，`LibraryItem.CoverDecodeWidth` 记着手上这张是按多宽解的），切档时按新宽度重建 + `DecodePixelType=Logical`（不设就是按 460×215 全量解码，几十张几十 MB）。⚠️ 这套只对**文件路径**（`UriSource`）成立；**流解码**路径（搜索页缩略图）设它会失效并发糊，见工作区 `doc/开发踩坑.md` 的 WinUI 小节
 
 ## 14. 文档索引
 

@@ -25,16 +25,18 @@ public class CoverImageService
     private const int MissTtlDays = 1;
 
     /// <summary>
-    /// 落盘宽度（像素）。卡片是 120×56 逻辑像素，200% DPI 的解码上限正好 240×112——
-    /// 存原始 460×215 等于 4/5 的字节白存（实测最大一张 125 KB → 10 KB）。
-    /// ⚠️ 卡片尺寸改大时：这里改大，并把 <see cref="MigrationMarker"/> 名字 +1（触发重编码）
+    /// 落盘宽度（像素）= 原生 header.jpg 尺寸（460×215），再大只是插值放大、没有真信息。
+    /// 两种显示形态共用这一份：**列表卡片 120×56**、**网格卡片 200×94** 逻辑像素——
+    /// 225% DPI 下网格图框要 ~450 物理像素，所以不能再按列表尺寸（曾经的 240）存，
+    /// 否则网格里就是 1.9× 放大、肉眼糊（与搜索页流解码那次同源）。
+    /// ⚠️ 卡片再变大时：这里改大，并把 <see cref="MigrationMarker"/> 名字 +1（触发一次性迁移）
     /// </summary>
-    private const int StoreWidth = 240;
+    private const int StoreWidth = 460;
 
     private const int JpegQuality = 85;
 
-    /// <summary>迁移标记：做过一次就不再重编码（改名 = 触发重编码）</summary>
-    private const string MigrationMarker = ".v2";
+    /// <summary>迁移标记：做过一次就不再迁移（改名 = 触发迁移）</summary>
+    private const string MigrationMarker = ".v3";
 
     /// <summary>
     /// 缺失标记后缀。⚠️ 改动 URL 链或兜底来源时必须 +1（.miss3 …），
@@ -87,8 +89,9 @@ public class CoverImageService
     private Task? _migration;
 
     /// <summary>
-    /// 一次性迁移：把旧版按原始尺寸（460×215）存的封面重编码成 <see cref="StoreWidth"/>。
-    /// 惰性跑一次、跑在后台线程；不联网、不丢数据（就地重写）。
+    /// 一次性迁移：清掉比 <see cref="StoreWidth"/> 窄的旧封面（曾经按 240×112 存过一批）。
+    /// **只删不放大**——把旧图插值放大到 460 是伪造清晰度，删掉后由按需加载重新下载（约 40KB/张）。
+    /// 惰性跑一次、跑在后台线程；不联网、不影响还没被访问到的条目。
     /// </summary>
     private Task EnsureMigratedAsync()
     {
@@ -99,26 +102,36 @@ public class CoverImageService
 
     private async Task MigrateOldCoversAsync()
     {
-        var marker = Path.Combine(CacheDir, MigrationMarker);
         try
         {
+            var marker = Path.Combine(CacheDir, MigrationMarker);
             if (File.Exists(marker)) return;
 
             var files = Directory.Exists(CacheDir) ? Directory.GetFiles(CacheDir, "*.jpg") : Array.Empty<string>();
-            var done = 0;
+            var removed = 0;
             foreach (var file in files)
             {
                 try
                 {
                     var bytes = await File.ReadAllBytesAsync(file).ConfigureAwait(false);
-                    if (TrySaveDownscaled(file, bytes)) done++;
+                    using var stream = new MemoryStream(bytes);   // 必须活到读完宽度
+                    using var image = Image.FromStream(stream);
+                    if (image.Width >= StoreWidth) continue;      // 已经是新尺寸，留着
+                    File.Delete(file);
+                    removed++;
                 }
-                catch { }
+                catch
+                {
+                    TryDelete(file);   // 损坏/读不出宽度：删掉走重下，别让它一直占着位置
+                    removed++;
+                }
             }
 
             Directory.CreateDirectory(CacheDir);
+            TryDelete(Path.Combine(CacheDir, ".v2"));   // 旧标记：留着只会让人以为还在用旧尺寸
             await File.WriteAllBytesAsync(marker, Array.Empty<byte>()).ConfigureAwait(false);
-            Log($"封面已迁移为 {StoreWidth}px 宽: 重编码 {done}/{files.Length} 张");
+            if (removed > 0)
+                Log($"封面迁移：清掉 {removed}/{files.Length} 张旧尺寸（<{StoreWidth}px），下次显示时按需重下");
         }
         catch { }
     }

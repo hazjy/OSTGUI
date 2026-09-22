@@ -59,6 +59,8 @@ public class AppConfig
     public double NavigationPaneWidth { get; set; } = 200;
     // 联机页「其他」下拉的选中项：0 = DLL 注入（推荐），1 = AppID Changer（轻量）
     public int OnlineOtherMode { get; set; }
+    // 入库管理视图形态：list = 列表卡片（默认），grid = 网格卡片
+    public string LibraryViewMode { get; set; } = "list";
 
     // === 应用程序设置 ===
     public int LogMaxLines { get; set; } = 1000;
@@ -95,6 +97,7 @@ public class AppConfig
         IsNavigationPaneOpen = true,
         NavigationPaneWidth = 200,
         OnlineOtherMode = 0,
+        LibraryViewMode = "list",
         LogMaxLines = 1000,
         ManifestSourceEnabled = ManifestSource.GetPresetSources()
             .ToDictionary(s => s.Id, s => s.IsEnabled),
