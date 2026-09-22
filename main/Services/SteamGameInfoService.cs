@@ -24,13 +24,18 @@ public class SteamGameInfoService
         LogService.AddLog(message);
         System.Diagnostics.Debug.WriteLine($"[SteamGameInfo] {message}");
     }
-    public async Task<GameInfo?> GetGameDetailsFromSteamAsync(string appId)
+    /// <summary>
+    /// 取游戏详情（depot + manifest gid）：SteamCMD API 优先、官方 Store API 回退。
+    /// <paramref name="ct"/> 全程贯通（含重试退避的 Delay）——取消时立即中止，
+    /// 不必再等 store appdetails 那个 30s 的全局 HTTP 超时（做不到"立即取消"的主因就是这条）。
+    /// </summary>
+    public async Task<GameInfo?> GetGameDetailsFromSteamAsync(string appId, CancellationToken ct = default)
     {
-        var game = await GetGameDetailsFromSteamCmdAsync(appId);
+        var game = await GetGameDetailsFromSteamCmdAsync(appId, ct);
         if (game != null && game.Depots.Count > 0)
             return game;
 
-        return await GetGameDetailsFromStoreApiAsync(appId);
+        return await GetGameDetailsFromStoreApiAsync(appId, ct);
     }
 
     /// <summary>
@@ -90,7 +95,7 @@ public class SteamGameInfoService
     /// 格式: {"data": {"<appid>": {"name": ..., "depots": {"<depotid>": {"manifests": {"public": {"gid": ..., "download": ...}}, "dlcappid": ...}}}}}
     /// </summary>
 
-    private async Task<GameInfo?> GetGameDetailsFromSteamCmdAsync(string appId)
+    private async Task<GameInfo?> GetGameDetailsFromSteamCmdAsync(string appId, CancellationToken ct = default)
     {
         // [本地补丁 2026-09-09] SteamCMD API 在本机 SSL/连接层偶发失败（schannel 受加速器干扰），
         // 实测日志"重试即成功"——引入最多 3 次重试，且每次使用全新 HttpClient
@@ -105,17 +110,17 @@ public class SteamGameInfoService
                     ? $"请求 SteamCMD API: {url}"
                     : $"请求 SteamCMD API 重试({attempt + 1}/{maxAttempts}): {url}");
                 if (attempt > 0)
-                    await Task.Delay(500 * attempt);
+                    await Task.Delay(500 * attempt, ct);
 
                 using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(30) };
-                var response = await client.GetAsync(url);
+                var response = await client.GetAsync(url, ct);
                 if (!response.IsSuccessStatusCode)
                 {
                     Log($"SteamCMD API 非成功响应 ({(int)response.StatusCode}), 重试({attempt + 1}/{maxAttempts})");
                     continue;
                 }
 
-                var json = await response.Content.ReadAsStringAsync();
+                var json = await response.Content.ReadAsStringAsync(ct);
                 var doc = JsonDocument.Parse(json);
                 if (!doc.RootElement.TryGetProperty("data", out var data) ||
                     !data.TryGetProperty(appId, out var appData) ||
@@ -168,6 +173,10 @@ public class SteamGameInfoService
                 Log($"SteamCMD API 解析到 {depotCount} 个 Depot");
                 return depotCount > 0 ? game : null;
             }
+            catch (OperationCanceledException)
+            {
+                throw;   // 取消不是"这次请求失败"，别吞掉去重试
+            }
             catch (Exception ex)
             {
                 Log($"SteamCMD API 异常 ({attempt + 1}/{maxAttempts}): {ex.Message}");
@@ -196,18 +205,19 @@ public class SteamGameInfoService
     /// 从 Steam 官方 Store API 获取游戏详情（含 depot 和 manifest）
     /// </summary>
 
-    private async Task<GameInfo?> GetGameDetailsFromStoreApiAsync(string appId)
+    private async Task<GameInfo?> GetGameDetailsFromStoreApiAsync(string appId, CancellationToken ct = default)
     {
         try
         {
             Log($"请求 Steam API: https://store.steampowered.com/api/appdetails?appids={appId}&cc=us");
-            var response = await _http.GetAsync($"https://store.steampowered.com/api/appdetails?appids={appId}&cc=us");
+            // 刻意不给这一步加新的超时上限（会改变"网络慢但能成"的成功行为），只让它可以被取消
+            var response = await _http.GetAsync($"https://store.steampowered.com/api/appdetails?appids={appId}&cc=us", ct);
             Log($"Steam API 响应: {(int)response.StatusCode}");
 
             if (!response.IsSuccessStatusCode)
                 return null;
 
-            var json = await response.Content.ReadAsStringAsync();
+            var json = await response.Content.ReadAsStringAsync(ct);
             Log($"响应长度: {json.Length} 字符");
 
             var doc = JsonDocument.Parse(json);
@@ -286,6 +296,10 @@ public class SteamGameInfoService
 
             return game;
         }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
         catch (Exception ex)
         {
             Log($"获取游戏详情异常: {ex.Message}");
@@ -297,7 +311,7 @@ public class SteamGameInfoService
     /// 获取可用的清单源列表
     /// </summary>
 
-    public async Task<List<string>> GetDlcIdsAsync(string appId)
+    public async Task<List<string>> GetDlcIdsAsync(string appId, CancellationToken ct = default)
     {
         var ids = new List<string>();
 
@@ -305,10 +319,10 @@ public class SteamGameInfoService
         // 官方 store 兜底已删——大陆网络不可达，只会让每次打开都空转 30s 超时。
         try
         {
-            var response = await _http.GetAsync($"https://api.steamcmd.net/v1/info/{appId}");
+            var response = await _http.GetAsync($"https://api.steamcmd.net/v1/info/{appId}", ct);
             if (response.IsSuccessStatusCode)
             {
-                var json = await response.Content.ReadAsStringAsync();
+                var json = await response.Content.ReadAsStringAsync(ct);
                 var doc = JsonDocument.Parse(json);
                 if (doc.RootElement.TryGetProperty("data", out var data) &&
                     data.TryGetProperty(appId, out var appData))
@@ -331,6 +345,10 @@ public class SteamGameInfoService
                     }
                 }
             }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
         }
         catch (Exception ex)
         {

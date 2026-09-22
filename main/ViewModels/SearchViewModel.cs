@@ -19,9 +19,20 @@ public partial class SearchViewModel : ObservableObject
     private readonly CoverImageService _coverService;
     private bool _isLoadingOptions;
 
+    /// <summary>当前入库任务的取消源（每次 AddGameAsync 新建、finally 里释放）；取消只作用于"当前这次"</summary>
+    private CancellationTokenSource? _addCts;
+
     [ObservableProperty] private string _searchQuery = "";
     [ObservableProperty] private bool _isSearching;
     [ObservableProperty] private bool _isAdding;
+
+    /// <summary>取消已按下、链路还在 unwind。用它给按钮上"取消中…"的即时反馈，手感不依赖链路返回速度</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CancelButtonText))]
+    private bool _isCancelling;
+
+    /// <summary>取消按钮文案</summary>
+    public string CancelButtonText => IsCancelling ? "取消中…" : "取消任务";
     [ObservableProperty] private string _statusMessage = "输入游戏名称或 AppID 进行搜索";
     [ObservableProperty] private string _statusType = "Info";
     [ObservableProperty] private double _progressValue;
@@ -252,7 +263,19 @@ public partial class SearchViewModel : ObservableObject
             return;
         }
 
+        // 一次只跑一个入库任务：取消按钮只能作用于"当前这次"，并发跑两个会让被顶掉的那个无法取消
+        if (IsAdding)
+        {
+            SetStatus("已有入库任务在进行，先取消或等它结束", "Warning");
+            return;
+        }
+
+        _addCts?.Dispose();
+        _addCts = new CancellationTokenSource();
+        var ct = _addCts.Token;
+
         IsAdding = true;
+        IsCancelling = false;   // 新一轮：清掉上一轮可能遗留的"取消中"状态
         ProgressValue = 0;
         LogService.Clear();
         LogService.AddLog($"开始入库 AppID: {target.AppId}");
@@ -285,19 +308,20 @@ public partial class SearchViewModel : ObservableObject
                 {
                     LogService.AddLog("使用 ManifestHub 下载清单...");
                     res = await _manifestService.DownloadFromManifestHubAsync(
-                        appId, FixedVersion, AddAllDlc, progress);
+                        appId, FixedVersion, AddAllDlc, progress, ct);
                 }
                 else
                 {
                     res = new AddGameResult();
                 }
 
-                // MHub 失败（含未配 key）时兜底走 Sudama：仅作为密钥源生成 Lua（不下载清单），清单需由清单源获取
-                if (!res.Success)
+                // MHub 失败（含未配 key）时兜底走 Sudama：仅作为密钥源生成 Lua（不下载清单），清单需由清单源获取。
+                // 被用户取消时不兜底——取消的语义是"停下来"，不是"换个源接着跑"
+                if (!res.Success && !res.Cancelled)
                 {
                     LogService.AddLog("尝试 Sudama 兜底...");
                     res = await _manifestService.DownloadFromSudamaAsync(
-                        appId, FixedVersion, AddAllDlc, progress);
+                        appId, FixedVersion, AddAllDlc, progress, ct);
                 }
             }
             else
@@ -305,7 +329,15 @@ public partial class SearchViewModel : ObservableObject
                 // 关闭清单下载：跳过清单源，直接用密钥源生成 Lua，清单由内核运行时兜底获取
                 LogService.AddLog("已关闭清单下载，跳过清单源，清单由内核运行时兜底获取...");
                 res = await _manifestService.DownloadFromSudamaAsync(
-                    appId, FixedVersion, AddAllDlc, progress);
+                    appId, FixedVersion, AddAllDlc, progress, ct);
+            }
+
+            // 用户取消：既不是成功也不是失败，安静收尾（不弹通知——是用户自己发起的）
+            if (res.Cancelled)
+            {
+                LogService.AddLog("入库已取消（临时文件已清理）");
+                SetStatus("已取消入库", "Info");
+                return;
             }
 
             ProgressValue = 100;
@@ -351,6 +383,13 @@ public partial class SearchViewModel : ObservableObject
                 SetStatus(res.Message, "Error");
             }
         }
+        catch (OperationCanceledException)
+        {
+            // 正常情况下 ManifestDownloadService 会把取消包成 res.Cancelled，走不到这里；
+            // 留着是防御：任何一处漏传 token 的取消也不会变成"入库失败"弹窗
+            LogService.AddLog("入库已取消");
+            SetStatus("已取消入库", "Info");
+        }
         catch (Exception ex)
         {
             LogService.AddLog($"异常: {ex.Message}");
@@ -359,7 +398,25 @@ public partial class SearchViewModel : ObservableObject
         finally
         {
             IsAdding = false;
+            IsCancelling = false;
+            _addCts?.Dispose();
+            _addCts = null;
         }
+    }
+
+    /// <summary>
+    /// 取消当前入库任务（按钮只在 IsAdding 时显示）。打断点与语义见
+    /// <see cref="ManifestDownloadService.DownloadFromManifestHubAsync"/> 的注释：
+    /// **所有会等的环节都可取消**（网络、逐份拷贝之间），只剩「lua 的原子写」这最后一步不打断——
+    /// 所以点下去基本是立即返回，且永远不会留下半个 .lua。
+    /// </summary>
+    [RelayCommand]
+    private void CancelAdd()
+    {
+        if (_addCts is null) return;
+        IsCancelling = true;      // 立刻反馈：按钮变「取消中…」并禁用，别等链路返回
+        _addCts.Cancel();
+        LogService.AddLog("用户取消入库");
     }
 
     private void SetStatus(string message, string type)

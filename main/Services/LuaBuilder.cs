@@ -30,17 +30,18 @@ public class LuaBuilder
         string sourceName,
         List<(string depotId, string manifestGid, long manifestSize)> depots,
         bool fixedVersion,
-        bool addAllDlc)
+        bool addAllDlc,
+        CancellationToken ct = default)
     {
         // 密钥与令牌获取失败不阻断，尽力而为
-        var keys = await _sudamaCache.GetSudamaKeysAsync();
-        var tokens = await _sudamaCache.GetAccessTokensAsync();
+        var keys = await _sudamaCache.GetSudamaKeysAsync(ct);
+        var tokens = await _sudamaCache.GetAccessTokensAsync(ct);
         var missingKeyDepots = new List<string>();
         var dlcCount = 0;
         var keyCount = 0;
 
         // 补全全部 depot（SteamCMD 列表），避免缺失 depot 下载时无密钥报"内容加密"
-        var allDepots = await MergeAllDepotsAsync(appId, depots);
+        var allDepots = await MergeAllDepotsAsync(appId, depots, ct);
 
         var lines = new List<string>
         {
@@ -86,7 +87,7 @@ public class LuaBuilder
             foreach (var (depotId, _, _) in allDepots)
                 existingIds.Add(depotId);
 
-            var dlcIds = await _gameInfoService.GetDlcIdsAsync(appId);
+            var dlcIds = await _gameInfoService.GetDlcIdsAsync(appId, ct);
             var newDlcs = dlcIds.Where(d => !existingIds.Contains(d)).ToList();
             dlcCount = newDlcs.Count;
             if (newDlcs.Count > 0)
@@ -156,7 +157,8 @@ public class LuaBuilder
     /// </summary>
     private async Task<List<(string depotId, string manifestGid, long manifestSize)>> MergeAllDepotsAsync(
         string appId,
-        List<(string depotId, string manifestGid, long manifestSize)> known)
+        List<(string depotId, string manifestGid, long manifestSize)> known,
+        CancellationToken ct = default)
     {
         var merged = new Dictionary<string, (string gid, long size)>();
         foreach (var (id, gid, size) in known)
@@ -164,7 +166,7 @@ public class LuaBuilder
 
         try
         {
-            var game = await _gameInfoService.GetGameDetailsFromSteamAsync(appId);
+            var game = await _gameInfoService.GetGameDetailsFromSteamAsync(appId, ct);
             if (game != null)
             {
                 foreach (var depot in game.Depots.Values)

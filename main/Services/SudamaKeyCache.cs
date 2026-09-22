@@ -52,7 +52,7 @@ public class SudamaKeyCache
     /// 带重试的流式下载：边收边写入内存流（避免整包 byte[] + 大字符串双重复制），
     /// 失败间隔 1.5s 重试一次。成功返回解析后的字典，均失败返回 null。
     /// </summary>
-    private async Task<Dictionary<string, string>?> DownloadJsonAsync(string url, string label)
+    private async Task<Dictionary<string, string>?> DownloadJsonAsync(string url, string label, CancellationToken ct = default)
     {
         for (var attempt = 1; attempt <= 2; attempt++)
         {
@@ -60,7 +60,7 @@ public class SudamaKeyCache
             try
             {
                 using var client = CreateDownloadClient(DownloadTimeoutSeconds);
-                using var resp = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead).ConfigureAwait(false);
+                using var resp = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
                 if (!resp.IsSuccessStatusCode)
                 {
                     Log($"{label}下载失败 HTTP {(int)resp.StatusCode}" + (attempt == 1 ? "，1.5s 后重试..." : ""));
@@ -68,10 +68,10 @@ public class SudamaKeyCache
                 else
                 {
                     using var ms = new MemoryStream();
-                    await resp.Content.CopyToAsync(ms).ConfigureAwait(false);
+                    await resp.Content.CopyToAsync(ms, ct).ConfigureAwait(false);
                     sw.Stop();
                     ms.Position = 0;
-                    var data = await JsonSerializer.DeserializeAsync<Dictionary<string, string>>(ms).ConfigureAwait(false);
+                    var data = await JsonSerializer.DeserializeAsync<Dictionary<string, string>>(ms, cancellationToken: ct).ConfigureAwait(false);
                     if (data is not { Count: > 0 })
                     {
                         Log($"{label}返回空数据");
@@ -81,41 +81,52 @@ public class SudamaKeyCache
                     return data;
                 }
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
                 Log($"{label}下载异常({sw.Elapsed.TotalSeconds:F0}s): {ex.Message}" + (attempt == 1 ? "，1.5s 后重试..." : ""));
             }
 
             if (attempt == 1)
-                await Task.Delay(1500).ConfigureAwait(false);
+                await Task.Delay(1500, ct).ConfigureAwait(false);
         }
         return null;
     }
 
-    public async Task<Dictionary<string, string>> GetSudamaKeysAsync()
+    public async Task<Dictionary<string, string>> GetSudamaKeysAsync(CancellationToken ct = default)
     {
-        return await GetCachedJsonAsync("sudama_cache.json", SudamaApiUrl, "Sudama 密钥");
+        return await GetCachedJsonAsync("sudama_cache.json", SudamaApiUrl, "Sudama 密钥", ct);
     }
 
     /// <summary>
     /// 从 Sudama API 获取全量 App 访问令牌（缓存存在即用、不自动过期；仅手动刷新或导入时更新）
     /// </summary>
 
-    public async Task<Dictionary<string, string>> GetAccessTokensAsync()
+    public async Task<Dictionary<string, string>> GetAccessTokensAsync(CancellationToken ct = default)
     {
-        return await GetCachedJsonAsync("token_cache.json", SudamaTokensUrl, "App 访问令牌");
+        return await GetCachedJsonAsync("token_cache.json", SudamaTokensUrl, "App 访问令牌", ct);
     }
 
     private static string CacheFilePath(string cacheFileName) => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "OSTGUI", cacheFileName);
 
+    /// <summary>
+    /// 原子写缓存（临时文件 + Move）：取消/中断若落在写盘中途，也只留一个 .tmp，
+    /// 不会把 16MB 的缓存截断——截断的缓存会让之后**所有**入库静默少密钥（比崩溃更难查）
+    /// </summary>
     private static async Task WriteCacheAsync(string cacheFileName, Dictionary<string, string> data)
     {
         var cachePath = CacheFilePath(cacheFileName);
         Directory.CreateDirectory(Path.GetDirectoryName(cachePath)!);
         var cache = new SudamaCache { Data = data };
-        await File.WriteAllTextAsync(cachePath, JsonSerializer.Serialize(cache)).ConfigureAwait(false);
+        var json = JsonSerializer.Serialize(cache);
+        var tmpPath = cachePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+        await File.WriteAllTextAsync(tmpPath, json).ConfigureAwait(false);
+        File.Move(tmpPath, cachePath, true);
     }
 
     /// <summary>
@@ -239,7 +250,7 @@ public class SudamaKeyCache
     /// 通用缓存 JSON 下载（缓存存在即用、不自动过期——仅在无缓存或缓存为空时才下载；手动刷新见 RefreshAsync）
     /// </summary>
 
-    private async Task<Dictionary<string, string>> GetCachedJsonAsync(string cacheFileName, string url, string label)
+    private async Task<Dictionary<string, string>> GetCachedJsonAsync(string cacheFileName, string url, string label, CancellationToken ct = default)
     {
         var cachePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -250,7 +261,7 @@ public class SudamaKeyCache
         {
             try
             {
-                var cachedJson = await File.ReadAllTextAsync(cachePath);
+                var cachedJson = await File.ReadAllTextAsync(cachePath, ct);
                 var cache = JsonSerializer.Deserialize<SudamaCache>(cachedJson);
                 if (cache is { Data.Count: > 0 })
                 {
@@ -258,12 +269,16 @@ public class SudamaKeyCache
                     return cache.Data;
                 }
             }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
             catch { }
         }
 
         // 下载新数据
         Log($"正在下载 {label}...");
-        var data = await DownloadJsonAsync(url, label).ConfigureAwait(false);
+        var data = await DownloadJsonAsync(url, label, ct).ConfigureAwait(false);
         if (data != null)
         {
             try

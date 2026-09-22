@@ -57,6 +57,24 @@
             <!-- 入库流程加载条（搜索框下方，入库结束自动消失） -->
             <ProgressBar x:Name="AddProgress" IsIndeterminate="True"
                          Visibility="{Binding IsAdding, Converter={StaticResource BoolToVis}}" />
+
+            <!-- 取消任务：只在入库进行中出现（IsAdding）。用默认 Button 样式（填充 + 1px 描边 + 圆角，
+                 自带 hover/pressed 反馈，所以不手工改画刷）；文字与图标走强调色，对齐用户给的参考图。
+                 图标 E7A7 = Undo（弯钩左箭头）—— Segoe Fluent Icons 里最接近参考图那个形状的
+                 （E7A6 是它的镜像、E10E 是另一种"返回"箭头）。 -->
+            <Button x:Name="CancelAddButton" Click="CancelAddButton_Click"
+                    AutomationProperties.Name="取消任务"
+                    IsEnabled="{Binding IsCancelling, Converter={StaticResource BoolNegateConverter}}"
+                    HorizontalAlignment="Stretch" CornerRadius="8" MinHeight="44"
+                    ToolTipService.ToolTip="中止本次入库（已下载的临时清单会被清理）"
+                    Visibility="{Binding IsAdding, Converter={StaticResource BoolToVis}}">
+                <StackPanel Orientation="Horizontal" Spacing="10" HorizontalAlignment="Center">
+                    <FontIcon Glyph="&#xE7A7;" FontSize="16"
+                              Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                    <TextBlock Text="{Binding CancelButtonText}" FontWeight="SemiBold"
+                               Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                </StackPanel>
+            </Button>
         </StackPanel>
 
         <!-- 滚动区：仅搜索结果与无结果提示 -->

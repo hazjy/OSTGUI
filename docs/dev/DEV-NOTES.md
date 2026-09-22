@@ -31,6 +31,7 @@
 - `LuaBuilder`：Sudama 密钥/令牌 → `MergeAllDepotsAsync` 用全量 depot 列表补全（防止只写有 manifest 的 depot 漏密钥）→ 缺密钥收集并通知。DLC 段也对每个 DLC AppID 查 `keys[dlcId]`，Sudama 收录的独立 DLC depot key 会自动写入 `addappid(dlcId, 1, "<key>")`
 - 缺解密密钥警告在两种模式下都保留（无 key 无法解密下载加密内容）
 - **搜索页卡片**：与入库管理同构（左侧 120×56 缩略图 + 名称 + `AppID:` 行 + 右侧图标按钮区），**不放版本模式行**；尺寸 / 图标 / tooltip / 标点等细碎选择见工作区 `doc/细节与偏好.md`
+- **入库可取消（2026-09-22）**：`SearchViewModel` 每次入库新建一个 `CancellationTokenSource`，ct 一路传到**所有会等的环节**——`ManifestDownloadService`（逐 depot 下载 + 复制前）、`SteamGameInfoService`（取 depot 信息 / DLC 列表，含重试退避的 Delay）、`ManifestFileService.CopyToDepotCache`（逐份之间）、`LuaBuilder.BuildLuaAsync` 及其内部两处网络、`SudamaKeyCache`（冷缓存下载）。**唯一不打断的是 `WriteLuaAsync` 的原子写**（临时文件 + Move，毫秒级）→ 取消是"立即"的，且永远不会留下半个 `.lua`；depotcache 拷贝也改成"临时名 + `File.Move`"，避免半份 manifest。取消后**不兜底第二个源**、**不弹通知**，状态显示「已取消入库」；同时入库期间禁止再起第二个任务（`IsAdding` 守卫）。按钮点下即变「取消中…」并禁用（不等链路返回）
 - **搜索结果缩略图：与入库封面同一套来源，只走内存不落盘**——`FetchThumbnailBytesAsync(appId)` 走 `HeaderTemplates`（两条 header 布局）→ **官方 `GetHeaderImageUrlAsync`** → null（占位图标）。**不再用 `SearchResult.ImageUrl`**：那是 storesearch 的 `tiny_image`（231×87 小胶囊，≈2.66:1），塞进 2.14:1 的卡片会被裁掉两侧——2026-09-21 用户报的"搜索页缩略图缺一块"就是它。上屏用 `SetSourceAsync(MemoryStream.AsRandomAccessStream())` + **刻意不设 `DecodePixelWidth`**（流解码不认 `Logical`，设了反而首拍发糊——见工作区 `doc/开发踩坑.md` 的 WinUI 小节）；并发 4；卡片 `Stretch="Uniform"` 作保险（宁愿留边也不裁）；**不调用 `EnsureCoverFileAsync`**（那条会落盘）
 
 ## 4. Sudama 缓存（v1.3.0 现状）

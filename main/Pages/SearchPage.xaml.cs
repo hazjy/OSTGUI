@@ -44,6 +44,12 @@ public sealed partial class SearchPage : Page
         }
     }
 
+    /// <summary>取消任务（按钮只在入库进行中可见）；打断点与语义见 SearchViewModel.CancelAdd</summary>
+    private void CancelAddButton_Click(object sender, RoutedEventArgs e)
+    {
+        VM.CancelAddCommand.Execute(null);
+    }
+
     private async void InfoButton_Click(object sender, RoutedEventArgs e)
     {
         if (sender is Button btn && btn.Tag is SearchResult result)
