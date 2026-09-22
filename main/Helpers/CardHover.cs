@@ -4,139 +4,117 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Hosting;
 using Microsoft.UI.Xaml.Media;
+using Microsoft.UI.Xaml.Media.Animation;
 
 namespace OSTGUI.Helpers;
 
 /// <summary>
 /// 卡片悬浮微交互：高亮 + 轻微放大 + 投影。
 ///
-/// 用 WinUI 原生件做：`ElementCompositionPreview` 的隐式动画（改属性即自动补间，进出都顺）
-/// + `ThemeShadow`（跟着 Z 深度走的系统投影，自动适配深浅主题），不引第三方库、不重写
-/// `ListViewItem`/`GridViewItem` 的 ControlTemplate（那要自己接管焦点/拖拽/选择等内置行为，回归面太大）。
+/// **纯 XAML 那套经典实现**，刻意不碰 Composition 的 visual 所有权：
+///   - 放大：卡片模板里挂一个 <see cref="ScaleTransform"/>（`RenderTransformOrigin="0.5,0.5"`），
+///     这里用代码建 <see cref="Storyboard"/> 动画（140ms 缓出，进出都补间）
+///   - 投影：`UIElement.Shadow` + `Translation.Z`（XAML 属性，系统投影，自动适配深浅主题）
+///   - 高亮：换卡片背景刷（`CardBackgroundFillColorSecondaryBrush`）
 ///
-/// 作用对象分两处，别搞混：
-///   - **缩放 / 位移 / 阴影** 打在**容器**（`GridViewItem` / `ListViewItem`）上 —— 卡片的 DataTemplate
-///     会被回收复用，而容器是稳定的，回收时才有东西可复位；
-///   - **背景高亮** 打在**卡片本身**上（容器在卡片底下，被不透明的卡片盖住，改它看不见）。
+/// ⚠️ **千万不要**在同一个元素上再调 `ElementCompositionPreview.GetElementVisual`（例如为了装
+/// 隐式动画）：一旦调过，XAML 的 `Scale` / `Translation` / `Shadow` 会全部抛
+/// `UnauthorizedAccessException: ... the ElementCompositionPreview.GetElementVisual property in use`
+/// ——2026-09-23 就是这么踩的：事件照常触发、每一步都异常、全被 catch 吞掉，表现成"悬浮什么反应都没有"。
+/// 要用 Composition 做动画就整套都用 Composition（阴影也得换成 composition DropShadow），两边不能混。
 ///
 /// 数值与画刷同步记在 `doc/细节与偏好.md`
 /// </summary>
 public static class CardHover
 {
-    // 网格卡片是窄卡，放大明显一点；列表卡片横跨整行，放大一点点就够
     public const float GridScale = 1.03f;
     public const float ListScale = 1.01f;
     public const float GridShadowZ = 24f;
     public const float ListShadowZ = 16f;
 
-    private static readonly TimeSpan Duration = TimeSpan.FromMilliseconds(140);
-
     private sealed class State
     {
         public Brush? NormalBackground;   // 首次悬浮时读一次，移开还原
-        public ThemeShadow? Shadow;       // 只在悬浮期间挂上，不常驻
+        public Storyboard? Running;       // 留住引用：交给 GC 有可能半路停掉
+        public ThemeShadow? Shadow;
     }
 
-    // 以**容器**为键：卡片元素会被回收重建，容器才是稳定的
-    private static readonly ConditionalWeakTable<FrameworkElement, State> States = new();
+    private static readonly ConditionalWeakTable<Border, State> States = new();
 
     private static bool? _animationsEnabled;
-
-    /// <summary>系统"关闭动画效果"时不做补间（属性照改，只是跳变）</summary>
-    private static bool AnimationsEnabled
-    {
-        get
-        {
-            if (_animationsEnabled is null)
-            {
-                try { _animationsEnabled = new Windows.UI.ViewManagement.UISettings().AnimationsEnabled; }
-                catch { _animationsEnabled = true; }
-            }
-            return _animationsEnabled.Value;
-        }
-    }
+    private static TimeSpan Duration =>
+        (_animationsEnabled ??= ReadAnimationsEnabled()) ? TimeSpan.FromMilliseconds(140) : TimeSpan.Zero;
 
     /// <summary>指针进入卡片</summary>
-    public static void Enter(FrameworkElement container, Border card, Brush? hoverBackground, float scale, float shadowZ)
+    public static void Enter(Border card, Brush? hoverBackground, float scale, float shadowZ)
     {
-        var state = States.GetOrCreateValue(container);
+        var state = States.GetOrCreateValue(card);
         state.NormalBackground ??= card.Background;
 
-        // ⚠️ 顺序要紧：**先设属性、再装动画**。动画只是"补间"，是锦上添花；
-        // 之前反过来写，装动画那句一旦抛异常就被 catch 吞掉，属性根本没设上 → 整个交互静默失效
+        Animate(card, state, scale);
+
+        // 高亮、阴影各自独立兜底：任何一步失败都不影响其它步骤（别再一次 try 全包住）
+        if (hoverBackground is not null)
+        {
+            try { card.Background = hoverBackground; }
+            catch (Exception ex) { Log($"换高亮背景失败: {ex.GetType().Name} {ex.Message}"); }
+        }
+
         try
         {
-            // Translation 要先在这个元素上启用（否则设了不生效，阴影也出不来）
-            ElementCompositionPreview.SetIsTranslationEnabled(container, true);
-            container.Scale = new Vector3(scale, scale, 1f);
-            container.Translation = new Vector3(0f, 0f, shadowZ);
-            if (hoverBackground is not null) card.Background = hoverBackground;
-
+            ElementCompositionPreview.SetIsTranslationEnabled(card, true);   // 启用 Translation（不启用了设了也没用）
             state.Shadow ??= new ThemeShadow();
-            container.Shadow = state.Shadow;
+            card.Shadow = state.Shadow;
+            card.Translation = new Vector3(0f, 0f, shadowZ);
         }
-        catch (Exception ex) { Log($"【诊断】设属性失败: {ex.GetType().Name} {ex.Message}"); }
-
-        try
-        {
-            EnsureImplicitAnimations(container);
-        }
-        catch (Exception ex) { Log($"【诊断】装隐式动画失败: {ex.GetType().Name} {ex.Message}"); }
-
-        Log("【诊断】enter");   // 诊断期临时日志：确认事件是否触发
+        catch (Exception ex) { Log($"阴影失败: {ex.GetType().Name} {ex.Message}"); }
     }
 
     /// <summary>指针离开卡片</summary>
-    public static void Exit(FrameworkElement container, Border? card)
+    public static void Exit(Border card)
     {
+        if (!States.TryGetValue(card, out var state)) return;
+
+        Animate(card, state, 1f);
+
         try
         {
-            if (States.TryGetValue(container, out var state))
-            {
-                if (card is not null && state.NormalBackground is not null)
-                    card.Background = state.NormalBackground;
-                container.Shadow = null;   // 阴影只在悬浮时挂着
-            }
-
-            container.Scale = Vector3.One;
-            container.Translation = Vector3.Zero;
+            if (state.NormalBackground is not null) card.Background = state.NormalBackground;
+            card.Shadow = null;          // 阴影只在悬浮时挂着
+            card.Translation = Vector3.Zero;
         }
-        catch (Exception ex) { Log($"【诊断】复位失败: {ex.GetType().Name} {ex.Message}"); }
+        catch (Exception ex) { Log($"复原失败: {ex.GetType().Name} {ex.Message}"); }
     }
 
-    /// <summary>
-    /// 容器被回收时复位（卡片滚出视口时指针可能还压着它——不复位的话，回收后的容器
-    /// 会带着高亮与缩放跳到别的位置去）。卡片自身的背景不用管：容器换条目时
-    /// ContentPresenter 会按模板重建一份新的卡片元素
-    /// </summary>
-    public static void Reset(FrameworkElement container) => Exit(container, null);
-
-    /// <summary>给元素视觉装一次隐式动画：之后改 Scale / Translation 就自动补间</summary>
-    private static void EnsureImplicitAnimations(FrameworkElement element)
+    /// <summary>把卡片缩放到 <paramref name="to"/>（进出都走这里，只有目标值不同）</summary>
+    private static void Animate(Border card, State state, float to)
     {
-        if (!AnimationsEnabled) return;
+        if (card.RenderTransform is not ScaleTransform transform) return;
 
-        var visual = ElementCompositionPreview.GetElementVisual(element);
-        if (visual.ImplicitAnimations is not null) return;   // 装过就不再装（元素自己就是判据，不用额外记账）
+        var storyboard = new Storyboard();
+        foreach (var property in new[] { "ScaleX", "ScaleY" })
+        {
+            var animation = new DoubleAnimation
+            {
+                To = to,
+                Duration = Duration,
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            };
+            Storyboard.SetTarget(animation, transform);
+            Storyboard.SetTargetProperty(animation, property);
+            storyboard.Children.Add(animation);
+        }
 
-        var compositor = visual.Compositor;
-        var easing = compositor.CreateCubicBezierEasingFunction(new Vector2(0.2f, 0f), new Vector2(0f, 1f));
-
-        var animations = compositor.CreateImplicitAnimationCollection();
-
-        var scale = compositor.CreateVector3KeyFrameAnimation();
-        scale.InsertExpressionKeyFrame(1f, "this.FinalValue", easing);
-        scale.Duration = Duration;
-        animations["Scale"] = scale;
-
-        var translation = compositor.CreateVector3KeyFrameAnimation();
-        translation.InsertExpressionKeyFrame(1f, "this.FinalValue", easing);
-        translation.Duration = Duration;
-        animations["Translation"] = translation;
-
-        visual.ImplicitAnimations = animations;
+        state.Running?.Stop();
+        state.Running = storyboard;
+        storyboard.Begin();
     }
 
-    /// <summary>诊断期临时日志：写进应用日志文件（设置页也能看），定位完就撤</summary>
+    private static bool ReadAnimationsEnabled()
+    {
+        try { return new Windows.UI.ViewManagement.UISettings().AnimationsEnabled; }
+        catch { return true; }
+    }
+
     private static void Log(string message) => OSTGUI.Services.LogService.AddAppLog($"[Hover] {message}");
 }

@@ -106,8 +106,13 @@
                         <Border Margin="0,4" Padding="15,12" MinHeight="80"
                                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                 CornerRadius="6"
+                                RenderTransformOrigin="0.5,0.5"
                                 PointerEntered="ListCard_PointerEntered"
                                 PointerExited="ListCard_PointerExited">
+                            <!-- 悬浮放大就靠这个变换（Storyboard 在代码里建，见 Helpers/CardHover.cs） -->
+                            <Border.RenderTransform>
+                                <ScaleTransform />
+                            </Border.RenderTransform>
                             <Grid ColumnSpacing="15">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto" />
@@ -207,8 +212,13 @@
                 <DataTemplate x:DataType="models:LibraryItem">
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                             CornerRadius="6"
+                            RenderTransformOrigin="0.5,0.5"
                             PointerEntered="GridCard_PointerEntered"
                             PointerExited="GridCard_PointerExited">
+                        <!-- 悬浮放大就靠这个变换（Storyboard 在代码里建，见 Helpers/CardHover.cs） -->
+                        <Border.RenderTransform>
+                            <ScaleTransform />
+                        </Border.RenderTransform>
                         <StackPanel>
                             <!-- 封面框 200×94 = header.jpg 原生比例（460×215），不裁不放大：
                                  225% DPI 下要 450 物理像素，落盘的 460 宽正好 1:1。
