@@ -16,11 +16,7 @@ public sealed partial class HomePage : Page
         VM = mainVM;
         this.DataContext = VM;
 
-        Loaded += async (s, e) =>
-        {
-            await VM.RefreshLibraryStatsAsync();
-            VM.RefreshOstStatus();
-        };
+        Loaded += (s, e) => VM.RefreshOstStatus();
     }
 
     private void GoToSearch_Click(object sender, RoutedEventArgs e)

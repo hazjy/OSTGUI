@@ -33,9 +33,10 @@ public class LuaBuilder
         bool addAllDlc,
         CancellationToken ct = default)
     {
-        // 密钥与令牌获取失败不阻断，尽力而为
-        var keys = await _sudamaCache.GetSudamaKeysAsync(ct);
-        var tokens = await _sudamaCache.GetAccessTokensAsync(ct);
+        // 密钥与令牌获取失败不阻断，尽力而为。
+        // 用"按键查询器"而不是整份字典：缓存 22 万条，物化成字典单次入库要多花 ~100MB 峰值（见 SudamaKeyCache 注释）
+        using var keys = await _sudamaCache.LoadDepotKeysAsync(ct);
+        using var tokens = await _sudamaCache.LoadAccessTokensAsync(ct);
         var missingKeyDepots = new List<string>();
         var dlcCount = 0;
         var keyCount = 0;
@@ -53,7 +54,7 @@ public class LuaBuilder
         // 创意工坊密钥：Sudama depotkeys 中若收录了 AppID 自身的密钥（社区通称"创意工坊密钥"），
         // 主游戏行带上它——Steam 客户端下载创意工坊内容时按 depot=AppID 读取解密密钥，
         // 缺此 key 会报"内容仍处于加密"（详见 docs/dev/DEV-NOTES.md 创意工坊章节）
-        var appKey = keys.TryGetValue(appId, out var k) ? k : "";
+        var appKey = keys.TryGet(appId, out var k) ? k : "";
         if (appKey.Length == 64) keyCount++;
         lines.Add(appKey.Length == 64
             ? $"addappid({appId}, 1, \"{appKey}\")"
@@ -63,7 +64,7 @@ public class LuaBuilder
         foreach (var (depotId, manifestGid, _) in allDepots)
         {
             // OpenSteamTool 只接受恰好 64 字符的 depot key
-            var hasKey = keys.TryGetValue(depotId, out var key) && key.Length == 64;
+            var hasKey = keys.TryGet(depotId, out var key) && key.Length == 64;
 
             // 无 manifest 的壳型 depot（纯所有权声明，如部分 DLC 占位）没有可解密的内容，
             // 本就不需要密钥，不计入缺失警告
@@ -97,7 +98,7 @@ public class LuaBuilder
                 foreach (var dlcId in newDlcs)
                 {
                     // DLC 自身 AppID 也可能作为独立 depot ID 在 Sudama 收录；查到 key 就带 key
-                    var hasDlcKey = keys.TryGetValue(dlcId, out var dlcKey) && dlcKey.Length == 64;
+                    var hasDlcKey = keys.TryGet(dlcId, out var dlcKey) && dlcKey.Length == 64;
                     if (hasDlcKey)
                     {
                         keyCount++;
@@ -109,8 +110,9 @@ public class LuaBuilder
 
                 // 为缓存中有 token 的 DLC 补充 addtoken（受限 DLC 获取 appinfo 需要）
                 var dlcTokenLines = newDlcs
-                    .Where(d => tokens.TryGetValue(d, out var t) && !string.IsNullOrEmpty(t))
-                    .Select(d => $"addtoken({d}, \"{tokens[d]}\")")
+                    .Select(d => (Id: d, Has: tokens.TryGet(d, out var t), Token: t))
+                    .Where(x => x.Has && !string.IsNullOrEmpty(x.Token))
+                    .Select(x => $"addtoken({x.Id}, \"{x.Token}\")")
                     .ToList();
                 if (dlcTokenLines.Count > 0)
                 {
@@ -142,7 +144,7 @@ public class LuaBuilder
             }
         }
 
-        if (tokens.TryGetValue(appId, out var token) && !string.IsNullOrEmpty(token))
+        if (tokens.TryGet(appId, out var token) && !string.IsNullOrEmpty(token))
         {
             lines.Add("");
             lines.Add($"addtoken({appId}, \"{token}\")");

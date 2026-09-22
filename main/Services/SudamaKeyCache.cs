@@ -96,20 +96,6 @@ public class SudamaKeyCache
         return null;
     }
 
-    public async Task<Dictionary<string, string>> GetSudamaKeysAsync(CancellationToken ct = default)
-    {
-        return await GetCachedJsonAsync("sudama_cache.json", SudamaApiUrl, "Sudama 密钥", ct);
-    }
-
-    /// <summary>
-    /// 从 Sudama API 获取全量 App 访问令牌（缓存存在即用、不自动过期；仅手动刷新或导入时更新）
-    /// </summary>
-
-    public async Task<Dictionary<string, string>> GetAccessTokensAsync(CancellationToken ct = default)
-    {
-        return await GetCachedJsonAsync("token_cache.json", SudamaTokensUrl, "App 访问令牌", ct);
-    }
-
     private static string CacheFilePath(string cacheFileName) => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "OSTGUI", cacheFileName);
@@ -127,6 +113,112 @@ public class SudamaKeyCache
         var tmpPath = cachePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
         await File.WriteAllTextAsync(tmpPath, json).ConfigureAwait(false);
         File.Move(tmpPath, cachePath, true);
+    }
+
+    /// <summary>
+    /// 取"按键查询器"（缓存优先，缺缓存才下载）——入库链路专用。
+    ///
+    /// 为什么不用 <c>Dictionary&lt;string,string&gt;</c>：密钥缓存是 17.5MB / 22 万条，
+    /// 物化成字典要 ~40-55MB 的字符串+字典，再叠加读文件时的 ~33MB 字符串 → **单次入库瞬时 ~110MB**，
+    /// 而且都是 LOH 大对象（峰值过后工作集退不回去）。入库其实只要点查几十个 id，
+    /// 所以这里用 <see cref="JsonDocument"/> 惰性解析：只留解析后的 UTF-8 文档（~18MB），不造 22 万条 string。
+    ///
+    /// 形状兼容：老的 <c>{"Data":{…}}</c>（本程序写的）与原始明文 <c>{…}</c> 都能读。
+    /// ⚠️ 调用方必须 <c>using</c>（Dispose 才会释放那份文档）。
+    /// </summary>
+    private async Task<SudamaLookup> LoadLookupAsync(string cacheFileName, string url, string label, CancellationToken ct = default)
+    {
+        var cachePath = CacheFilePath(cacheFileName);
+
+        if (File.Exists(cachePath))
+        {
+            var cached = await TryOpenLookupAsync(cachePath, label, ct).ConfigureAwait(false);
+            if (cached != null) return cached;
+        }
+
+        // 缓存缺失/读不动 → 下载（这条路径本来就产出字典，用它建查询器，省一次解析）
+        Log($"正在下载 {label}...");
+        var data = await DownloadJsonAsync(url, label, ct).ConfigureAwait(false);
+        if (data != null)
+        {
+            try { await WriteCacheAsync(cacheFileName, data).ConfigureAwait(false); } catch { }
+            return FromDictionary(data);
+        }
+
+        // 下载失败：再试一次现有缓存（过期兜底，等价于原来的 TryLoadStaleCache）
+        return await TryOpenLookupAsync(cachePath, label, ct).ConfigureAwait(false) ?? SudamaLookup.Empty;
+    }
+
+    /// <summary>惰性打开缓存文件；读不动返回 null（由调用方决定下载或降级）</summary>
+    private static async Task<SudamaLookup?> TryOpenLookupAsync(string cachePath, string label, CancellationToken ct)
+    {
+        try
+        {
+            await using var fs = File.OpenRead(cachePath);
+            var doc = await JsonDocument.ParseAsync(fs, cancellationToken: ct).ConfigureAwait(false);
+            var root = doc.RootElement;
+
+            if (root.ValueKind == JsonValueKind.Object &&
+                root.TryGetProperty("Data", out var inner) && inner.ValueKind == JsonValueKind.Object)
+                return new SudamaLookup(doc, inner);      // {"Data":{…}}
+
+            if (root.ValueKind == JsonValueKind.Object)
+                return new SudamaLookup(doc, root);       // 明文 {…}
+
+            doc.Dispose();
+            return null;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            throw;   // 用户取消透传；读盘出错仍走"改用下载"分支
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static SudamaLookup FromDictionary(Dictionary<string, string> data)
+    {
+        var doc = JsonSerializer.SerializeToDocument(data);
+        return new SudamaLookup(doc, doc.RootElement);
+    }
+
+    /// <summary>depot key 缓存（sudama_cache.json）</summary>
+    public Task<SudamaLookup> LoadDepotKeysAsync(CancellationToken ct = default) =>
+        LoadLookupAsync("sudama_cache.json", SudamaApiUrl, "Sudama 密钥", ct);
+
+    /// <summary>App 访问令牌缓存（token_cache.json）</summary>
+    public Task<SudamaLookup> LoadAccessTokensAsync(CancellationToken ct = default) =>
+        LoadLookupAsync("token_cache.json", SudamaTokensUrl, "App 访问令牌", ct);
+
+    /// <summary>
+    /// 只读的按键查询器：包一层 <see cref="JsonDocument"/>，按 id 点查。
+    /// 用完必须 Dispose（文档持有 ~18MB 缓冲）。<see cref="Empty"/> 表示"没有数据"，点查恒 false。
+    /// </summary>
+    public sealed class SudamaLookup : IDisposable
+    {
+        private readonly JsonDocument? _doc;
+        private readonly JsonElement _map;
+
+        internal SudamaLookup(JsonDocument? doc, JsonElement map)
+        {
+            _doc = doc;
+            _map = map;
+        }
+
+        public static SudamaLookup Empty { get; } = new(null, default);
+
+        public bool TryGet(string id, out string value)
+        {
+            value = "";
+            if (string.IsNullOrEmpty(id) || _map.ValueKind != JsonValueKind.Object) return false;
+            if (!_map.TryGetProperty(id, out var el) || el.ValueKind != JsonValueKind.String) return false;
+            value = el.GetString() ?? "";
+            return value.Length > 0;
+        }
+
+        public void Dispose() => _doc?.Dispose();
     }
 
     /// <summary>
@@ -244,51 +336,6 @@ public class SudamaKeyCache
             return (stale.Count > 0,
                 $"{label}刷新异常: {ex.Message}，已保留旧缓存");
         }
-    }
-
-    /// <summary>
-    /// 通用缓存 JSON 下载（缓存存在即用、不自动过期——仅在无缓存或缓存为空时才下载；手动刷新见 RefreshAsync）
-    /// </summary>
-
-    private async Task<Dictionary<string, string>> GetCachedJsonAsync(string cacheFileName, string url, string label, CancellationToken ct = default)
-    {
-        var cachePath = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "OSTGUI", cacheFileName);
-
-        // 尝试读取缓存
-        if (File.Exists(cachePath))
-        {
-            try
-            {
-                var cachedJson = await File.ReadAllTextAsync(cachePath, ct);
-                var cache = JsonSerializer.Deserialize<SudamaCache>(cachedJson);
-                if (cache is { Data.Count: > 0 })
-                {
-                    Log($"使用本地缓存的 {label}");
-                    return cache.Data;
-                }
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                throw;   // 读缓存被取消（用户取消）透传；读盘出错仍走下面的"改用下载"分支
-            }
-            catch { }
-        }
-
-        // 下载新数据
-        Log($"正在下载 {label}...");
-        var data = await DownloadJsonAsync(url, label, ct).ConfigureAwait(false);
-        if (data != null)
-        {
-            try
-            {
-                await WriteCacheAsync(cacheFileName, data).ConfigureAwait(false);
-            }
-            catch { }
-            return data;
-        }
-        return TryLoadStaleCache(cachePath);
     }
 
     /// <summary>

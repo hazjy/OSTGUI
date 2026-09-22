@@ -45,15 +45,11 @@ public partial class MainViewModel : ObservableObject
             }
         }
     }
-    [ObservableProperty] private int _totalGames;
-    [ObservableProperty] private int _fixedVersionCount;
-    [ObservableProperty] private int _autoVersionCount;
     [ObservableProperty] private string _steamPathDisplay = "未检测到";
     public string OstStatusText => IsOstInjected ? "已注入" : "未注入";
     public string SteamRunningText => IsSteamRunning ? "运行中" : "未运行";
 
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _steamStatusTimer;
-    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _libraryRefreshTimer;
 
     // 子 ViewModels
     public SearchViewModel SearchVM { get; }
@@ -128,9 +124,6 @@ public partial class MainViewModel : ObservableObject
 
         // 启动 Steam 状态轮询
         StartSteamStatusPolling(dispatcherQueue);
-
-        // 启动库刷新定时器
-        StartLibraryRefreshTimer(dispatcherQueue);
     }
 
     /// <summary>
@@ -158,36 +151,6 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    /// <summary>
-    /// 启动库刷新定时器
-    /// </summary>
-    public void StartLibraryRefreshTimer(DispatcherQueue queue)
-    {
-        StopLibraryRefreshTimer();
-        _libraryRefreshTimer = queue.CreateTimer();
-        _libraryRefreshTimer.Interval = TimeSpan.FromSeconds(5);
-        _libraryRefreshTimer.Tick += OnLibraryRefreshTimerTick;
-        _libraryRefreshTimer.Start();
-    }
-
-    /// <summary>
-    /// 停止库刷新定时器
-    /// </summary>
-    public void StopLibraryRefreshTimer()
-    {
-        if (_libraryRefreshTimer != null)
-        {
-            _libraryRefreshTimer.Stop();
-            _libraryRefreshTimer.Tick -= OnLibraryRefreshTimerTick;
-            _libraryRefreshTimer = null;
-        }
-    }
-
-    private async void OnLibraryRefreshTimerTick(Microsoft.UI.Dispatching.DispatcherQueueTimer sender, object args)
-    {
-        await RefreshLibraryStatsAsync();
-    }
-
     private void OnSteamStatusTimerTick(Microsoft.UI.Dispatching.DispatcherQueueTimer sender, object args)
     {
         var isRunning = SteamService.IsSteamRunning();
@@ -195,18 +158,6 @@ public partial class MainViewModel : ObservableObject
         {
             IsSteamRunning = isRunning;
         }
-    }
-
-    /// <summary>
-    /// 刷新库统计
-    /// </summary>
-    public async Task RefreshLibraryStatsAsync()
-    {
-        var items = await LuaService.ScanLibraryAsync();
-        var games = items.Where(i => i.AppId != "N/A").ToList();
-        TotalGames = games.Count;
-        FixedVersionCount = games.Count(i => i.VersionMode == "fixed");
-        AutoVersionCount = games.Count(i => i.VersionMode == "auto");
     }
 
     /// <summary>

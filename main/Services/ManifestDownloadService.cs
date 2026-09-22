@@ -104,15 +104,32 @@ public class ManifestDownloadService
 
                 try
                 {
-                    var response = await dlClient.GetAsync(url, ct);
+                    // 流式落盘（不再 ReadAsByteArrayAsync）：单份清单不再整块进内存，
+                    // 顺带让"取消"不必等整份读完才响应。先写 .part，成功才改名（沿用临时名 + Move 的纪律）
+                    var response = await dlClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
                     if (response.IsSuccessStatusCode)
                     {
-                        var content = await response.Content.ReadAsByteArrayAsync(ct);
                         var fileName = $"{depotId}_{manifestGid}.manifest";
                         var filePath = Path.Combine(tempDir, fileName);
-                        await File.WriteAllBytesAsync(filePath, content, ct);
-                        downloaded.Add((depotId, manifestGid, content.LongLength));
-                        Log($"已下载 {fileName}");
+                        var partPath = filePath + ".part";
+                        try
+                        {
+                            long size;
+                            await using (var fs = File.Create(partPath))
+                            {
+                                await using (var src = await response.Content.ReadAsStreamAsync(ct))
+                                    await src.CopyToAsync(fs, ct);
+                                size = fs.Length;
+                            }
+                            File.Move(partPath, filePath, true);
+                            downloaded.Add((depotId, manifestGid, size));
+                            Log($"已下载 {fileName}");
+                        }
+                        catch
+                        {
+                            try { if (File.Exists(partPath)) File.Delete(partPath); } catch { }
+                            throw;
+                        }
                     }
                     else
                     {

@@ -34,6 +34,7 @@
 - **入库可取消（2026-09-22）**：`SearchViewModel` 每次入库新建一个 `CancellationTokenSource`，ct 一路传到**所有会等的环节**——`ManifestDownloadService`（逐 depot 下载 + 复制前）、`SteamGameInfoService`（取 depot 信息 / DLC 列表，含重试退避的 Delay）、`ManifestFileService.CopyToDepotCache`（逐份之间）、`LuaBuilder.BuildLuaAsync` 及其内部两处网络、`SudamaKeyCache`（冷缓存下载）。**唯一不打断的是 `WriteLuaAsync` 的原子写**（临时文件 + Move，毫秒级）→ 取消是"立即"的，且永远不会留下半个 `.lua`；depotcache 拷贝也改成"临时名 + `File.Move`"，避免半份 manifest。取消后**不兜底第二个源**、**不弹通知**，状态显示「已取消入库」；同时入库期间禁止再起第二个任务（`IsAdding` 守卫）。按钮点下即变「取消中…」并禁用（不等链路返回）。
   - ⚠️ **两条纪律（2026-09-22 复核后补，都是上轮踩出来的）**：① **`catch (OperationCanceledException)` 必须带 `when (ct.IsCancellationRequested)` 过滤** —— `HttpClient` 的**超时抛的也是 `TaskCanceledException`（OCE）**，不过滤就会把一次网络超时当成"用户取消"透传，**白白吃掉原有的重试与兜底**（`GetGameDetailsFromSteamCmdAsync` 的 3 次重试、`DownloadJsonAsync` 的重试 + 过期缓存兜底、逐 depot 下载的失败记账）；② **每个网络 / 等待点都要真的把 ct 传下去**——最容易漏的是链路开头那两处取 depot 信息（漏了等于"点完立刻取消"这一最常见场景仍不可取消）。
   - 不可打断的只剩**两处原子写**：Sudama 缓存的 `tmp + Move`（冷缓存时 16MB，约亚秒级）与 lua 的 `tmp + Move`（毫秒级）——换来的是永不出现截断缓存 / 半个 lua。
+  - **manifest 下载已改流式落盘（2026-09-22，内存优化）**：`ResponseHeadersRead` + `CopyToAsync(FileStream)` 写 `.part`、成功才 `Move` —— 单份清单不再整块进内存（大游戏单份可达几十 MB），取消也不必等整份读完。
 - **搜索结果缩略图：与入库封面同一套来源，只走内存不落盘**——`FetchThumbnailBytesAsync(appId)` 走 `HeaderTemplates`（两条 header 布局）→ **官方 `GetHeaderImageUrlAsync`** → null（占位图标）。**不再用 `SearchResult.ImageUrl`**：那是 storesearch 的 `tiny_image`（231×87 小胶囊，≈2.66:1），塞进 2.14:1 的卡片会被裁掉两侧——2026-09-21 用户报的"搜索页缩略图缺一块"就是它。上屏用 `SetSourceAsync(MemoryStream.AsRandomAccessStream())` + **刻意不设 `DecodePixelWidth`**（流解码不认 `Logical`，设了反而首拍发糊——见工作区 `doc/开发踩坑.md` 的 WinUI 小节）；并发 4；卡片 `Stretch="Uniform"` 作保险（宁愿留边也不裁）；**不调用 `EnsureCoverFileAsync`**（那条会落盘）
 
 ## 4. Sudama 缓存（v1.3.0 现状）
@@ -42,6 +43,9 @@
 - 缓存**存在即用、不自动过期**（已去掉 24h TTL，08-28 起：缓存存在即用，不再自动刷新）；仅当无缓存文件时才会自动下载；新密钥/令牌靠设置页**手动刷新**或**手动导入本地文件**（浏览器直连快于应用内时使用，按文件名/内容自动识别类型）才能拿到
 - 下载策略：密钥与令牌并行；流式接收；单次超时 max(120, 设置值)；重试间隔 1.5s；成功日志带条数/体积/耗时
 - Sudama 无按需查询接口，只有全量端点；勿每次入库实时拉全量
+- **入库取键走"惰性查询器"而不是整份字典（2026-09-22，内存优化）**：22 万条物化成 `Dictionary<string,string>` 要 ~40-55MB 字符串 + 字典，再叠加读文件时的 ~33MB 字符串 → **单次入库瞬时 ~110MB**（且都是 LOH 大对象，峰值过后工作集退不回去）。改成 `SudamaLookup`：`JsonDocument.ParseAsync(FileStream)` 只留解析后的 UTF-8 文档（~18MB），按 id 点查（`TryGet`）；`LuaBuilder` 里两处 `using` 包住，入库结束即释放。⚠️ **只允许 `using` 持有，别塞字段缓存**（忘了 Dispose 就是 18MB 常驻）。
+- **缓存文件形状兼容两种**：本程序写的是 `{"Data":{…}}`，读侧也认原始明文 `{…}`（`TryOpenLookupAsync` 里"根上有 `Data` 就下探"）。设置页的刷新/导入仍走字典版（那两条路径本来就要写整份文件）。
+- **待做（A2）**：冷缓存下载现在仍是"MemoryStream → 字典 → 再序列化 17.5MB 落盘"三次物化，可改成流式写 `.tmp` + `Move`（读侧已兼容原始形状）；因为要动缓存文件形状且只能靠真实冷缓存验证，暂缓。
 - 隐藏调优参数 `DownloadTimeout`（config.json，默认 120，无 UI）：同时影响清单文件下载（max(60,·)）与 Sudama 缓存下载（max(120,·)）的超时；早期版本曾有设置控件，08-14 起移除仅留字段
 
 ## 5. 日志系统（含线程教训）
@@ -113,7 +117,7 @@
 | `SteamGameInfoService` | 统一查询：depot + manifest gid + DLC 列表与名称（优先走社区非官方 API `api.steamcmd.net`——注意并非 Valve 官方，由 github.com/steamcmd/api 项目运营；失败回退官方 `store.steampowered.com/api/appdetails`，大陆网络下通常不可达）|
 | `ManifestDownloadService` | 多源清单下载 + 生成 Lua（门面已移除）|
 | `LuaBuilder` / `LuaConfigService` | Lua 生成（补全 depot/key/token/DLC/固定版本）；Lua 读写与版本模式切换 |
-| `SudamaKeyCache` | 密钥/令牌缓存（存在即用不自动过期、并行下载、手动刷新与本地导入）|
+| `SudamaKeyCache` | 密钥/令牌缓存（存在即用不自动过期、并行下载、手动刷新与本地导入）；**入库取键走 `SudamaLookup` 惰性点查**（不物化 22 万条字典，见 §4）|
 | `CoverImageService` | 入库卡片封面：静态 CDN 链 → 官方 appdetails 兜底 → 缺失标记（`.miss2`），落盘 `%LOCALAPPDATA%\OSTGUI\covers\`；详见 §13 |
 | `LibraryScanner` | 扫描 Lua 目录、检测错误 |
 | `NoSteamLauncherService` / `NoSteamLaunchOrchestrator` | 免 Steam 部署封装 / 编排（Steamless + GBE + Bypass）+ 一键还原（照抄 SAC `Restore` 四步，见 §6）|

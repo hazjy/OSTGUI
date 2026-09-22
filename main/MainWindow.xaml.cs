@@ -44,7 +44,6 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
     private void OnClosed(object sender, WindowEventArgs args)
     {
         _mainVM.StopSteamStatusPolling();
-        _mainVM.StopLibraryRefreshTimer();
         SaveSizeToConfig();
 
         // 清理 NoSteamLauncher 临时资源
@@ -361,9 +360,6 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
             // 配置加载完成后重新读取入库选项，
             // 避免启动瞬间 ViewModel 用默认值初始化后覆盖真实配置
             _mainVM.SearchVM.LoadOptionsFromConfig();
-
-            // 刷新库统计并更新标题
-            await _mainVM.RefreshLibraryStatsAsync();
 
             // 排查"启动后空白/数据全空"时先看这一行在不在（初始化有没有跑完）
             LogService.AddAppLog($"[Init] page={page}, steam={_mainVM.SteamPathDisplay}");
