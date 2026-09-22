@@ -39,7 +39,7 @@ public sealed partial class LibraryPage : Page
     {
         if (args.InRecycleQueue) return;
         if (args.Item is LibraryItem item)
-            _ = VM.EnsureCoverAsync(item);   // 该不该重新解码由 VM 按当前视图判断
+            _ = VM.EnsureCoverAsync(item);   // 只加载一次；已加载的直接返回
     }
 
     /// <summary>网格视图的懒加载钩子：GridView 也继承 ListViewBase，语义与列表完全一样</summary>
@@ -53,30 +53,15 @@ public sealed partial class LibraryPage : Page
     /// <summary>
     /// 视图形态切换。控件初始化阶段会提前触发一次，此时命名元素尚未就绪 → 守卫掉
     /// （照抄 NoSteamPage 的既有写法）
+    ///
+    /// 这里**不需要**再管已实体化卡片的封面：位图两档共用同一个解码宽度、只建一次，
+    /// 切档只是换宿主显示同一张位图（按视图重建位图反而会造成"时糊时清"，见 VM 的注释）
     /// </summary>
     private void ViewSegmented_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (LibraryList == null || LibraryGrid == null) return;
 
         _ = VM.SetViewModeAsync(ViewSegmented.SelectedIndex == 1 ? "grid" : "list");
-        RefreshVisibleCovers();
-    }
-
-    /// <summary>
-    /// 切换视图后，对**新显示那一档**已经实体化的卡片按新解码宽度重建封面位图
-    /// （列表 120 / 网格 200）。只处理已实体化的十来张、纯本地文件解码（不联网）；
-    /// 不依赖"切回来后容器还会不会再触发 ContainerContentChanging"这种框架行为
-    /// </summary>
-    private void RefreshVisibleCovers()
-    {
-        var panel = VM.IsGridView ? LibraryGrid.ItemsPanelRoot : LibraryList.ItemsPanelRoot;
-        if (panel == null) return;
-
-        foreach (var child in panel.Children)
-        {
-            if ((child as ContentControl)?.Content is LibraryItem item)
-                _ = VM.EnsureCoverAsync(item);
-        }
     }
 
     private async void ToggleVersion_Click(object sender, RoutedEventArgs e)

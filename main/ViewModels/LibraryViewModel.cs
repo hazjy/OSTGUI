@@ -34,17 +34,17 @@ public partial class LibraryViewModel : ObservableObject
 
     /// <summary>入库管理视图形态：list / grid。持久化在 config.json 的 LibraryViewMode</summary>
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsListView), nameof(IsGridView), nameof(CoverDecodeWidth))]
+    [NotifyPropertyChangedFor(nameof(IsListView), nameof(IsGridView))]
     private string _viewMode = "list";
 
     public bool IsListView => ViewMode != "grid";
     public bool IsGridView => ViewMode == "grid";
 
-    /// <summary>列表卡片图框 120×56、网格卡片图框 200×94（逻辑像素），两者的解码宽度不同：
-    /// 225% DPI 下网格要 ~450 物理像素，按列表的 120 解就是 1.9× 放大发糊</summary>
-    private const int ListCoverDecodeWidth = 120;
-    private const int GridCoverDecodeWidth = 200;
-    public int CoverDecodeWidth => IsGridView ? GridCoverDecodeWidth : ListCoverDecodeWidth;
+    /// <summary>封面解码宽度（逻辑像素）= **网格**卡片图框的宽度（200×94）。列表卡片图框是 120×56，
+    /// 用这张 450 物理像素的位图显示只是降采样，**比按 120 解更锐**。
+    /// 要害是**两档共用同一个宽度、位图只建一次**：按视图来回重建的话，任何一次没重建到，
+    /// 卡片就会带着另一档的宽度显示（网格里 1.67× 放大 = 糊）——2026-09-22 的"时糊时清"就是这么来的</summary>
+    private const int CoverDecodeWidth = 200;
 
     /// <summary>页面标题：入库管理 + 游戏总数，计数用 CJK 角括号「」括住（U+300C / U+300D）。
     /// WinUI 的 {Binding} 不支持 StringFormat，故按惯例在 VM 里拼；0（还没扫完）时只显示"入库管理"，免得闪一下</summary>
@@ -165,11 +165,6 @@ public partial class LibraryViewModel : ObservableObject
         ViewMode = mode;
         try { await _configService.UpdateAndSaveAsync(c => c.LibraryViewMode = mode); }
         catch { }
-
-        // 切档会把已实体化卡片的封面位图按新宽度重建（列表 120 / 网格 200），旧的 WinRT 图像表面
-        // 要等 GC 才释放——空闲时 GC 不会自己跑，来回切几轮就白白多占几十 MB。这里主动压一次
-        // （与入库结束、刷新缓存后同一套做法，见 OstMemory）
-        OstMemory.CompactAfterLargeBuffers();
     }
 
     /// <summary>
@@ -177,21 +172,16 @@ public partial class LibraryViewModel : ObservableObject
     /// 并发上限在 CoverImageService（信号量）里；这里只把拿到的文件变成 BitmapImage——
     /// 必须在 UI 线程调用/赋值（BitmapImage 是 DependencyObject）。
     ///
-    /// 解码宽度按**当前视图**取（列表 120 / 网格 200）：已经按当前宽度解好的直接返回，
-    /// 否则重建一份（切视图时用到，旧位图随之可回收，内存不翻倍）
+    /// **只加载一次**：拿到就不再动它（切档也不重建，理由见 <see cref="CoverDecodeWidth"/>）
     /// </summary>
     public async Task EnsureCoverAsync(LibraryItem item)
     {
-        var wanted = CoverDecodeWidth;
-        if (item.Cover != null && item.CoverDecodeWidth == wanted) return;
+        if (item.Cover != null) return;
         try
         {
             var path = await _coverService.EnsureCoverFileAsync(item.AppId);
             if (path != null)
-            {
-                item.Cover = CreateBitmap(path, wanted);
-                item.CoverDecodeWidth = wanted;
-            }
+                item.Cover = CreateBitmap(path);
         }
         catch { }
     }
@@ -200,12 +190,12 @@ public partial class LibraryViewModel : ObservableObject
     /// 由本地封面文件构造位图。DecodePixelWidth 必须先于 UriSource 设置，
     /// 否则按原图 460×215 全量解码，几十张就是几十 MB
     /// </summary>
-    private static BitmapImage CreateBitmap(string path, int decodeWidth)
+    private static BitmapImage CreateBitmap(string path)
     {
         var bitmap = new BitmapImage
         {
             DecodePixelType = DecodePixelType.Logical,
-            DecodePixelWidth = decodeWidth
+            DecodePixelWidth = CoverDecodeWidth
         };
         bitmap.UriSource = new Uri(path);
         return bitmap;

@@ -57,13 +57,6 @@ public class LibraryItem : ObservableObject
     }
 
     /// <summary>
-    /// 当前 <see cref="Cover"/> 位图是按多宽（逻辑像素）解码的，0 = 还没解码。
-    /// 列表与网格两档视图的解码宽度不同（120 / 200），切视图时靠它判断要不要重建位图——
-    /// 不做这个判断就会把列表尺寸的位图塞进网格卡片里显示，照样是糊的
-    /// </summary>
-    internal int CoverDecodeWidth { get; set; }
-
-    /// <summary>
     /// 获取版本模式显示文本（无 emoji）
     /// </summary>
     public string VersionModeText => VersionMode switch
