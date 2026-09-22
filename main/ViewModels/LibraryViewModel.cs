@@ -40,12 +40,6 @@ public partial class LibraryViewModel : ObservableObject
     public bool IsListView => ViewMode != "grid";
     public bool IsGridView => ViewMode == "grid";
 
-    /// <summary>封面解码宽度（逻辑像素）= **网格**卡片图框的宽度（200×94）。列表卡片图框是 120×56，
-    /// 用这张 450 物理像素的位图显示只是降采样，**比按 120 解更锐**。
-    /// 要害是**两档共用同一个宽度、位图只建一次**：按视图来回重建的话，任何一次没重建到，
-    /// 卡片就会带着另一档的宽度显示（网格里 1.67× 放大 = 糊）——2026-09-22 的"时糊时清"就是这么来的</summary>
-    private const int CoverDecodeWidth = 200;
-
     /// <summary>页面标题：入库管理 + 游戏总数，计数用 CJK 角括号「」括住（U+300C / U+300D）。
     /// WinUI 的 {Binding} 不支持 StringFormat，故按惯例在 VM 里拼；0（还没扫完）时只显示"入库管理"，免得闪一下</summary>
     public string TitleText => TotalCount > 0 ? $"入库管理 「{TotalCount}」" : "入库管理";
@@ -172,7 +166,7 @@ public partial class LibraryViewModel : ObservableObject
     /// 并发上限在 CoverImageService（信号量）里；这里只把拿到的文件变成 BitmapImage——
     /// 必须在 UI 线程调用/赋值（BitmapImage 是 DependencyObject）。
     ///
-    /// **只加载一次**：拿到就不再动它（切档也不重建，理由见 <see cref="CoverDecodeWidth"/>）
+    /// **只加载一次**：拿到就不再动它，切档也不重建
     /// </summary>
     public async Task EnsureCoverAsync(LibraryItem item)
     {
@@ -181,23 +175,26 @@ public partial class LibraryViewModel : ObservableObject
         {
             var path = await _coverService.EnsureCoverFileAsync(item.AppId);
             if (path != null)
-                item.Cover = CreateBitmap(path);
+                item.Cover = await CreateBitmapAsync(path);
         }
         catch { }
     }
 
     /// <summary>
-    /// 由本地封面文件构造位图。DecodePixelWidth 必须先于 UriSource 设置，
-    /// 否则按原图 460×215 全量解码，几十张就是几十 MB
+    /// 文件 → 位图：**按原生尺寸解码**，刻意不设 `DecodePixelWidth`。
+    /// 落盘的 460×215 正好覆盖网格图框（225% DPI 下 450 物理像素），显示端一律是缩小，任何 DPI 都清晰。
+    /// 更要紧的是**不依赖"解码那一刻的缩放/时机"**：`DecodePixelType=Logical` 那条路是按当时的缩放
+    /// 取表面的，一旦系统在别处重新取一次表面（久置、息屏/锁屏回来、被系统回收图像表面后再显示），
+    /// 就可能取到比显示尺寸小的表面 = 糊；而"重建位图"（刷新）又恢复正常 —— 症状正是"时糊时清"。
+    /// 同一个做法早已用在搜索页缩略图上（`SearchViewModel.CreateBitmapAsync`），那边从来没糊过。
+    /// ⚠️ 探针 `bitmap.PixelWidth` 读到的是原图尺寸、不是上屏表面，别拿它当判据
     /// </summary>
-    private static BitmapImage CreateBitmap(string path)
+    private static async Task<BitmapImage> CreateBitmapAsync(string path)
     {
-        var bitmap = new BitmapImage
-        {
-            DecodePixelType = DecodePixelType.Logical,
-            DecodePixelWidth = CoverDecodeWidth
-        };
-        bitmap.UriSource = new Uri(path);
+        var bytes = await File.ReadAllBytesAsync(path);
+        var bitmap = new BitmapImage();
+        using var stream = new MemoryStream(bytes);   // 必须活到 SetSourceAsync 完成
+        await bitmap.SetSourceAsync(stream.AsRandomAccessStream());
         return bitmap;
     }
 
