@@ -221,7 +221,7 @@ public partial class AchievementViewModel : ObservableObject
             return;
         }
         var extra = string.IsNullOrEmpty(_steamId) ? "" : $"　·　留底来自账号 {_steamId}";
-        Notice = $"改动会立即存进本地留底；入库游戏的 Steam 端状态服务端不认，要重启后仍在需要 CloudRedirect（下一步做）。{extra}";
+        Notice = $"改动会立即存进本地留底；点「保存到 Steam」才写进客户端（重启 Steam 后仍在）。若成就页一时显示不出来，是内核在拉取时会清空入库游戏的成就响应。{extra}";
         NoticeSeverity = InfoBarSeverity.Informational;
     }
 
