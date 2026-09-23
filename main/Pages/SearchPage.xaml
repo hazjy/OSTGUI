@@ -126,6 +126,7 @@
                 <DataTemplate x:DataType="models:SearchResult">
                     <Border Padding="15,12" MinHeight="80" CornerRadius="6"
                             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                             RenderTransformOrigin="0.5,0.5"
                             PointerEntered="ListCard_PointerEntered"
                             PointerExited="ListCard_PointerExited">
@@ -227,6 +228,7 @@
             <GridView.ItemTemplate>
                 <DataTemplate x:DataType="models:SearchResult">
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
                             CornerRadius="6"
                             RenderTransformOrigin="0.5,0.5"
                             PointerEntered="GridCard_PointerEntered"
@@ -235,7 +237,9 @@
                             <ScaleTransform />
                         </Border.RenderTransform>
                         <StackPanel>
-                            <Border Height="93" CornerRadius="6,6,0,0"
+                            <!-- 高度 92（不是 93）：卡片加了 1px 描边后内容宽 198，198/92 = 2.152 仍 ≥ 素材比例 2.1395，
+                                 所以封面左右依然不裁；若改回 93 就会重新裁掉细边框（详见入库管理页那段注释） -->
+                            <Border Height="92" CornerRadius="6,6,0,0"
                                     Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
                                 <Grid>
                                     <FontIcon Glyph="&#xE7FC;" FontSize="24"
