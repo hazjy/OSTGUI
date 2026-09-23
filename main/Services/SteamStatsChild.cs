@@ -10,8 +10,6 @@ public sealed class StatsChildResult
     public string Message { get; set; } = "";
     public string SteamId { get; set; } = "";
     public bool StatsReady { get; set; }
-    /// <summary>现场校准出的 vtable 偏移（0 / 1），排障用</summary>
-    public int LayoutOffset { get; set; }
     public string Warning { get; set; } = "";
     public int Changed { get; set; }
     public List<AchievementRecord> Achievements { get; set; } = new();
@@ -26,9 +24,11 @@ public sealed class StatsChildResult
 /// </summary>
 internal static class SteamStatsChild
 {
-    // ISteamUserStats013 的 vtable 索引，顺序取自 SAM（Steam Achievement Manager）的接口声明。
-    // 本机客户端的 vtable 可能在其前面多一个 RequestCurrentStats（以下索引整体 +1），
-    // 所以不写死：Calibrate() 用 schema 里的成就条数现场校验 GetNumAchievements，挑对的偏移。
+    // ISteamUserStats013 的 vtable 索引，顺序取自 SAM（Steam Achievement Manager）的接口声明
+    // —— Fluent-Steam-Lua 用同一套在本机跑通过，直接照用。
+    // ⚠️ 别再加"探测偏移"那类代码：探测只能靠调用别的函数，而 GetAchievementName(index) 之类拿到
+    // 垃圾下标就会越界（2026-09-23 实测：正是那个探测把子进程打成 0xC0000005 = 访问违例）。
+    // 布局对不对改由**行为**校验：RequestUserStats 之后 GetNumAchievements() 应等于 schema 条数。
     private const int IdxSetAchievement = 6;
     private const int IdxGetAchievementAndUnlockTime = 8;
     private const int IdxStoreStats = 9;
@@ -59,6 +59,17 @@ internal static class SteamStatsChild
             return defs == null ? 2 : 0;
         }
 
+        var outFile = apply ? args[5] : args[4];
+
+        // 先占位：子进程要是在下面崩掉（原生调用越界是进程级死亡，catch 拦不住），
+        // 父进程至少能拿到"未完成"而不是一句"无输出"。
+        try
+        {
+            File.WriteAllText(outFile, JsonSerializer.Serialize(
+                new StatsChildResult { Ok = false, Message = "子进程未完成（崩溃或被杀）" }));
+        }
+        catch { }
+
         StatsChildResult result;
         try
         {
@@ -72,7 +83,6 @@ internal static class SteamStatsChild
             result = new StatsChildResult { Ok = false, Message = ex.ToString() };
         }
 
-        var outFile = apply ? args[5] : args[4];
         try
         {
             File.WriteAllText(outFile, JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
@@ -81,7 +91,7 @@ internal static class SteamStatsChild
         {
             LogService.AddAppLog($"成就子进程写结果失败: {ex.Message}");
         }
-        LogService.AddAppLog($"stats {mode} appid={appId} ok={result.Ok} off={result.LayoutOffset} {result.Message}");
+        LogService.AddAppLog($"stats {mode} appid={appId} ok={result.Ok} {result.Message} {result.Warning}");
         return result.Ok ? 0 : 1;
     }
 
@@ -95,6 +105,7 @@ internal static class SteamStatsChild
             res.Message = "未找到成就定义（缺少 schema 文件）：" + SteamStatsSchema.PathFor(steamPath, appId);
             return res;
         }
+        LogService.AddAppLog($"stats[{appId}] begin defs={defs.Count} changes={changes?.Count.ToString() ?? "-"}");
 
         // 加载 steamclient 之前设定身份；退出前清掉（否则 Steam 长时间把本进程认成该游戏）
         Environment.SetEnvironmentVariable("SteamAppId", appId);
@@ -136,6 +147,7 @@ internal static class SteamStatsChild
 
             var user = connectGlobal(client, pipe);
             if (user == 0) { res.Message = "ConnectToGlobalUser 失败（Steam 未登录？）"; return res; }
+            LogService.AddAppLog($"stats[{appId}] pipe ok user={user}");
 
             // SteamAppId 是否真的生效（不致命，只记警告）
             var utils = CallWithAnsi("SteamUtils004", p => getUtils(client, pipe, p));
@@ -150,27 +162,72 @@ internal static class SteamStatsChild
                 ? 0UL
                 : GetDelegate<GetSteamIdFn>(Marshal.ReadIntPtr(steamUser), IdxUserGetSteamId)(steamUser);
             res.SteamId = steamId.ToString();
+            LogService.AddAppLog($"stats[{appId}] identity steamId={steamId}");
 
             var stats = CallWithAnsi("STEAMUSERSTATS_INTERFACE_VERSION013", p => getGeneric(client, user, pipe, p));
             if (stats == IntPtr.Zero) { res.Message = "拿不到 ISteamUserStats013 接口"; return res; }
+            LogService.AddAppLog($"stats[{appId}] iface ok");
 
             var statsVt = Marshal.ReadIntPtr(stats);
-            var off = Calibrate(stats, statsVt, defs.Count, res);
-            res.LayoutOffset = off;
+            var getAchieved = GetDelegate<GetAchievementAndUnlockTimeFn>(statsVt, IdxGetAchievementAndUnlockTime);
 
-            if (steamId != 0)
+            List<AchievementRecord> ReadAll()
             {
-                var request = GetDelegate<RequestUserStatsFn>(statsVt, IdxRequestUserStats + off);
+                var list = new List<AchievementRecord>(defs.Count);
+                foreach (var d in defs)
+                {
+                    var rec = new AchievementRecord { Name = d.Name };
+                    var np = Marshal.StringToCoTaskMemAnsi(d.Name);
+                    try
+                    {
+                        if (getAchieved(stats, np, out var achieved, out var unlockTime) != 0)
+                        {
+                            rec.Achieved = achieved != 0;
+                            rec.UnlockTime = unlockTime;
+                        }
+                    }
+                    finally { Marshal.FreeCoTaskMem(np); }
+                    list.Add(rec);
+                }
+                return list;
+            }
+
+            // 先把客户端**当前缓存**读一遍：入库游戏的成就服务端本来就是空的，而 RequestUserStats 会重新拉
+            // 一次（内核还会把 819 里的 stats 清掉）——那会把客户端里已有的状态（比如别处工具刚写的）抹平。
+            // 所以只有"一条已解锁都没有"才去请求。
+            var needsRequest = changes != null;
+            if (!needsRequest)
+            {
+                var cached = ReadAll();
+                if (cached.Any(r => r.Achieved))
+                {
+                    res.Achievements = cached;
+                    LogService.AddAppLog($"stats[{appId}] read(cached) {cached.Count(r => r.Achieved)}/{cached.Count} unlocked");
+                    res.Ok = true;
+                    return res;
+                }
+                needsRequest = true;
+            }
+
+            if (needsRequest && steamId != 0)
+            {
+                var request = GetDelegate<RequestUserStatsFn>(statsVt, IdxRequestUserStats);
                 if (request(stats, steamId) == 0) Append(ref res, "请求成就数据失败");
             }
 
             res.StatsReady = PumpCallbacks(pipe, getCallback, freeCallback);
             if (!res.StatsReady) Append(ref res, "未收到 UserStatsReceived（成就状态可能仍是旧值）");
 
+            // 行为校验：接口布局对的话，客户端报的成就条数应与本地 schema 一致
+            var clientCount = GetDelegate<GetCountFn>(statsVt, IdxGetNumAchievements)(stats);
+            LogService.AddAppLog($"stats[{appId}] count={clientCount} schema={defs.Count} ready={res.StatsReady}");
+            if (clientCount != defs.Count)
+                Append(ref res, $"客户端成就数 {clientCount} 与 schema {defs.Count} 不一致（接口布局可能不匹配）");
+
             if (changes != null)
             {
-                var setAchievement = GetDelegate<SetAchievementFn>(statsVt, IdxSetAchievement + off);
-                var store = GetDelegate<StoreStatsFn>(statsVt, IdxStoreStats + off);
+                var setAchievement = GetDelegate<SetAchievementFn>(statsVt, IdxSetAchievement);
+                var store = GetDelegate<StoreStatsFn>(statsVt, IdxStoreStats);
 
                 var failed = 0;
                 foreach (var c in changes)
@@ -182,25 +239,11 @@ internal static class SteamStatsChild
                 res.Changed = changes.Count - failed;
                 if (store(stats) == 0) Append(ref res, "StoreStats 失败（未拥有的游戏服务端不认，属预期）");
                 if (failed > 0) res.Message = $"{failed} 项设置失败";
+                LogService.AddAppLog($"stats[{appId}] applied={res.Changed}/{changes.Count} failed={failed}");
             }
 
-            // 回读（dump 与 apply 共用同一条路）
-            var getAchieved = GetDelegate<GetAchievementAndUnlockTimeFn>(statsVt, IdxGetAchievementAndUnlockTime + off);
-            foreach (var d in defs)
-            {
-                var rec = new AchievementRecord { Name = d.Name };
-                var np = Marshal.StringToCoTaskMemAnsi(d.Name);
-                try
-                {
-                    if (getAchieved(stats, np, out var achieved, out var unlockTime) != 0)
-                    {
-                        rec.Achieved = achieved != 0;
-                        rec.UnlockTime = unlockTime;
-                    }
-                }
-                finally { Marshal.FreeCoTaskMem(np); }
-                res.Achievements.Add(rec);
-            }
+            res.Achievements = ReadAll();
+            LogService.AddAppLog($"stats[{appId}] read {res.Achievements.Count(a => a.Achieved)}/{res.Achievements.Count} unlocked");
 
             res.Ok = true;
             return res;
@@ -212,24 +255,6 @@ internal static class SteamStatsChild
             Environment.SetEnvironmentVariable("SteamAppId", null);
             Environment.SetEnvironmentVariable("SteamGameId", null);
         }
-    }
-
-    /// <summary>
-    /// 现场校准 vtable 偏移：拿 schema 里的成就条数去校验 GetNumAchievements。
-    /// 两个候选调用都无副作用——偏移 0 时命中的就是真 GetNumAchievements；偏移 1 时命中的是真
-    /// GetAchievementName(0)（只读它返回指针的低 32 位，不解引用）。
-    /// </summary>
-    private static int Calibrate(IntPtr stats, IntPtr vtable, int expected, StatsChildResult res)
-    {
-        foreach (var off in new[] { 0, 1 })
-        {
-            uint n;
-            try { n = GetDelegate<GetCountFn>(vtable, IdxGetNumAchievements + off)(stats); }
-            catch { continue; }
-            if (expected > 0 ? n == expected : n > 0 && n < 4096) return off;
-        }
-        Append(ref res, "无法确认成就接口布局，按偏移 0 继续");
-        return 0;
     }
 
     /// <summary>把回调队列抽干，等到 UserStatsReceived（成就数据到位）为止</summary>

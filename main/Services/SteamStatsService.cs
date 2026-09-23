@@ -68,8 +68,14 @@ public class SteamStatsService
                 return new StatsChildResult { Ok = false, Message = $"子进程无输出（退出码 {proc.ExitCode}）" };
 
             var json = await File.ReadAllTextAsync(outFile);
-            return JsonSerializer.Deserialize<StatsChildResult>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
-                   ?? new StatsChildResult { Ok = false, Message = "子进程结果解析失败" };
+            var result = JsonSerializer.Deserialize<StatsChildResult>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                         ?? new StatsChildResult { Ok = false, Message = "子进程结果解析失败" };
+
+            // 占位结果 = 子进程没跑完（原生调用越界属进程级死亡，子进程自己 catch 不住）
+            if (!result.Ok && result.Message.StartsWith("子进程未完成"))
+                result.Message += $"（退出码 {proc.ExitCode}；0xC0000005 = 访问违例，日志里有最后一条 stats[…] 阶段行）";
+
+            return result;
         }
         catch (Exception ex)
         {
