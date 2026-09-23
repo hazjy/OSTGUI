@@ -15,6 +15,8 @@ public sealed class StatsChildResult
     public int ReadOk { get; set; }
     public string Warning { get; set; } = "";
     public int Changed { get; set; }
+    /// <summary>SetAchievement 返回失败的条数（&gt;0 表示没全部写进去）</summary>
+    public int Failed { get; set; }
     public List<AchievementRecord> Achievements { get; set; } = new();
 }
 
@@ -173,9 +175,9 @@ internal static class SteamStatsChild
                 if (!client.SteamUserStats.SetAchievement(c.Name, c.Achieved)) failed++;
 
             res.Changed = changes.Count - failed;
+            res.Failed = failed;
             if (!client.SteamUserStats.StoreStats())
-                Append(ref res, "StoreStats 失败（未拥有的游戏服务端不认，属预期）");
-            if (failed > 0) res.Message = $"{failed} 项设置失败";
+                Append(ref res, "StoreStats 失败");
             LogService.AddAppLog($"stats[{appId}] applied={res.Changed}/{changes.Count} failed={failed}");
         }
 

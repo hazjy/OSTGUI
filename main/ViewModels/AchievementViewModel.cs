@@ -271,10 +271,26 @@ public partial class AchievementViewModel : ObservableObject
             var result = await _stats.ApplyAsync(SelectedGame.AppId, changes);
             if (result is { Ok: true })
             {
-                MergeFromResult(result);
-                SaveStore("steam");
-                // 不报数量：现在每次都是"整体写一遍"，数量恒等于总数，没有信息量（有警告才补一行）
-                ToastService.ShowSuccess("成就已写入 Steam", result.Warning);
+                // 客户端一条状态都没读回来（比如成就根本设不上）→ 别拿它覆盖界面与留底
+                if (result.ReadOk > 0)
+                {
+                    MergeFromResult(result);
+                    SaveStore("steam");
+                }
+
+                if (result.Failed > 0)
+                {
+                    var extra = string.IsNullOrEmpty(result.Warning) ? "" : $"；{result.Warning}";
+                    ToastService.ShowError("成就未全部写入 Steam", $"{result.Failed} 项设置失败{extra}");
+                }
+                else if (!string.IsNullOrEmpty(result.Warning))
+                {
+                    ToastService.ShowWarning("成就已写入 Steam", result.Warning);
+                }
+                else
+                {
+                    ToastService.ShowSuccess("成就已写入 Steam", "");
+                }
             }
             else
             {
