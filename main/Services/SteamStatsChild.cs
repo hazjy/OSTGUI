@@ -11,6 +11,8 @@ public sealed class StatsChildResult
     public string Message { get; set; } = "";
     public string SteamId { get; set; } = "";
     public bool StatsReady { get; set; }
+    /// <summary>true = 没重新向服务器拉取，直接读的客户端当前状态（读路径的"缓存优先"分支）</summary>
+    public bool UsedCache { get; set; }
     public string Warning { get; set; } = "";
     public int Changed { get; set; }
     public List<AchievementRecord> Achievements { get; set; } = new();
@@ -144,6 +146,7 @@ internal static class SteamStatsChild
             if (cached.Any(r => r.Achieved))
             {
                 res.Achievements = cached;
+                res.UsedCache = true;
                 res.Ok = true;
                 LogService.AddAppLog($"stats[{appId}] read(cached) {cached.Count(r => r.Achieved)}/{cached.Count} unlocked");
                 return res;

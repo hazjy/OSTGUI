@@ -334,8 +334,12 @@ public partial class AchievementViewModel : ObservableObject
             {
                 MergeFromResult(result);
                 SaveStore("steam");
-                if (!result.StatsReady) ToastService.ShowWarning("从 Steam 读取", "没等到成就数据回调，读到的是客户端当前状态");
-                else ToastService.ShowSuccess("从 Steam 读取", $"{result.Achievements.Count(a => a.Achieved)} 项已解锁");
+                if (result.UsedCache)
+                    ToastService.ShowInfo("从 Steam 读取", "读的是客户端当前状态（没有重新向服务器拉取）");
+                else if (!result.StatsReady)
+                    ToastService.ShowWarning("从 Steam 读取", "没等到成就数据回调，读到的是客户端当前状态");
+                else
+                    ToastService.ShowSuccess("从 Steam 读取", $"{result.Achievements.Count(a => a.Achieved)} 项已解锁");
             }
             else
             {
