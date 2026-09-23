@@ -2,10 +2,17 @@
   <!-- 构建产物集中到仓库级 .build\ 目录，脱离各项目源码树。
        背景：WindowsAppSDK 自包含部署偶发把产物写进项目目录下的嵌套 bin
        （如 main\main\bin），与源码树内的规范路径互相干扰，曾导致清理脚本
-       误删唯一副本、旧 exe 冒充新构建。产物外迁后该类问题整体消失。 -->
+       误删唯一副本、旧 exe 冒充新构建。产物外迁后该类问题整体消失。
+
+       ⚠️ 这两个路径必须**绝对**：它们会随 ProjectReference 传进被引用项目的构建，
+       一旦是相对值（如 .build\OSTGUI\bin\），内层构建就按它自己的目录重新解析，产出
+       <项目>\.build\OSTGUI\bin\... 这种嵌套副本 —— 2026-09-23 实测 OnlineHost 中招。
+       不要用 $(MSBuildThisFileDirectory)：某些评估下它是空的（-getProperty、静态图评估等），
+       那时算出来的就是相对路径。改用"从项目目录向上找到本文件"得到的绝对目录。 -->
   <PropertyGroup>
-    <BaseOutputPath>$(MSBuildThisFileDirectory).build\$(MSBuildProjectName)\bin\</BaseOutputPath>
-    <BaseIntermediateOutputPath>$(MSBuildThisFileDirectory).build\$(MSBuildProjectName)\obj\</BaseIntermediateOutputPath>
+    <_RepoRoot>$([MSBuild]::GetDirectoryNameOfFileAbove('$(MSBuildProjectDirectory)', 'Directory.Build.props'))\</_RepoRoot>
+    <BaseOutputPath>$(_RepoRoot).build\$(MSBuildProjectName)\bin\</BaseOutputPath>
+    <BaseIntermediateOutputPath>$(_RepoRoot).build\$(MSBuildProjectName)\obj\</BaseIntermediateOutputPath>
     <DefaultItemExcludes>$(DefaultItemExcludes);.build/**</DefaultItemExcludes>
   </PropertyGroup>
 </Project>

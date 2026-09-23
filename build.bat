@@ -31,10 +31,9 @@ if not defined MSBUILD (
 
 echo [1/2] Building OSTGUI (Debug) ...
 echo        full log: %LOGFILE%
-REM Pass an ABSOLUTE project path: with a relative one, custom
-REM BaseOutputPath (from Directory.Build.props) gets re-resolved against
-REM the current directory in some child evaluations and outputs land in
-REM main\.build\ instead of the canonical repo-root .build\.
+REM Pass an ABSOLUTE project path: 相对路径下 MSBuild 可能把自定义 BaseOutputPath
+REM 重新解析到当前目录、产物落到 <项目>\.build\（根因已在 Directory.Build.props
+REM 改成绝对路径，这里保持绝对以免再触发；兜底见文件末尾的嵌套目录清理）。
 "%MSBUILD%" "%~dp0main\OSTGUI.csproj" /t:Build /restore /p:Configuration=Debug /m /nologo ^
   /v:q ^
   /flp:"LogFile=%LOGFILE%;Verbosity=normal" ^
@@ -51,32 +50,28 @@ if not "%EC%"=="0" (
     exit /b %EC%
 )
 
-REM WindowsAppSDK quirk: every Debug build puts the fresh managed outputs in
-REM a nested copy (main\.build\... & NoSteamLauncher\.build\...) while the
-REM canonical repo-root .build may keep stale files. So BUILD OK on a stale
-REM canonical exe was silently shipping old builds. Sync anything fresher from
-REM the nested copies back to canonical BEFORE verifying. Idempotent: /E /XO
-REM overwrites only when the source file is newer; never deletes.
+REM 兜底：内层构建偶发把**相对**的输出基路径重定位到项目目录，于是冒出 <项目>\.build\ 这种
+REM 嵌套副本（根因见 Directory.Build.props 的绝对路径；这里防别的项目/别的 SDK 再踩进来）。
+REM 嵌套副本可能比 canonical 还新，所以先同步回去再删。idempotent：/E /XO 只在源更新时覆盖。
 set "CANON=%~dp0%OUTDIR%"
-set "ALTMAIN=%~dp0main\.build\OSTGUI\bin\Debug\net10.0-windows10.0.19041.0\win-x64"
-set "ALTNS=%~dp0NoSteamLauncher\.build\NoSteamLauncher\bin\Debug\net8.0"
-if exist "%ALTMAIN%\OSTGUI.exe" robocopy "%ALTMAIN%" "%CANON%" /E /XO /NFL /NDL /NJH /NJS >nul
-if exist "%ALTNS%\NoSteamLauncher.dll" robocopy "%ALTNS%" "%~dp0.build\NoSteamLauncher\bin\Debug\net8.0" /E /XO /NFL /NDL /NJH /NJS >nul
-if errorlevel 8 (
-    echo [BUILD ERROR] robocopy sync failed
-    exit /b 1
+for /d %%P in ("%~dp0*") do (
+    if exist "%%P\.build" if /i not "%%~nxP"==".build" (
+        robocopy "%%P\.build" "%~dp0.build" /E /XO /NFL /NDL /NJH /NJS >nul
+        if errorlevel 8 (
+            echo [BUILD ERROR] robocopy sync failed: %%P\.build
+            exit /b 1
+        )
+        rd /s /q "%%P\.build"
+    )
 )
 
 set "APPEXE=%CANON%\OSTGUI.exe"
 if not exist "%APPEXE%" (
     echo [BUILD ERROR] output exe not found: %APPEXE%
-    echo If this persists, wipe .build\ and main\.build\ and retry once.
+    echo If this persists, wipe .build\ and retry once.
     exit /b 1
 )
 
-REM Nested copies are redundant now -- drop them so they never linger.
-rd /s /q "%~dp0main\.build" 2>nul
-rd /s /q "%~dp0NoSteamLauncher\.build" 2>nul
 echo [2/2] [BUILD OK] %APPEXE%
 
 if defined RUN_AFTER (
