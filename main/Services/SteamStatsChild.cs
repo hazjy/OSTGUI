@@ -11,8 +11,8 @@ public sealed class StatsChildResult
     public string Message { get; set; } = "";
     public string SteamId { get; set; } = "";
     public bool StatsReady { get; set; }
-    /// <summary>true = 没重新向服务器拉取，直接读的客户端当前状态（读路径的"缓存优先"分支）</summary>
-    public bool UsedCache { get; set; }
+    /// <summary>成功读到状态的成就条数；0 = 客户端里根本没有这个游戏的成就数据（不是"全部未解锁"）</summary>
+    public int ReadOk { get; set; }
     public string Warning { get; set; } = "";
     public int Changed { get; set; }
     public List<AchievementRecord> Achievements { get; set; } = new();
@@ -125,6 +125,7 @@ internal static class SteamStatsChild
         List<AchievementRecord> ReadAll()
         {
             var list = new List<AchievementRecord>(defs.Count);
+            var ok = 0;
             foreach (var d in defs)
             {
                 var rec = new AchievementRecord { Name = d.Name };
@@ -132,9 +133,11 @@ internal static class SteamStatsChild
                 {
                     rec.Achieved = achieved;
                     rec.UnlockTime = unlockTime;
+                    ok++;
                 }
                 list.Add(rec);
             }
+            res.ReadOk = ok;
             return list;
         }
 
@@ -146,7 +149,6 @@ internal static class SteamStatsChild
             if (cached.Any(r => r.Achieved))
             {
                 res.Achievements = cached;
-                res.UsedCache = true;
                 res.Ok = true;
                 LogService.AddAppLog($"stats[{appId}] read(cached) {cached.Count(r => r.Achieved)}/{cached.Count} unlocked");
                 return res;
@@ -180,7 +182,7 @@ internal static class SteamStatsChild
 
         res.Achievements = ReadAll();
         LogService.AddAppLog(
-            $"stats[{appId}] read {res.Achievements.Count(a => a.Achieved)}/{res.Achievements.Count} unlocked ready={res.StatsReady}");
+            $"stats[{appId}] read {res.Achievements.Count(a => a.Achieved)}/{res.Achievements.Count} unlocked ready={res.StatsReady} ok={res.ReadOk}");
         res.Ok = true;
         return res;
     }
