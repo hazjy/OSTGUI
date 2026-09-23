@@ -1,7 +1,7 @@
 # OSTGUI 开发笔记（DEV-NOTES）
 
 > 本文合并自原 plan1.md / plan2.md 两份沉淀文档，并更新至 2026-09-18 现状（GUI v1.4.1 + 配套内核 v1.1.3）。
-> 收录原则：**项目结构与工程现状长期保留**；领域事实/机制查证/调研结论提取至工作区根 `doc/` 下的事实考证（GUI 侧）（Lua 语义、depot/manifest/key 关系、Denuvo 授权、480 联机调研等）；**环境 / 工具链 / 打包类坑不收录**（本机 DPI、沙箱、构建命令、git 行尾、验证手法等一律写工作区 `doc/开发踩坑.md`）；**框架 / 桌面应用踩坑与绕法同样不收录**（WinUI 3 等的坑、怎么绕、怎么一眼验出来 —— 同上那份；本文件只留**框架 / API 语义**，即"怎么用对"）；**机制 / 领域语义就近写代码注释**（首选），成体系定论写 `doc/*-事实考证.md`；**UI 尺寸 / 文案 / 图标 / 标点这类细碎细节与用户偏好不收录**（一律写工作区 `doc/细节与偏好.md`）；工程状态快照（构建命令产物、临时数字、"待提交"类状态）不再收录，避免过时。
+> 收录原则：**项目结构与工程现状长期保留**；领域事实/机制查证/调研结论提取至工作区根 `doc/` 下的事实考证（GUI 侧）（Lua 语义、depot/manifest/key 关系、Denuvo 授权、480 联机调研等）；**环境 / 工具链 / 打包类坑不收录**（本机 DPI、沙箱、构建命令、git 行尾等写工作区 `doc/开发踩坑-环境.md`；量尺寸 / 截图 / UIA 等验证手法写 `doc/开发踩坑-UI.md`）；**框架 / 桌面应用踩坑与绕法同样不收录**（WinUI 3 等的坑、怎么绕、怎么一眼验出来 —— 见 `doc/开发踩坑-UI.md`；本文件只留**框架 / API 语义**，即"怎么用对"）；**机制 / 领域语义就近写代码注释**（首选），成体系定论写 `doc/*-事实考证.md`；**UI 尺寸 / 文案 / 图标 / 标点这类细碎细节与用户偏好不收录**（一律写工作区 `doc/细节与偏好.md`）；工程状态快照（构建命令产物、临时数字、"待提交"类状态）不再收录，避免过时。
 
 ## 1. 架构总览
 
@@ -33,12 +33,12 @@
 - **搜索页卡片**：与入库管理同构（左侧 120×56 缩略图 + 名称 + `AppID:` 行 + 右侧图标按钮区），**不放版本模式行**；尺寸 / 图标 / tooltip / 标点等细碎选择见工作区 `doc/细节与偏好.md`
 - **搜索页也是列表 / 网格两档**（与入库管理同款切换控件、同尺寸卡片、同一套悬浮微交互）。两档**共用同一份 `SearchResult.Thumbnail` 位图**：切档只切宿主可见性，不重新联网
 - **搜索页的封面刻意不落盘**：走 `CoverImageService.FetchThumbnailBytesAsync`（内存）→ `SetSourceAsync` 按原生尺寸解码；**不要**在这里接 `EnsureCoverFileAsync`（那是入库管理的磁盘缓存路径）。网格卡的封面用 `Stretch="Uniform"`（宁可留边不裁）——搜索结果可能来自官方 appdetails 兜底、比例不一定是 460×215，与入库管理那份"永远是 460×215 的自建缓存"不同
-- **卡片底色 / 描边（`CardBackgroundFillColorDefaultBrush` + `CardStrokeColorDefaultBrush` + `BorderThickness=1`）写在 `Style x:Key="CardSurface"` 里，不要直接写在 `Border` 属性上**：悬浮高亮结束时靠 `card.ClearValue(Border.BackgroundProperty)` 退回主题引用，写在属性上就成了"本地值"，清完背景会变透明。反过来也成立：**别把悬浮前读到的画刷缓存下来写回**，那样这张卡片从此不再跟随主题切换（2026-09-23 用户报的"深色主题下卡片还是浅色底、字已经变白"就是这么来的：被鼠标划过的卡片全中，没划过的那张正常）——机理见工作区 `doc/开发踩坑.md`
+- **卡片底色 / 描边（`CardBackgroundFillColorDefaultBrush` + `CardStrokeColorDefaultBrush` + `BorderThickness=1`）写在 `Style x:Key="CardSurface"` 里，不要直接写在 `Border` 属性上**：悬浮高亮结束时靠 `card.ClearValue(Border.BackgroundProperty)` 退回主题引用，写在属性上就成了"本地值"，清完背景会变透明。反过来也成立：**别把悬浮前读到的画刷缓存下来写回**，那样这张卡片从此不再跟随主题切换（2026-09-23 用户报的"深色主题下卡片还是浅色底、字已经变白"就是这么来的：被鼠标划过的卡片全中，没划过的那张正常）——机理见工作区 `doc/开发踩坑-UI.md`
 - **入库可取消（2026-09-22）**：`SearchViewModel` 每次入库新建一个 `CancellationTokenSource`，ct 一路传到**所有会等的环节**——`ManifestDownloadService`（逐 depot 下载 + 复制前）、`SteamGameInfoService`（取 depot 信息 / DLC 列表，含重试退避的 Delay）、`ManifestFileService.CopyToDepotCache`（逐份之间）、`LuaBuilder.BuildLuaAsync` 及其内部两处网络、`SudamaKeyCache`（冷缓存下载）。**唯一不打断的是 `WriteLuaAsync` 的原子写**（临时文件 + Move，毫秒级）→ 取消是"立即"的，且永远不会留下半个 `.lua`；depotcache 拷贝也改成"临时名 + `File.Move`"，避免半份 manifest。取消后**不兜底第二个源**、**不弹通知**，状态显示「已取消入库」；同时入库期间禁止再起第二个任务（`IsAdding` 守卫）。按钮点下即变「取消中…」并禁用（不等链路返回）。
   - ⚠️ **两条纪律（2026-09-22 复核后补，都是上轮踩出来的）**：① **`catch (OperationCanceledException)` 必须带 `when (ct.IsCancellationRequested)` 过滤** —— `HttpClient` 的**超时抛的也是 `TaskCanceledException`（OCE）**，不过滤就会把一次网络超时当成"用户取消"透传，**白白吃掉原有的重试与兜底**（`GetGameDetailsFromSteamCmdAsync` 的 3 次重试、`DownloadJsonAsync` 的重试 + 过期缓存兜底、逐 depot 下载的失败记账）；② **每个网络 / 等待点都要真的把 ct 传下去**——最容易漏的是链路开头那两处取 depot 信息（漏了等于"点完立刻取消"这一最常见场景仍不可取消）。
   - 不可打断的只剩**两处原子写**：Sudama 缓存的 `tmp + Move`（冷缓存时 16MB，约亚秒级）与 lua 的 `tmp + Move`（毫秒级）——换来的是永不出现截断缓存 / 半个 lua。
   - **manifest 下载已改流式落盘（2026-09-22，内存优化）**：`ResponseHeadersRead` + `CopyToAsync(FileStream)` 写 `.part`、成功才 `Move` —— 单份清单不再整块进内存（大游戏单份可达几十 MB），取消也不必等整份读完。
-- **搜索结果缩略图：与入库封面同一套来源，只走内存不落盘**——`FetchThumbnailBytesAsync(appId)` 走 `HeaderTemplates`（两条 header 布局）→ **官方 `GetHeaderImageUrlAsync`** → null（占位图标）。**不再用 `SearchResult.ImageUrl`**：那是 storesearch 的 `tiny_image`（231×87 小胶囊，≈2.66:1），塞进 2.14:1 的卡片会被裁掉两侧——2026-09-21 用户报的"搜索页缩略图缺一块"就是它。上屏用 `SetSourceAsync(MemoryStream.AsRandomAccessStream())` + **刻意不设 `DecodePixelWidth`**（流解码不认 `Logical`，设了反而首拍发糊——见工作区 `doc/开发踩坑.md` 的 WinUI 小节）；并发 4；卡片 `Stretch="Uniform"` 作保险（宁愿留边也不裁）；**不调用 `EnsureCoverFileAsync`**（那条会落盘）
+- **搜索结果缩略图：与入库封面同一套来源，只走内存不落盘**——`FetchThumbnailBytesAsync(appId)` 走 `HeaderTemplates`（两条 header 布局）→ **官方 `GetHeaderImageUrlAsync`** → null（占位图标）。**不再用 `SearchResult.ImageUrl`**：那是 storesearch 的 `tiny_image`（231×87 小胶囊，≈2.66:1），塞进 2.14:1 的卡片会被裁掉两侧——2026-09-21 用户报的"搜索页缩略图缺一块"就是它。上屏用 `SetSourceAsync(MemoryStream.AsRandomAccessStream())` + **刻意不设 `DecodePixelWidth`**（流解码不认 `Logical`，设了反而首拍发糊——见工作区 `doc/开发踩坑-UI.md`）；并发 4；卡片 `Stretch="Uniform"` 作保险（宁愿留边也不裁）；**不调用 `EnsureCoverFileAsync`**（那条会落盘）
 
 ## 4. Sudama 缓存（v1.3.0 现状）
 
@@ -118,7 +118,7 @@
 
 ## 8. WinUI 3 踩坑合集（已整节迁出）
 
-已整节迁至工作区 `doc/开发踩坑.md`（2026-09-22）。边界：**本文件只留框架 / API 语义（怎么用对）**；**踩坑与绕法（踩过什么、怎么绕、怎么一眼验出来）一律写那份**，细碎 UI 偏好写工作区 `doc/细节与偏好.md`。
+已整节迁至工作区 `doc/开发踩坑-UI.md`（2026-09-22；该文件 09-23 拆为环境 / UI 两份）。边界：**本文件只留框架 / API 语义（怎么用对）**；**踩坑与绕法（踩过什么、怎么绕、怎么一眼验出来）一律写那份 UI 踩坑**，细碎 UI 偏好写工作区 `doc/细节与偏好.md`。
 
 ## 9. 服务索引（当前）
 
@@ -163,7 +163,7 @@
 - ⚠️ **`SystemBackdrop = null` 时窗口底色跟的是系统主题，不是应用主题**：浅色应用主题 + 深色系统时背景会露成灰/黑（实测采样 `#808080`、导航栏处 `#000000`）。所以「无」档由 `SolidBackdrop`（`RootGrid` 第一层的 Border，`{ThemeResource SolidBackgroundFillColorBaseBrush}`）自己铺底，云母/亚克力时隐藏让 backdrop 透出来
 - 诊断：每次切换往应用日志写一行 `[Backdrop] <mode> -> <类名>`——"选了没效果"时先看这行在不在、类名对不对
 - 系统要求：云母 Win11 22000+、亚克力 Win11 22621+；不支持时框架静默回落纯色底（不崩），设置页有一行小字说明
-- 弹层（弹窗/菜单）**不**跟着这个设置换背景，只跟随深浅主题——实测与理由见工作区 `doc/开发踩坑.md` 的「弹层背景不要跟随显示效果」
+- 弹层（弹窗/菜单）**不**跟着这个设置换背景，只跟随深浅主题——实测与理由见工作区 `doc/开发踩坑-UI.md` 的「弹层背景 / App.xaml 画刷都别加料」
 
 ## 13. 封面图（入库管理卡片）
 

@@ -255,7 +255,7 @@ public partial class SearchViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 字节 → 位图。**刻意不设 `DecodePixelWidth`**（2026-09-22 实测的坑，见工作区 `doc/开发踩坑.md` 的 WinUI 小节）：
+    /// 字节 → 位图。**刻意不设 `DecodePixelWidth`**（2026-09-22 实测的坑，见工作区 `doc/开发踩坑-UI.md`）：
     /// 流解码（`SetSourceAsync`）路径上 `DecodePixelType=Logical` 不生效，120 被当**物理像素**用，
     /// 首拍上屏用的是 ≈120px 的表面、再被 225% DPI 的卡片放大 2.25 倍 → 明显发糊；
     /// 切页重建 `Image` 后按真实布局尺寸重新取表面才变清楚（同一矩形梯度能量 13.6 → 19.5）。
