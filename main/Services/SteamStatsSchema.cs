@@ -36,21 +36,26 @@ public static class SteamStatsSchema
     public static string PathFor(string steamPath, string appId) =>
         Path.Combine(steamPath, "appcache", "stats", $"UserGameStatsSchema_{appId}.bin");
 
-    /// <summary>读不到（文件不存在/格式不认）返回 null；读到但无成就返回空列表</summary>
-    public static List<AchievementDef>? Load(string steamPath, string appId)
+    /// <summary>
+    /// 读本地 schema。失败返回 false 并给出错误码（本项目自己的码，不是 Steam 的）：
+    /// E1 文件不存在 / E2 解析失败 / E3 没有成就条目
+    /// </summary>
+    public static bool TryLoad(string steamPath, string appId, out List<AchievementDef> defs, out string error)
     {
+        defs = new List<AchievementDef>();
+        error = "";
+
         var path = PathFor(steamPath, appId);
-        if (!File.Exists(path)) return null;
+        if (!File.Exists(path)) { error = "E1（schema 文件不存在）"; return false; }
 
         var root = ParseFile(path);
         var appNode = root?.Children.FirstOrDefault();
         var stats = appNode?.Child("stats");
-        if (stats == null) return null;
+        if (stats == null) { error = "E2（schema 解析失败）"; return false; }
 
         // 成就有可能在**多个组**里（2026-09-23 实测：无人深空 1/2 两组都是 ACHIEVEMENTS；
         // 深海迷航的 2 组是**空的**、真正的位在 5 组）。所以不能只认"第一个 ACHIEVEMENTS 组"——
         // 那样会把空组当答案，成就列表直接变空。这里扫所有组，凡是带具名 bits 的都收。
-        var defs = new List<AchievementDef>();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var groups = 0;
         foreach (var group in stats.Children)
@@ -76,9 +81,10 @@ public static class SteamStatsSchema
             }
             if (used) groups++;
         }
-        if (defs.Count > 4096) return null;   // 明显不是成就 schema（防把别的 bin 当成就表）
+        if (defs.Count > 4096) { defs = new List<AchievementDef>(); error = "E2（schema 解析失败）"; return false; }
         LogService.AddAppLog($"schema {appId}: 成就 {defs.Count} 条（来自 {groups} 个 bits 组）");
-        return defs;
+        if (defs.Count == 0) { error = "E3（schema 里没有成就条目）"; return false; }
+        return true;
     }
 
     /// <summary>中文优先，其次英文，再退第一个非空</summary>

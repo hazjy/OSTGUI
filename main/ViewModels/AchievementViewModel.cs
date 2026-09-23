@@ -104,7 +104,6 @@ public partial class AchievementViewModel : ObservableObject
                 item.GameName = name;
         }
         ApplyFilter();
-        RefreshNotice();
     }
 
     private void ApplyFilter()
@@ -129,22 +128,21 @@ public partial class AchievementViewModel : ObservableObject
             _baseline = new Dictionary<string, bool>();
             HasChanges = false;
             _steamId = "";
+            Notice = "";
 
             if (game == null)
             {
                 GameTitle = "未选择游戏";
                 SetProgress(0, 0);
-                RefreshNotice();
                 return;
             }
 
             GameTitle = game.GameName;
 
-            var defs = SteamStatsSchema.Load(_steam.GetSteamPath() ?? "", game.AppId);
-            if (defs == null)
+            if (!SteamStatsSchema.TryLoad(_steam.GetSteamPath() ?? "", game.AppId, out var defs, out var schemaError))
             {
                 SetProgress(0, 0);
-                Notice = $"未找到成就定义：先在 Steam 里启动一次这个游戏让客户端缓存成就列表，再点「重试」。\n期望文件：{SteamStatsSchema.PathFor(_steam.GetSteamPath() ?? "", game.AppId)}";
+                Notice = $"未发现成就定义，错误码：{schemaError}";
                 NoticeSeverity = InfoBarSeverity.Warning;
                 return;
             }
@@ -169,7 +167,6 @@ public partial class AchievementViewModel : ObservableObject
         {
             _suppress = false;
         }
-        RefreshNotice();
         await Task.CompletedTask;
     }
 
@@ -203,26 +200,6 @@ public partial class AchievementViewModel : ObservableObject
                 UnlockTime = r.UnlockTime,
             }).ToList(),
         });
-    }
-
-    private void RefreshNotice()
-    {
-        if (SelectedGame != null && Rows.Count == 0) return;   // 已有更具体的提示
-        if (!SteamRunning)
-        {
-            Notice = "Steam 未运行：现在只能编辑本地留底，「保存到 Steam」与「从 Steam 读取」不可用。";
-            NoticeSeverity = InfoBarSeverity.Warning;
-            return;
-        }
-        if (SelectedGame == null)
-        {
-            Notice = "从左侧选一个游戏开始编辑。";
-            NoticeSeverity = InfoBarSeverity.Informational;
-            return;
-        }
-        var extra = string.IsNullOrEmpty(_steamId) ? "" : $"　·　留底来自账号 {_steamId}";
-        Notice = $"改动会立即存进本地留底；点「保存到 Steam」才写进客户端（重启 Steam 后仍在）。若成就页一时显示不出来，是内核在拉取时会清空入库游戏的成就响应。{extra}";
-        NoticeSeverity = InfoBarSeverity.Informational;
     }
 
     /// <summary>把子进程回读的状态套回列表（并重置"未保存"基线）</summary>

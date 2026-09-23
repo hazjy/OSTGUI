@@ -42,14 +42,14 @@ internal static class SteamStatsChild
 
         if (mode.Equals("--stats-schema-dump", StringComparison.OrdinalIgnoreCase))
         {
-            var defs = SteamStatsSchema.Load(args[3], appId);
-            var text = defs == null
-                ? "schema 缺失或无法解析：" + SteamStatsSchema.PathFor(args[3], appId)
-                : string.Join(Environment.NewLine,
-                    defs.Select((d, i) => $"{i,3}  {(d.Hidden ? "[隐]" : "    ")}  {d.Name}  =  {d.DisplayName}"));
+            var ok = SteamStatsSchema.TryLoad(args[3], appId, out var defs, out var error);
+            var text = ok
+                ? string.Join(Environment.NewLine,
+                    defs.Select((d, i) => $"{i,3}  {(d.Hidden ? "[隐]" : "    ")}  {d.Name}  =  {d.DisplayName}"))
+                : "未发现成就定义，错误码：" + error;
             File.WriteAllText(args[4], text);
-            LogService.AddAppLog($"schema dump appid={appId} 条数={defs?.Count ?? -1}");
-            return defs == null ? 2 : 0;
+            LogService.AddAppLog($"schema dump appid={appId} 条数={(ok ? defs.Count : -1)} {error}");
+            return ok ? 0 : 2;
         }
 
         var outFile = apply ? args[5] : args[4];
@@ -92,10 +92,9 @@ internal static class SteamStatsChild
     {
         var res = new StatsChildResult();
 
-        var defs = SteamStatsSchema.Load(steamPath, appId);
-        if (defs == null)
+        if (!SteamStatsSchema.TryLoad(steamPath, appId, out var defs, out var schemaError))
         {
-            res.Message = "未找到成就定义（缺少 schema 文件）：" + SteamStatsSchema.PathFor(steamPath, appId);
+            res.Message = "未发现成就定义，错误码：" + schemaError;
             return res;
         }
         LogService.AddAppLog($"stats[{appId}] begin defs={defs.Count} changes={changes?.Count.ToString() ?? "-"}");
