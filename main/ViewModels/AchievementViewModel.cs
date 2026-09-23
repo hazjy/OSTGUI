@@ -273,8 +273,8 @@ public partial class AchievementViewModel : ObservableObject
             {
                 MergeFromResult(result);
                 SaveStore("steam");
-                var tail = string.IsNullOrEmpty(result.Warning) ? "" : $"（{result.Warning}）";
-                ToastService.ShowSuccess("成就已写入 Steam", $"{result.Changed} 项{tail}");
+                // 不报数量：现在每次都是"整体写一遍"，数量恒等于总数，没有信息量（有警告才补一行）
+                ToastService.ShowSuccess("成就已写入 Steam", result.Warning);
             }
             else
             {

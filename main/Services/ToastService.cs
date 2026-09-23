@@ -50,11 +50,11 @@ public static class ToastService
 
     private static void ShowToast(string title, string content)
     {
-        new ToastContentBuilder()
+        var builder = new ToastContentBuilder()
             .AddArgument("action", "viewDetail")
-            .AddText(title)
-            .AddText(content)
-            .Show();
+            .AddText(title);
+        if (!string.IsNullOrEmpty(content)) builder.AddText(content);   // 只有标题的通知不留空行
+        builder.Show();
     }
 
     public static void ShowSuccess(string title, string content) => Show(title, content, ToastType.Success);
