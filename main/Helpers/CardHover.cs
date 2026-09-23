@@ -15,7 +15,8 @@ namespace OSTGUI.Helpers;
 ///   - 放大：卡片模板里挂一个 <see cref="ScaleTransform"/>（`RenderTransformOrigin="0.5,0.5"`），
 ///     这里用代码建 <see cref="Storyboard"/> 动画（140ms 缓出，进出都补间）
 ///   - 投影：`UIElement.Shadow` + `Translation.Z`（XAML 属性，系统投影，自动适配深浅主题）
-///   - 高亮：换卡片背景刷（`CardBackgroundFillColorSecondaryBrush`）
+///   - 高亮：换卡片背景刷（`CardBackgroundFillColorSecondaryBrush`）；移开时用 `ClearValue` **退回 Style 里的
+///     主题引用**（卡片模板的 `Background` 必须写在 Style 上，原因见 <see cref="Exit"/>）
 ///
 /// ⚠️ **千万不要**在同一个元素上再调 `ElementCompositionPreview.GetElementVisual`（例如为了装
 /// 隐式动画）：一旦调过，XAML 的 `Scale` / `Translation` / `Shadow` 会全部抛
@@ -39,7 +40,6 @@ public static class CardHover
 
     private sealed class State
     {
-        public Brush? NormalBackground;   // 首次悬浮时读一次，移开还原
         public Storyboard? Running;       // 留住引用：交给 GC 有可能半路停掉
         public ThemeShadow? Shadow;
     }
@@ -54,7 +54,6 @@ public static class CardHover
     public static void Enter(Border card, Brush? hoverBackground, float scale, float shadowZ)
     {
         var state = States.GetOrCreateValue(card);
-        state.NormalBackground ??= card.Background;
 
         Animate(card, state, scale);
 
@@ -84,7 +83,12 @@ public static class CardHover
 
         try
         {
-            if (state.NormalBackground is not null) card.Background = state.NormalBackground;
+            // ⚠️ 用 ClearValue 收回本地值，退回到 Style 里那条「{ThemeResource}」引用 —— 卡片模板的
+            // Background 必须写在 Style（而不是 Border 属性）上，就是为了这一步能退得回去。
+            // **千万别**改成"悬浮前把 card.Background 存下来、移开写回去"：那存的是一个已经解析好的
+            // 裸画刷实例，写回就把主题引用顶掉了，之后切主题这张卡片再也不跟 —— 2026-09-23 用户报的
+            // "深色主题下卡片还是浅色底、字却变白了"就是这么来的（被悬浮过的卡片全中，没碰过的正常）。
+            card.ClearValue(Border.BackgroundProperty);
             card.Shadow = null;          // 阴影只在悬浮时挂着
             card.Translation = Vector3.Zero;
         }

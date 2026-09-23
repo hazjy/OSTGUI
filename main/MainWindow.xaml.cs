@@ -22,8 +22,12 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
 
         _mainVM = App.Services.GetRequiredService<MainViewModel>();
 
-        // 显示效果先落地再激活窗口，避免闪一下默认底
-        ApplyBackdrop(_mainVM.ConfigService.Config.BackdropMode);
+        // ⚠️ 主题必须赶在**窗口显示之前**落地（App.OnLaunched 紧接着就 Activate()）：
+        //    - 晚一步，第一帧还是按系统主题画的 —— 系统深色 + 应用浅色时，用户看到"顶上闪一下"
+        //    - 首屏页面也会在旧主题下被建出来，它里面的 {ThemeResource} 就可能停在那一套
+        //    这里直接读配置而不是 SettingsVM：VM 要等 InitializeAppAsync 里的 LoadFromConfig() 才准，
+        //    在那之前它只会给出默认的 "auto"。
+        ApplyThemeAndChrome(refreshLibrary: false, themeMode: _mainVM.ConfigService.Config.ThemeMode);
 
         // 点击空白（非输入控件区域）时把焦点收回到全局锚点，统一取消各页面输入框激活。
         // WinUI 在"已有焦点"时不会自行转移焦点（microsoft-ui-xaml #10051），需主动拉取；
@@ -42,6 +46,10 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
         titleBar.InactiveBackgroundColor = Microsoft.UI.Colors.Transparent;
         titleBar.ButtonBackgroundColor = Microsoft.UI.Colors.Transparent;
         titleBar.ButtonInactiveBackgroundColor = Microsoft.UI.Colors.Transparent;
+
+        // 显示效果（亚克力/云母）要排在 caption 色设好**之后**：顺序反了，第一帧顶上会先露出一条
+        // 系统 caption 色再变成透明。「无」模式那层纯色底的可见性在 ApplyBackdrop 里一并设好。
+        ApplyBackdrop(_mainVM.ConfigService.Config.BackdropMode);
 
         // 侧边栏是"平级切换"，没有返回语义：关掉导航栈，免得每切一次都往 BackStack 里塞一个（见 GoToPage）
         ContentFrame.IsNavigationStackEnabled = false;
@@ -366,10 +374,12 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
             _mainVM.SettingsVM.LoadFromConfig();
 
             var config = _mainVM.ConfigService.Config;
+
+            // 主题先于建页面落地：页面在旧主题下建出来，里面的 {ThemeResource} 可能就停在那一套
+            ApplyThemeAndChrome();
+
             var page = config.DefaultPage == "search" ? "search" : "home";
             GoToPage(page);
-
-            ApplyThemeAndChrome();
 
             // 配置加载完成后重新读取入库选项，
             // 避免启动瞬间 ViewModel 用默认值初始化后覆盖真实配置
@@ -389,11 +399,18 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
     /// 应用主题并同步窗口级外观：
     /// XAML 主题、标题栏按钮颜色、转换器深色标志、刷新库列表（触发绑定重算）
     /// </summary>
-    public void ApplyThemeAndChrome()
+    /// <param name="refreshLibrary">
+    /// 构造阶段必须传 false：库数据还没加载，跑一遍刷新命令等于提前触发一次扫描
+    /// </param>
+    /// <param name="themeMode">
+    /// 主题取值来源，缺省读 <c>SettingsVM</c>；构造阶段必须显式传配置里的值 —— 那时 VM 还没
+    /// <c>LoadFromConfig()</c>，读 VM 只会拿到默认的 "auto"（跟随系统主题）
+    /// </param>
+    public void ApplyThemeAndChrome(bool refreshLibrary = true, string? themeMode = null)
     {
         try
         {
-            var theme = _mainVM.SettingsVM.ThemeMode switch
+            var theme = (themeMode ?? _mainVM.SettingsVM.ThemeMode) switch
             {
                 "dark" => ElementTheme.Dark,
                 "light" => ElementTheme.Light,
@@ -410,7 +427,7 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
 
             Helpers.ThemeColorHelper.IsDarkTheme = isDark;
             UpdateTitleBarButtonColor(isDark);
-            RefreshLibraryIfLoaded();
+            if (refreshLibrary) RefreshLibraryIfLoaded();
         }
         catch { }
     }

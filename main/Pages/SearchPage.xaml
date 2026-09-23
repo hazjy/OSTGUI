@@ -10,6 +10,15 @@
     <Page.Resources>
         <helpers:BoolToVisibilityConverter x:Key="BoolToVis" />
         <helpers:BoolNegateConverter x:Key="BoolNegateConverter" />
+
+        <!-- 卡片外观：Background **必须**由 Style 提供，不能直接写在 Border 属性上 ——
+             悬浮高亮结束后代码用 ClearValue 退回这条「{ThemeResource}」引用（见 Helpers/CardHover.cs）。
+             写在 Border 属性上就成了本地值，ClearValue 会把 Background 直接清成 null。 -->
+        <Style x:Key="CardSurface" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
     </Page.Resources>
 
     <Grid>
@@ -125,8 +134,7 @@
             <ListView.ItemTemplate>
                 <DataTemplate x:DataType="models:SearchResult">
                     <Border Padding="15,12" MinHeight="80" CornerRadius="6"
-                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                            Style="{StaticResource CardSurface}"
                             RenderTransformOrigin="0.5,0.5"
                             PointerEntered="ListCard_PointerEntered"
                             PointerExited="ListCard_PointerExited">
@@ -227,8 +235,7 @@
             </GridView.ItemContainerStyle>
             <GridView.ItemTemplate>
                 <DataTemplate x:DataType="models:SearchResult">
-                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                    <Border Style="{StaticResource CardSurface}"
                             CornerRadius="6"
                             RenderTransformOrigin="0.5,0.5"
                             PointerEntered="GridCard_PointerEntered"

@@ -11,6 +11,15 @@
         <helpers:BoolToVisibilityConverter x:Key="BoolToVis" />
         <helpers:VersionModeToBrushConverter x:Key="VersionModeToBrushConverter" />
         <helpers:StatusToBrushConverter x:Key="StatusToBrushConverter" />
+
+        <!-- 卡片外观：Background **必须**由 Style 提供，不能直接写在 Border 属性上 ——
+             悬浮高亮结束后代码用 ClearValue 退回这条「{ThemeResource}」引用（见 Helpers/CardHover.cs）。
+             写在 Border 属性上就成了本地值，ClearValue 会把 Background 直接清成 null。 -->
+        <Style x:Key="CardSurface" TargetType="Border">
+            <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeColorDefaultBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+        </Style>
         <MenuFlyout x:Key="MoreMenu">
             <MenuFlyoutItem Text="编辑 Lua" Click="EditLua_Click" />
             <MenuFlyoutItem Text="复制 AppID" Click="CopyAppId_Click" />
@@ -105,8 +114,7 @@
             <ListView.ItemTemplate>
                     <DataTemplate x:DataType="models:LibraryItem">
                         <Border Margin="0,4" Padding="15,12" MinHeight="80"
-                                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                                Style="{StaticResource CardSurface}"
                                 CornerRadius="6"
                                 RenderTransformOrigin="0.5,0.5"
                                 PointerEntered="ListCard_PointerEntered"
@@ -212,8 +220,7 @@
             </GridView.ItemContainerStyle>
             <GridView.ItemTemplate>
                 <DataTemplate x:DataType="models:LibraryItem">
-                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                    <Border Style="{StaticResource CardSurface}"
                             CornerRadius="6"
                             RenderTransformOrigin="0.5,0.5"
                             PointerEntered="GridCard_PointerEntered"
