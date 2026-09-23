@@ -7,6 +7,8 @@
     <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <!-- SteamApi/ 里的 SAM 封装（zlib）用 unsafe 处理原生字符串指针 -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <Version>1.6.2</Version>
     <AssemblyVersion>1.6.2.0</AssemblyVersion>

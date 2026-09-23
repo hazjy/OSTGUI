@@ -48,6 +48,18 @@
 
 > ⚠️ 与 GSE 同样采用 **LGPL-3.0**。本项目以自编译的本体 DLL 形式集成本组件，仅供非商业的学习与研究用途。
 
+## 6. SAM.API（Steam Achievement Manager 的接口封装，成就页用）
+
+| 项目 | 内容 |
+|---|---|
+| 文件 | `main/SteamApi/**`（源码，非二进制：Client / Steam / NativeWrapper / NativeStrings / Callbacks / Interfaces / Wrappers / Types） |
+| 上游 | https://github.com/gibbed/SteamAchievementManager （`SAM.API` 命名空间，作者 Rick / gibbed，2024） |
+| 许可证 | **zlib**（见同目录 `LICENSE.txt`，随源码分发） |
+| 用途 | 成就页读写 Steam 成就：`steamclient64.dll` → `ISteamClient018` / `ISteamUserStats013`（`RequestUserStats` / `GetAchievementAndUnlockTime` / `SetAchievement` / `StoreStats`），在 `--stats-dump` / `--stats-apply` 子进程里使用 |
+| 本地改动 | ① `Steam.cs` 增加 `InstallPath` 覆盖（本项目的 Steam 路径来自自身配置，不回退注册表）；② 未引入 `GlobalSuppressions.cs`、`KeyValue*.cs`（成就定义改用本项目自己的 `SteamStatsSchema` 解析）；③ 本 csproj 因此需要 `AllowUnsafeBlocks`（`NativeStrings.cs` 用 unsafe 处理原生字符串） |
+
+> zlib 许可允许闭源/商用与修改，条件是保留版权声明、标明改动（已在上表列出）、不得移除许可声明。
+
 ---
 
 ## 使用声明
