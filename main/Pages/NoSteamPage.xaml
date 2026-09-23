@@ -34,7 +34,7 @@
 
         <!-- 固定标题栏 -->
         <StackPanel Grid.Row="0" Margin="40,32,40,12">
-            <TextBlock Text="模拟器" FontSize="24" FontWeight="Bold" />
+            <TextBlock Text="模拟器" FontSize="32" FontWeight="Bold" />
         </StackPanel>
 
         <!-- 内容区域 -->

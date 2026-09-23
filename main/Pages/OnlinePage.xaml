@@ -13,7 +13,7 @@
         </Grid.RowDefinitions>
 
         <StackPanel Grid.Row="0" Margin="40,32,40,12">
-            <TextBlock Text="联机" FontSize="24" FontWeight="Bold" />
+            <TextBlock Text="联机" FontSize="32" FontWeight="Bold" />
         </StackPanel>
 
         <Grid Grid.Row="1" Margin="40,0,40,0">
