@@ -25,6 +25,7 @@
 - **显示效果（无 / 云母 / 亚克力）**：设置页下拉 → `config.json` 的 `BackdropMode` → `MainWindow.ApplyBackdrop()` 改 `Window.SystemBackdrop`；「无」档由 `SolidBackdrop` 自己铺底。出处与落地顺序：`doc/GUI-事实考证.md`「显示效果」、`doc/开发踩坑-UI.md`
 - **日志**：双轨 —— 运行时日志（`LogService.AddLog`，内存集合绑设置页，可复制 / 清空）与应用日志文件（`AddAppLog` → `%LOCALAPPDATA%\OSTGUI\logs\ostgui.log`）；联机宿主另写 `onlinehost.log`。跨线程写法见 `doc/开发踩坑-UI.md`
 - **配置与状态**：`ConfigService` → `%LOCALAPPDATA%\OSTGUI\config.json`（自动保存）；视图档位 `LibraryViewMode` / `SearchViewMode`、联机「其他」下拉 `OnlineOtherMode`、`BackdropMode` 等偏好都落在这一份里
+- **成就编辑（成就页）**：左侧 = `LibraryScanner` 扫出的入库游戏；成就定义读本地 `<Steam>\appcache\stats\UserGameStatsSchema_<appid>.bin`（二进制 KV，`SteamStatsSchema`）。勾选**只写本地留底** `%LOCALAPPDATA%\OSTGUI\achievements\<appid>.json`；点「保存到 Steam」才 spawn `OSTGUI.exe --stats-apply`（`SteamStatsChild`，短命子进程 + 结果 JSON 文件，理由与 `SteamTicketExtractor` 相同）用 `ISteamUserStats013` 写回。假入库游戏的 Steam 端状态服务端不认、内核又清空 819 响应 → **留底才是唯一可靠副本**；链路证据与边界见 `doc/GUI-事实考证.md`「成就链路」
 
 ## 3. 服务索引（当前）
 
@@ -42,6 +43,7 @@
 | `SteamDllService` | 三 DLL 是否已注入 / 内核 `opensteamtool.toml` 读写（`[denuvo] mode`、`[lua] paths`）/ **内核版本读取**（读已部署 `OpenSteamTool.dll` 的 Windows 版本资源）|
 | `TicketService` / `OstFileService` / `SteamTicketExtractor` | Denuvo 授权管理 / .ost 导入导出 / 在线提取 |
 | `ConfigService` / `LogService` / `ToastService` / `GameNameCacheService` | 配置 / 日志 / 通知 / 名称缓存 |
+| `AchievementStore` / `SteamStatsSchema` / `SteamStatsService` + `SteamStatsChild` | 成就编辑：本地留底 JSON / 解析本地 schema（二进制 KV）/ 父进程 spawn 子进程；子进程侧用 `ISteamUserStats013` 读写 Steam 成就 |
 
 ## 4. 已知限制（仍然有效的）
 

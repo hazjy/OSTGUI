@@ -51,6 +51,13 @@ public partial class App : Application
             return;
         }
 
+        // 成就读写子进程：同样不建窗口，干完即退（实现见 Services/SteamStatsChild.cs）
+        if (cmdArgs.Length >= 5 && cmdArgs[1].StartsWith("--stats", StringComparison.OrdinalIgnoreCase))
+        {
+            Environment.Exit(SteamStatsChild.Run(cmdArgs));
+            return;
+        }
+
         // 先完整读取配置文件，再创建窗口，
         // 避免窗口先以默认状态显示、随后又被配置恢复导致闪烁
         var services = new ServiceCollection();
@@ -75,6 +82,8 @@ public partial class App : Application
         services.AddSingleton<TicketService>();
         services.AddSingleton<OstFileService>();
         services.AddSingleton<OnlineFixService>();
+        services.AddSingleton<AchievementStore>();
+        services.AddSingleton<SteamStatsService>();
         services.AddSingleton<NoSteamLauncherService>();
         services.AddSingleton<SteamlessService>();
         services.AddSingleton<GBEDeploymentService>();
@@ -86,6 +95,7 @@ public partial class App : Application
         services.AddTransient<DenuvoViewModel>();
         services.AddTransient<NoSteamViewModel>();
         services.AddTransient<SettingsViewModel>();
+        services.AddTransient<AchievementViewModel>();
         Services = services.BuildServiceProvider();
 
         // 上次的文件法联机会话（AppID Changer）若没还原干净，这里补一刀
