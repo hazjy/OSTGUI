@@ -280,8 +280,8 @@ public partial class AchievementViewModel : ObservableObject
 
                 if (result.Failed > 0)
                 {
-                    var extra = string.IsNullOrEmpty(result.Warning) ? "" : $"；{result.Warning}";
-                    ToastService.ShowError("成就未全部写入 Steam", $"{result.Failed} 项设置失败{extra}");
+                    // 不报条数：设不上的游戏通常是"全都没设上"，报出来恒等于总数，没有信息量
+                    ToastService.ShowError("成就未全部写入 Steam", result.Warning);
                 }
                 else if (!string.IsNullOrEmpty(result.Warning))
                 {
