@@ -47,29 +47,37 @@ public static class SteamStatsSchema
         var stats = appNode?.Child("stats");
         if (stats == null) return null;
 
-        // 成就组：优先按 type 找，退化到惯例的 "1"
-        var group = stats.Children.FirstOrDefault(c =>
-                        string.Equals(c.Child("type")?.String, "ACHIEVEMENTS", StringComparison.OrdinalIgnoreCase))
-                    ?? stats.Child("1");
-        var bits = group?.Child("bits");
+        // 成就有可能在**多个组**里（2026-09-23 实测：无人深空 1/2 两组都是 ACHIEVEMENTS；
+        // 深海迷航的 2 组是**空的**、真正的位在 5 组）。所以不能只认"第一个 ACHIEVEMENTS 组"——
+        // 那样会把空组当答案，成就列表直接变空。这里扫所有组，凡是带具名 bits 的都收。
         var defs = new List<AchievementDef>();
-        if (bits == null) return defs;
-
-        foreach (var bit in bits.Children)
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var groups = 0;
+        foreach (var group in stats.Children)
         {
-            var name = bit.Child("name")?.String;
-            if (string.IsNullOrWhiteSpace(name)) continue;   // 无内部名的位无法调用 API，丢弃
+            var bits = group.Child("bits");
+            if (bits == null) continue;
 
-            var names = bit.Child("display")?.Child("name");
-            defs.Add(new AchievementDef
+            var used = false;
+            foreach (var bit in bits.Children)
             {
-                Name = name,
-                DisplayName = PickLanguage(names) ?? name,
-                Description = bit.Child("description")?.String ?? "",
-                Hidden = bit.Child("hidden")?.Int == 1,
-            });
+                var name = bit.Child("name")?.String;
+                if (string.IsNullOrWhiteSpace(name) || !seen.Add(name)) continue;   // 无名位没法调 API；重名去重
+
+                var display = bit.Child("display");
+                defs.Add(new AchievementDef
+                {
+                    Name = name,
+                    DisplayName = PickLanguage(display?.Child("name")) ?? name,
+                    Description = PickLanguage(display?.Child("desc")) ?? bit.Child("description")?.String ?? "",
+                    Hidden = bit.Child("hidden")?.Int == 1,
+                });
+                used = true;
+            }
+            if (used) groups++;
         }
         if (defs.Count > 4096) return null;   // 明显不是成就 schema（防把别的 bin 当成就表）
+        LogService.AddAppLog($"schema {appId}: 成就 {defs.Count} 条（来自 {groups} 个 bits 组）");
         return defs;
     }
 
