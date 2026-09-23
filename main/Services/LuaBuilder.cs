@@ -71,7 +71,7 @@ public class LuaBuilder
 
         // 创意工坊密钥：Sudama depotkeys 中若收录了 AppID 自身的密钥（社区通称"创意工坊密钥"），
         // 主游戏行带上它——Steam 客户端下载创意工坊内容时按 depot=AppID 读取解密密钥，
-        // 缺此 key 会报"内容仍处于加密"（详见 docs/dev/DEV-NOTES.md 创意工坊章节）
+        // 缺此 key 会报"内容仍处于加密"（详见工作区 doc/GUI-事实考证.md 的「创意工坊下载」）
         var appKey = keys.TryGet(appId, out var k) ? k : "";
         if (appKey.Length == 64) keyCount++;
         lines.Add(appKey.Length == 64
