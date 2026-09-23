@@ -319,7 +319,6 @@ public partial class AchievementViewModel : ObservableObject
                 }
                 MergeFromResult(result);
                 SaveStore("steam");
-                ToastService.ShowSuccess("从 Steam 读取", $"{result.Achievements.Count(a => a.Achieved)} 项已解锁");
             }
             else
             {
