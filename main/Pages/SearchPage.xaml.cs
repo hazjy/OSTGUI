@@ -1,5 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Input;
+using OSTGUI.Helpers;
 using OSTGUI.Models;
 using OSTGUI.Services;
 using OSTGUI.ViewModels;
@@ -22,6 +24,40 @@ public sealed partial class SearchPage : Page
         this.InitializeComponent();
         VM = vm;
         this.DataContext = VM;
+
+        // 切换控件按上次选择回设（初始化期那次 SelectionChanged 已被 null 守卫挡掉）
+        ViewSegmented.SelectedIndex = VM.IsGridView ? 1 : 0;
+    }
+
+    // ==================== 卡片悬浮微交互 ====================
+    // 与入库管理同款：缩放/阴影/高亮都落在卡片本身，实现与数值见 Helpers/CardHover.cs
+
+    private void ListCard_PointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is Border card) CardHover.Enter(card, ProbeCardHover.Background, CardHover.ListScale, CardHover.ListShadowZ);
+    }
+
+    private void ListCard_PointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is Border card) CardHover.Exit(card);
+    }
+
+    private void GridCard_PointerEntered(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is Border card) CardHover.Enter(card, ProbeCardHover.Background, CardHover.GridScale, CardHover.GridShadowZ);
+    }
+
+    private void GridCard_PointerExited(object sender, PointerRoutedEventArgs e)
+    {
+        if (sender is Border card) CardHover.Exit(card);
+    }
+
+    /// <summary>视图形态切换（与入库管理同款；控件初始化期会提前触发一次 → 守卫掉）</summary>
+    private void ViewSegmented_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ResultList == null || ResultGrid == null) return;
+
+        _ = VM.SetViewModeAsync(ViewSegmented.SelectedIndex == 1 ? "grid" : "list");
     }
 
     private void SearchBox_KeyDown(object sender, Microsoft.UI.Xaml.Input.KeyRoutedEventArgs e)

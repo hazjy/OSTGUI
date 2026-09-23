@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:helpers="using:OSTGUI.Helpers"
     xmlns:models="using:OSTGUI.Models"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls"
     >
     <Page.Resources>
         <helpers:BoolToVisibilityConverter x:Key="BoolToVis" />
@@ -16,6 +17,11 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
+
+        <!-- 画刷取样点：代码里换"悬浮高亮"背景时按**应用主题**取（Application.Current.Resources 走系统主题，
+             浅色应用 + 深色系统会取到深色画刷）。做法与入库管理页一致 -->
+        <Border x:Name="ProbeCardHover" Grid.RowSpan="2" Visibility="Collapsed" Width="1" Height="1"
+                Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}" />
 
         <!-- 固定区：标题、入库选项、搜索框（不随滚动移动） -->
         <StackPanel Grid.Row="0" Margin="40,32,40,12" Spacing="20">
@@ -34,10 +40,11 @@
                 </StackPanel>
             </Grid>
 
-            <!-- 搜索框 -->
+            <!-- 搜索框 + 视图切换（纯图标，与入库管理同款） -->
             <Grid ColumnSpacing="8">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
                     <ColumnDefinition Width="Auto" />
                 </Grid.ColumnDefinitions>
                 <TextBox Grid.Column="0" x:Name="SearchBox"
@@ -51,6 +58,24 @@
                         <TextBlock Text="搜索" />
                     </StackPanel>
                 </Button>
+
+                <!-- 视图切换：纯图标（没有文字 → 必须给 AutomationProperties.Name，否则 UIA 读不到）；
+                     不要 HorizontalAlignment="Stretch"，那是整行分页用法，会把两枚图标拉散 -->
+                <controls:Segmented x:Name="ViewSegmented" Grid.Column="2" VerticalAlignment="Center"
+                                    SelectionChanged="ViewSegmented_SelectionChanged">
+                    <controls:SegmentedItem AutomationProperties.Name="列表视图"
+                                            ToolTipService.ToolTip="列表视图">
+                        <controls:SegmentedItem.Icon>
+                            <FontIcon Glyph="&#xE8FD;" FontSize="16" />
+                        </controls:SegmentedItem.Icon>
+                    </controls:SegmentedItem>
+                    <controls:SegmentedItem AutomationProperties.Name="网格视图"
+                                            ToolTipService.ToolTip="网格视图">
+                        <controls:SegmentedItem.Icon>
+                            <FontIcon Glyph="&#xF0E2;" FontSize="16" />
+                        </controls:SegmentedItem.Icon>
+                    </controls:SegmentedItem>
+                </controls:Segmented>
             </Grid>
 
             <ProgressBar x:Name="SearchProgress" IsIndeterminate="True" Visibility="{Binding IsSearching, Converter={StaticResource BoolToVis}}" />
@@ -78,23 +103,37 @@
             </Button>
         </StackPanel>
 
-        <!-- 滚动区：仅搜索结果与无结果提示 -->
-        <ScrollViewer Grid.Row="1" VerticalScrollMode="Auto" VerticalScrollBarVisibility="Auto">
-            <StackPanel Margin="40,4,40,40" Spacing="20">
-
-                <!-- 搜索结果（独立卡片） -->
-                <ItemsControl ItemsSource="{Binding SearchResults}"
-                              Visibility="{Binding HasResults, Converter={StaticResource BoolToVis}}">
-                    <ItemsControl.ItemsPanel>
-                        <ItemsPanelTemplate>
-                            <StackPanel Spacing="12" />
-                        </ItemsPanelTemplate>
-                    </ItemsControl.ItemsPanel>
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate x:DataType="models:SearchResult">
-                            <Border Padding="15,12" MinHeight="80" CornerRadius="6"
-                                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
-                                <Grid ColumnSpacing="15">
+        <!-- 结果区：列表 / 网格两档宿主**共用**同一份 SearchResults，靠 Visibility 二选一（与入库管理同构）。
+             改成 ListView/GridView 后滚动与虚拟化由控件负责，页头（Row0）照旧固定不动。
+             缩略图仍是**内存路径**（SearchViewModel 拉字节 → 按原生尺寸解码），两档共用同一张位图、
+             切档不重新联网，也**不落盘**（搜索页不做封面缓存，这是明确约定）。 -->
+        <ListView x:Name="ResultList" Grid.Row="1" Margin="40,4,40,36"
+                  ItemsSource="{Binding SearchResults}"
+                  Background="Transparent"
+                  SelectionMode="None"
+                  IsItemClickEnabled="False"
+                  Visibility="{Binding IsListView, Converter={StaticResource BoolToVis}}">
+            <ListView.ItemContainerStyle>
+                <!-- 抹掉容器自带内边距；左右各留 10：悬浮放大时卡片要往两边长，不留会被视口边界切掉（与入库管理同值） -->
+                <Style TargetType="ListViewItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    <Setter Property="Padding" Value="0" />
+                    <Setter Property="Margin" Value="10,6" />
+                    <Setter Property="MinHeight" Value="0" />
+                </Style>
+            </ListView.ItemContainerStyle>
+            <ListView.ItemTemplate>
+                <DataTemplate x:DataType="models:SearchResult">
+                    <Border Padding="15,12" MinHeight="80" CornerRadius="6"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            RenderTransformOrigin="0.5,0.5"
+                            PointerEntered="ListCard_PointerEntered"
+                            PointerExited="ListCard_PointerExited">
+                        <!-- 悬浮放大靠这个变换（Storyboard 在代码里建，见 Helpers/CardHover.cs） -->
+                        <Border.RenderTransform>
+                            <ScaleTransform />
+                        </Border.RenderTransform>
+                        <Grid ColumnSpacing="15">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="Auto" />
                                         <ColumnDefinition Width="*" />
@@ -156,20 +195,97 @@
                                     </StackPanel>
                                 </Grid>
                             </Border>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                </DataTemplate>
+            </ListView.ItemTemplate>
+        </ListView>
 
-                <!-- 无结果提示 -->
-                <Border Padding="24" CornerRadius="12"
-                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
-                        Visibility="{Binding ShowNoResults, Converter={StaticResource BoolToVis}}">
-                    <TextBlock Text="超时或无结果" FontSize="14"
-                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
-                </Border>
+        <!-- 网格视图：卡片尺寸/间距/悬浮数值与入库管理完全一致（封面框 200×93 = 比例 2.1505 ≥ 素材 2.1395，不裁左右）。
+             ⚠️ 封面用 Stretch="Uniform"（宁可留边不裁）：搜索结果的缩略图可能来自官方 appdetails 兜底、
+             比例不一定是 460×215，而入库管理那份自建缓存永远是 460×215 才敢用 UniformToFill -->
+        <GridView x:Name="ResultGrid" Grid.Row="1" Margin="40,4,40,36"
+                  ItemsSource="{Binding SearchResults}"
+                  Background="Transparent"
+                  SelectionMode="None"
+                  IsItemClickEnabled="False"
+                  Visibility="{Binding IsGridView, Converter={StaticResource BoolToVis}}">
+            <GridView.ItemsPanel>
+                <ItemsPanelTemplate>
+                    <!-- 212×222 = 卡片 200×210 + 四边各 6 间距（与入库管理同尺寸） -->
+                    <ItemsWrapGrid Orientation="Horizontal" ItemWidth="212" ItemHeight="222" />
+                </ItemsPanelTemplate>
+            </GridView.ItemsPanel>
+            <GridView.ItemContainerStyle>
+                <Style TargetType="GridViewItem">
+                    <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                    <Setter Property="VerticalContentAlignment" Value="Stretch" />
+                    <Setter Property="Padding" Value="0" />
+                    <Setter Property="Margin" Value="6,6,6,6" />
+                    <Setter Property="MinHeight" Value="0" />
+                    <Setter Property="MinWidth" Value="0" />
+                </Style>
+            </GridView.ItemContainerStyle>
+            <GridView.ItemTemplate>
+                <DataTemplate x:DataType="models:SearchResult">
+                    <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            CornerRadius="6"
+                            RenderTransformOrigin="0.5,0.5"
+                            PointerEntered="GridCard_PointerEntered"
+                            PointerExited="GridCard_PointerExited">
+                        <Border.RenderTransform>
+                            <ScaleTransform />
+                        </Border.RenderTransform>
+                        <StackPanel>
+                            <Border Height="93" CornerRadius="6,6,0,0"
+                                    Background="{ThemeResource CardBackgroundFillColorSecondaryBrush}">
+                                <Grid>
+                                    <FontIcon Glyph="&#xE7FC;" FontSize="24"
+                                              Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                    <Image Source="{Binding Thumbnail}" Stretch="Uniform" />
+                                </Grid>
+                            </Border>
 
-            </StackPanel>
-        </ScrollViewer>
+                            <StackPanel Padding="10,8,10,10" Spacing="6">
+                                <TextBlock Text="{Binding Name}" FontSize="15" FontWeight="SemiBold"
+                                           TextAlignment="Center" TextTrimming="CharacterEllipsis"
+                                           Foreground="{ThemeResource TextFillColorPrimaryBrush}" />
+                                <TextBlock Text="{Binding AppIdDisplay}" FontSize="12" TextAlignment="Center"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+                                <!-- 两个按钮与列表卡完全一致（同一批处理器）。Path 的坐标来历见列表卡里那段长注释，别手调 -->
+                                <StackPanel Orientation="Horizontal" Spacing="8" HorizontalAlignment="Center">
+                                    <Button Click="ListAddGame_Click" Tag="{Binding}"
+                                            ToolTipService.ToolTip="入库"
+                                            Width="32" Height="32" MinWidth="0" Padding="0"
+                                            Background="Transparent" BorderThickness="0">
+                                        <Path Width="16" Height="16" Stretch="None"
+                                              Stroke="{ThemeResource TextFillColorPrimaryBrush}"
+                                              StrokeThickness="1.1"
+                                              StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                              Data="M7.56,0.59 L7.56,8.68 M4.05,5.38 L7.56,8.89 L11.07,5.38 M1.5,10.7 L1.5,12.72 A1.81,1.81 0 0 0 3.3,14.53 L11.82,14.53 A1.81,1.81 0 0 0 13.62,12.72 L13.62,10.7" />
+                                    </Button>
+                                    <Button Click="InfoButton_Click" Tag="{Binding}"
+                                            ToolTipService.ToolTip="信息"
+                                            Width="32" Height="32" MinWidth="0" Padding="0"
+                                            Background="Transparent" BorderThickness="0">
+                                        <FontIcon Glyph="&#xE946;" FontSize="16" />
+                                    </Button>
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+                </DataTemplate>
+            </GridView.ItemTemplate>
+        </GridView>
+
+        <!-- 无结果提示（两档共用） -->
+        <Border Grid.Row="1" Padding="24" CornerRadius="12" Margin="40,4,40,40"
+                VerticalAlignment="Top"
+                Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                Visibility="{Binding ShowNoResults, Converter={StaticResource BoolToVis}}">
+            <TextBlock Text="超时或无结果" FontSize="14"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" HorizontalAlignment="Center" />
+        </Border>
     </Grid>
 </Page>

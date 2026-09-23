@@ -61,6 +61,8 @@ public class AppConfig
     public int OnlineOtherMode { get; set; }
     // 入库管理视图形态：list = 列表卡片（默认），grid = 网格卡片
     public string LibraryViewMode { get; set; } = "list";
+    // 搜索入库视图形态：同上（两页各自独立记忆；想联动就都读这一个键）
+    public string SearchViewMode { get; set; } = "list";
 
     // === 应用程序设置 ===
     public int LogMaxLines { get; set; } = 1000;
@@ -98,6 +100,7 @@ public class AppConfig
         NavigationPaneWidth = 200,
         OnlineOtherMode = 0,
         LibraryViewMode = "list",
+        SearchViewMode = "list",
         LogMaxLines = 1000,
         ManifestSourceEnabled = ManifestSource.GetPresetSources()
             .ToDictionary(s => s.Id, s => s.IsEnabled),

@@ -58,6 +58,28 @@ public partial class SearchViewModel : ObservableObject
     public bool HasResults => SearchResults.Count > 0;
     public bool ShowNoResults => HasSearched && !HasResults;
 
+    /// <summary>搜索结果视图形态：list / grid。持久化在 config.json 的 SearchViewMode
+    /// （与入库管理各自独立记忆；做法与 <see cref="LibraryViewModel"/> 一致）</summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(IsListView), nameof(IsGridView))]
+    private string _viewMode = "list";
+
+    public bool IsListView => ViewMode != "grid";
+    public bool IsGridView => ViewMode == "grid";
+
+    /// <summary>
+    /// 切视图形态。写盘失败不影响切换（内存态优先，下次重开最多回到上一档）
+    /// </summary>
+    public async Task SetViewModeAsync(string mode)
+    {
+        mode = mode == "grid" ? "grid" : "list";
+        if (ViewMode == mode) return;
+
+        ViewMode = mode;
+        try { await _configService.UpdateAndSaveAsync(c => c.SearchViewMode = mode); }
+        catch { }
+    }
+
     public SearchViewModel(
         GameSearchService searchService,
         ManifestDownloadService manifestService,
@@ -70,6 +92,9 @@ public partial class SearchViewModel : ObservableObject
         _steamService = steamService;
         _configService = configService;
         _coverService = coverService;
+
+        // 视图形态跟着上次选择（脏值一律归一到 list）
+        _viewMode = configService.Config.SearchViewMode == "grid" ? "grid" : "list";
 
         // 集合内容变化时同步刷新 HasResults 与无结果提示
         SearchResults.CollectionChanged += (s, e) =>
