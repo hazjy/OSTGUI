@@ -57,7 +57,7 @@
                     <!-- 游戏数量挂在标题里，计数用 CJK 角括号「」（U+300C / U+300D）括住 -->
                     <TextBlock Text="{Binding TitleText}" FontSize="32" FontWeight="Bold" />
                 </StackPanel>
-                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8">
+                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                     <AutoSuggestBox Width="240" QueryIcon="Find"
                                     PlaceholderText="搜索游戏 / AppID"
                                     Text="{Binding SearchFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
