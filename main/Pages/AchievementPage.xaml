@@ -80,7 +80,6 @@
                             <Button Content="全部锁定" Command="{Binding LockAllCommand}" />
                             <Button Content="保存到 Steam" Command="{Binding SaveToSteamCommand}" IsEnabled="{Binding SteamRunning}" />
                             <Button Content="从 Steam 读取" Command="{Binding ReadFromSteamCommand}" IsEnabled="{Binding SteamRunning}" />
-                            <Button Content="重试" Command="{Binding ReloadCommand}" />
                         </StackPanel>
                     </StackPanel>
 

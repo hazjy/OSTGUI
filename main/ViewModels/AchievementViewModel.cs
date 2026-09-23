@@ -56,7 +56,6 @@ public partial class AchievementViewModel : ObservableObject
     private Dictionary<string, bool> _baseline = new();
     private string _steamId = "";
     private bool _suppress;
-    private bool _initialized;
 
     [ObservableProperty] private ObservableCollection<LibraryItem> _games = new();
     [ObservableProperty] private LibraryItem? _selectedGame;
@@ -92,9 +91,6 @@ public partial class AchievementViewModel : ObservableObject
 
     public async Task InitializeAsync()
     {
-        if (_initialized) return;
-        _initialized = true;
-
         SteamRunning = _steam.IsSteamRunning();
         var items = await _scanner.ScanLibraryAsync();
         _allGames = items.Where(i => i.AppId != "N/A").ToList();
@@ -104,6 +100,9 @@ public partial class AchievementViewModel : ObservableObject
                 item.GameName = name;
         }
         ApplyFilter();
+
+        // 每次进页面都重读当前游戏（原来的「重试」按钮就是这个）：启动过一次游戏后再回来就能拿到 schema
+        await LoadGameAsync(SelectedGame);
     }
 
     private void ApplyFilter()
@@ -261,15 +260,10 @@ public partial class AchievementViewModel : ObservableObject
             return;
         }
 
+        // 不做"有没有改动"的判断：每次都把当前状态整体写一遍（幂等，也省得改动判断本身出岔子）
         var changes = Rows
-            .Where(r => _baseline.TryGetValue(r.Name, out var b) ? b != r.Achieved : r.Achieved)
             .Select(r => new AchievementRecord { Name = r.Name, Achieved = r.Achieved })
             .ToList();
-        if (changes.Count == 0)
-        {
-            ToastService.ShowInfo("成就", "没有需要保存的改动");
-            return;
-        }
 
         IsBusy = true;
         try
@@ -330,7 +324,4 @@ public partial class AchievementViewModel : ObservableObject
             IsBusy = false;
         }
     }
-
-    [RelayCommand]
-    private Task ReloadAsync() => LoadGameAsync(SelectedGame);
 }
