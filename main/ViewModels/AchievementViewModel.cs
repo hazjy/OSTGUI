@@ -108,6 +108,8 @@ public partial class AchievementViewModel : ObservableObject
             item.SourceTag = "lua";
             if (_names.TryGet(item.AppId, out var name) && !string.IsNullOrWhiteSpace(name))
                 item.GameName = name;
+            else if (SteamStatsSchema.ReadGameName(_steam.GetSteamPath() ?? "", item.AppId) is { } schemaName)
+                item.GameName = schemaName;   // schema 里自带 gamename，省得显示成 "AppID xxx"
         }
         ApplyFilter();
 
@@ -129,44 +131,56 @@ public partial class AchievementViewModel : ObservableObject
         _ownedLoaded = true;
 
         var lua = _allGames.Select(g => g.AppId).ToHashSet(StringComparer.Ordinal);
-        var candidates = new Dictionary<string, LibraryItem>(StringComparer.Ordinal);
 
-        // ① 本地已有成就定义的游戏（appcache\stats\UserGameStatsSchema_<appid>.bin）
-        try
+        // 收集候选（要解析 schema 取名字 + 读 appmanifest）→ 放后台线程，别卡 UI
+        var candidates = await Task.Run(() =>
         {
-            foreach (var file in Directory.GetFiles(
-                         Path.Combine(steamPath, "appcache", "stats"), "UserGameStatsSchema_*.bin"))
-            {
-                var id = Path.GetFileNameWithoutExtension(file)["UserGameStatsSchema_".Length..];
-                if (id.Length == 0 || lua.Contains(id)) continue;
-                candidates[id] = new LibraryItem { AppId = id, GameName = $"AppID {id}", SourceTag = "正版" };
-            }
-        }
-        catch (Exception ex) { LogService.AddAppLog($"正版候选①失败: {ex.Message}"); }
+            var map = new Dictionary<string, LibraryItem>(StringComparer.Ordinal);
 
-        // ② 已安装的游戏（appmanifest_<appid>.acf，顺带取游戏名）
-        try
-        {
-            foreach (var root in SteamLibraryRoots(steamPath))
-            foreach (var file in Directory.GetFiles(Path.Combine(root, "steamapps"), "appmanifest_*.acf"))
+            // ① 本地已有成就定义的游戏（名字就在 schema 的 gamename 里，不用联网）
+            try
             {
-                var text = File.ReadAllText(file);
-                var idMatch = Regex.Match(text, "\"appid\"\\s*\"(\\d+)\"");
-                if (!idMatch.Success) continue;
-                var id = idMatch.Groups[1].Value;
-                if (lua.Contains(id)) continue;
-                var nameMatch = Regex.Match(text, "\"name\"\\s*\"([^\"]*)\"");
-                candidates[id] = new LibraryItem
+                foreach (var file in Directory.GetFiles(
+                             Path.Combine(steamPath, "appcache", "stats"), "UserGameStatsSchema_*.bin"))
                 {
-                    AppId = id,
-                    GameName = nameMatch.Success && nameMatch.Groups[1].Value.Length > 0
-                        ? nameMatch.Groups[1].Value
-                        : $"AppID {id}",
-                    SourceTag = "正版",
-                };
+                    var id = Path.GetFileNameWithoutExtension(file)["UserGameStatsSchema_".Length..];
+                    if (id.Length == 0 || lua.Contains(id)) continue;
+                    map[id] = new LibraryItem
+                    {
+                        AppId = id,
+                        GameName = SteamStatsSchema.ReadGameName(steamPath, id) ?? $"AppID {id}",
+                        SourceTag = "正版",
+                    };
+                }
             }
-        }
-        catch (Exception ex) { LogService.AddAppLog($"正版候选②失败: {ex.Message}"); }
+            catch (Exception ex) { LogService.AddAppLog($"正版候选①失败: {ex.Message}"); }
+
+            // ② 已安装的游戏（appmanifest_<appid>.acf，顺带取游戏名）
+            try
+            {
+                foreach (var root in SteamLibraryRoots(steamPath))
+                foreach (var file in Directory.GetFiles(Path.Combine(root, "steamapps"), "appmanifest_*.acf"))
+                {
+                    var text = File.ReadAllText(file);
+                    var idMatch = Regex.Match(text, "\"appid\"\\s*\"(\\d+)\"");
+                    if (!idMatch.Success) continue;
+                    var id = idMatch.Groups[1].Value;
+                    if (lua.Contains(id)) continue;
+                    var nameMatch = Regex.Match(text, "\"name\"\\s*\"([^\"]*)\"");
+                    map[id] = new LibraryItem
+                    {
+                        AppId = id,
+                        GameName = nameMatch.Success && nameMatch.Groups[1].Value.Length > 0
+                            ? nameMatch.Groups[1].Value
+                            : SteamStatsSchema.ReadGameName(steamPath, id) ?? $"AppID {id}",
+                        SourceTag = "正版",
+                    };
+                }
+            }
+            catch (Exception ex) { LogService.AddAppLog($"正版候选②失败: {ex.Message}"); }
+
+            return map;
+        });
 
         if (candidates.Count == 0) return;
 
