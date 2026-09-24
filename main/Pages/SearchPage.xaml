@@ -42,7 +42,7 @@
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
                 <TextBlock Grid.Column="0" Text="搜索入库" FontSize="32" FontWeight="Bold" VerticalAlignment="Center" />
-                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12" VerticalAlignment="Center">
+                <StackPanel Grid.Column="1" Orientation="Horizontal" HorizontalAlignment="Right" Spacing="12" VerticalAlignment="Bottom">
                     <CheckBox Content="添加所有DLC" IsChecked="{Binding AddAllDlc, Mode=TwoWay}" />
                     <CheckBox Content="写入固定版本配置" IsChecked="{Binding FixedVersion, Mode=TwoWay}" />
                     <CheckBox Content="下载 Manifest" IsChecked="{Binding DownloadManifest, Mode=TwoWay}" />
