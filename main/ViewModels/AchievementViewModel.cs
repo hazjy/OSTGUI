@@ -163,15 +163,19 @@ public partial class AchievementViewModel : ObservableObject
             .ToList();
         if (nameless.Count == 0) return;
 
-        // ① 本地 appinfo.vdf
+        // ① 本地 appinfo.vdf（离线、权威）
         var steamPath = _steam.GetSteamPath() ?? "";
-        var local = await Task.Run(() => AppInfoVdf.GetNames(steamPath, nameless.Select(g => g.AppId).ToList()));
-        if (local.Count > 0)
+        var local = await Task.Run(() => AppInfoVdf.GetAll(steamPath));
+        var filled = false;
+        foreach (var item in nameless)
         {
-            foreach (var item in nameless)
-                if (local.TryGetValue(item.AppId, out var localName)) item.GameName = localName;
-            ApplyFilter();
+            if (local.TryGetValue(item.AppId, out var localName) && localName.Length > 0)
+            {
+                item.GameName = localName;
+                filled = true;
+            }
         }
+        if (filled) ApplyFilter();
 
         // ② 还缺的走在线补名（能补多少算多少）
         var ids = _allGames.Concat(_ownedGames)
@@ -213,18 +217,17 @@ public partial class AchievementViewModel : ObservableObject
         {
             var map = new Dictionary<string, LibraryItem>(StringComparer.Ordinal);
 
-            // ① 本地已有成就定义的游戏（名字就在 schema 的 gamename 里，不用联网）
+            // ① 客户端认识的所有 app（appinfo.vdf，实测 492 条）——不按"有没有成就定义"筛，
+            //    否则没装、也没启动过的拥有游戏不会出现
             try
             {
-                foreach (var file in Directory.GetFiles(
-                             Path.Combine(steamPath, "appcache", "stats"), "UserGameStatsSchema_*.bin"))
+                foreach (var (id, name) in AppInfoVdf.GetAll(steamPath))
                 {
-                    var id = Path.GetFileNameWithoutExtension(file)["UserGameStatsSchema_".Length..];
-                    if (id.Length == 0 || lua.Contains(id)) continue;
+                    if (lua.Contains(id)) continue;
                     map[id] = new LibraryItem
                     {
                         AppId = id,
-                        GameName = $"AppID {id}",   // 名字交给后面的批量补名（schema 的 gamename 是代号，不能用）
+                        GameName = name.Length > 0 ? name : $"AppID {id}",
                         SourceTag = "正版",
                     };
                 }
