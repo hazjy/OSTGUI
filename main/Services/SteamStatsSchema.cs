@@ -36,15 +36,6 @@ public static class SteamStatsSchema
     public static string PathFor(string steamPath, string appId) =>
         Path.Combine(steamPath, "appcache", "stats", $"UserGameStatsSchema_{appId}.bin");
 
-    /// <summary>只取 schema 里的 gamename（给列表显示用；文件不在或没这个键就返回 null）</summary>
-    public static string? ReadGameName(string steamPath, string appId)
-    {
-        var path = PathFor(steamPath, appId);
-        if (!File.Exists(path)) return null;
-        var name = ParseFile(path)?.Children.FirstOrDefault()?.Child("gamename")?.String;
-        return string.IsNullOrWhiteSpace(name) ? null : name;
-    }
-
     /// <summary>
     /// 读本地 schema。失败返回 false 并给出错误码（本项目自己的码，不是 Steam 的）：
     /// E1 文件不存在 / E2 解析失败 / E3 没有成就条目

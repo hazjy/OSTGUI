@@ -52,6 +52,7 @@ public partial class AchievementViewModel : ObservableObject
     private readonly GameNameCacheService _names;
     private readonly AchievementStore _store;
     private readonly SteamStatsService _stats;
+    private readonly GameSearchService _search;
 
     private List<LibraryItem> _allGames = new();
     private List<LibraryItem> _ownedGames = new();
@@ -59,6 +60,9 @@ public partial class AchievementViewModel : ObservableObject
     private string _steamId = "";
     private bool _suppress;
     private bool _ownedLoaded;
+
+    /// <summary>lua 入库涉及的所有 appid（文件名 + 各 addappid），用来把正版候选排除掉</summary>
+    private readonly HashSet<string> _luaIds = new(StringComparer.Ordinal);
 
     [ObservableProperty] private ObservableCollection<LibraryItem> _games = new();
     [ObservableProperty] private LibraryItem? _selectedGame;
@@ -79,13 +83,14 @@ public partial class AchievementViewModel : ObservableObject
 
     public AchievementViewModel(
         SteamService steam, LibraryScanner scanner, GameNameCacheService names,
-        AchievementStore store, SteamStatsService stats)
+        AchievementStore store, SteamStatsService stats, GameSearchService search)
     {
         _steam = steam;
         _scanner = scanner;
         _names = names;
         _store = store;
         _stats = stats;
+        _search = search;
     }
 
     public bool HasNotice => !string.IsNullOrEmpty(Notice);
@@ -102,22 +107,65 @@ public partial class AchievementViewModel : ObservableObject
     {
         SteamRunning = _steam.IsSteamRunning();
         var items = await _scanner.ScanLibraryAsync();
-        _allGames = items.Where(i => i.AppId != "N/A").ToList();
-        foreach (var item in _allGames)
+
+        _allGames = new List<LibraryItem>();
+        foreach (var item in items.Where(i => i.AppId != "N/A"))
         {
+            _luaIds.Add(item.AppId);                                   // lua 内容里的第一个 addappid
+            foreach (var id in item.InstalledAppIds) _luaIds.Add(id);   // 文件里的其它 addappid（depot/DLC）
+
+            // lua 文件名才是游戏 appid：内容里第一个 addappid 常常是 depot
+            // （如 3751950.lua 里先出现 1716751，会把游戏记错 id、还会被当成正版）
+            var fileId = Path.GetFileNameWithoutExtension(item.FileName);
+            if (fileId.Length > 0 && fileId.All(char.IsDigit))
+            {
+                _luaIds.Add(fileId);
+                item.AppId = fileId;
+            }
+
             item.SourceTag = "lua";
-            if (_names.TryGet(item.AppId, out var name) && !string.IsNullOrWhiteSpace(name))
-                item.GameName = name;
-            else if (SteamStatsSchema.ReadGameName(_steam.GetSteamPath() ?? "", item.AppId) is { } schemaName)
-                item.GameName = schemaName;   // schema 里自带 gamename，省得显示成 "AppID xxx"
+            if (_names.TryGet(item.AppId, out var cached) && !string.IsNullOrWhiteSpace(cached))
+                item.GameName = cached;
+            _allGames.Add(item);
         }
         ApplyFilter();
+
+        _ = BackfillNamesAsync();   // 补名（库页同款）；补到会自动刷新列表
 
         // 正版列表要连一次 Steam，放后台拿（拿到再刷新列表）
         if (!_ownedLoaded) _ = LoadOwnedAsync();
 
         // 每次进页面都重读当前游戏（原来的「重试」按钮就是这个）：启动过一次游戏后再回来就能拿到 schema
         await LoadGameAsync(SelectedGame);
+    }
+
+    /// <summary>
+    /// 还叫 "AppID xxx" 的交给库页同款的批量取名字（结果落名字缓存），补到就刷新列表。
+    /// 故意不用 schema 里的 gamename：那可能是开发代号（实测 3751950 的 gamename 是 OBSIDIAN，
+    /// 实际是刺客信条黑旗记忆重置）。
+    /// </summary>
+    private async Task BackfillNamesAsync()
+    {
+        var ids = _allGames.Concat(_ownedGames)
+            .Where(g => g.GameName.StartsWith("AppID", StringComparison.Ordinal))
+            .Select(g => g.AppId)
+            .Distinct()
+            .ToList();
+        if (ids.Count == 0) return;
+
+        try { await _search.GetGameNamesBatchAsync(ids); }
+        catch (Exception ex) { LogService.AddAppLog($"成就页补名失败: {ex.Message}"); }
+
+        var changed = false;
+        foreach (var item in _allGames.Concat(_ownedGames))
+        {
+            if (_names.TryGet(item.AppId, out var name) && !string.IsNullOrWhiteSpace(name) && item.GameName != name)
+            {
+                item.GameName = name;
+                changed = true;
+            }
+        }
+        if (changed) ApplyFilter();
     }
 
     /// <summary>
@@ -130,7 +178,7 @@ public partial class AchievementViewModel : ObservableObject
         if (string.IsNullOrEmpty(steamPath) || !SteamRunning) return;   // 不标记已加载，下次进页面再试
         _ownedLoaded = true;
 
-        var lua = _allGames.Select(g => g.AppId).ToHashSet(StringComparer.Ordinal);
+        var lua = _luaIds;
 
         // 收集候选（要解析 schema 取名字 + 读 appmanifest）→ 放后台线程，别卡 UI
         var candidates = await Task.Run(() =>
@@ -148,7 +196,7 @@ public partial class AchievementViewModel : ObservableObject
                     map[id] = new LibraryItem
                     {
                         AppId = id,
-                        GameName = SteamStatsSchema.ReadGameName(steamPath, id) ?? $"AppID {id}",
+                        GameName = $"AppID {id}",   // 名字交给后面的批量补名（schema 的 gamename 是代号，不能用）
                         SourceTag = "正版",
                     };
                 }
@@ -172,7 +220,7 @@ public partial class AchievementViewModel : ObservableObject
                         AppId = id,
                         GameName = nameMatch.Success && nameMatch.Groups[1].Value.Length > 0
                             ? nameMatch.Groups[1].Value
-                            : SteamStatsSchema.ReadGameName(steamPath, id) ?? $"AppID {id}",
+                            : $"AppID {id}",
                         SourceTag = "正版",
                     };
                 }
@@ -193,6 +241,7 @@ public partial class AchievementViewModel : ObservableObject
         }
         LogService.AddAppLog($"正版游戏：候选={candidates.Count} 拥有={_ownedGames.Count}");
         ApplyFilter();
+        _ = BackfillNamesAsync();
     }
 
     /// <summary>Steam 库根目录（含 libraryfolders.vdf 里记录的其他盘）</summary>
