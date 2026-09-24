@@ -26,7 +26,8 @@
             <MenuFlyoutItem Text="复制游戏名称" Click="CopyGameName_Click" />
             <MenuFlyoutSeparator />
             <MenuFlyoutItem Text="补齐版本配置" Click="RepairVersionConfig_Click" />
-            <MenuFlyoutItem Text="入库信息" Click="InstallInfo_Click" />
+            <MenuFlyoutItem Text="删除" Click="Delete_Click"
+                            Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
         </MenuFlyout>
     </Page.Resources>
 
@@ -175,12 +176,6 @@
                                             Background="Transparent" BorderThickness="0">
                                         <FontIcon Glyph="&#xE712;" FontSize="16" />
                                     </Button>
-                                    <Button Click="Delete_Click" Tag="{Binding}"
-                                            ToolTipService.ToolTip="删除"
-                                            Width="32" Height="32" MinWidth="0" Padding="0"
-                                            Background="Transparent" BorderThickness="0">
-                                        <FontIcon Glyph="&#xE74D;" FontSize="16" />
-                                    </Button>
                                 </StackPanel>
                             </Grid>
                         </Border>
@@ -279,12 +274,6 @@
                                             Width="32" Height="32" MinWidth="0" Padding="0"
                                             Background="Transparent" BorderThickness="0">
                                         <FontIcon Glyph="&#xE712;" FontSize="16" />
-                                    </Button>
-                                    <Button Click="Delete_Click" Tag="{Binding}"
-                                            ToolTipService.ToolTip="删除"
-                                            Width="32" Height="32" MinWidth="0" Padding="0"
-                                            Background="Transparent" BorderThickness="0">
-                                        <FontIcon Glyph="&#xE74D;" FontSize="16" />
                                     </Button>
                                 </StackPanel>
                             </StackPanel>

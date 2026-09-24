@@ -115,20 +115,18 @@ public sealed partial class LibraryPage : Page
         }
     }
 
+    /// <summary>更多菜单里的「删除」（红色）。菜单打开时 LastRightClickedItem 已由 More_Click 设好</summary>
     private void Delete_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is Button btn && btn.Tag is LibraryItem item)
-        {
-            VM.LastRightClickedItem = item;
+        if (VM.LastRightClickedItem is { } item)
             VM.DeleteItemCommand.Execute(item);
-        }
     }
 
     private void Info_Click(object sender, RoutedEventArgs e)
     {
         if (sender is Button btn && btn.Tag is LibraryItem item)
         {
-            ShowInfoDialog(item);
+            ShowInstallInfoDialog(item);
         }
     }
 
@@ -168,54 +166,33 @@ public sealed partial class LibraryPage : Page
         VM.RepairVersionConfigCommand.Execute(null);
     }
 
-    private async void InstallInfo_Click(object sender, RoutedEventArgs e)
-    {
-        if (VM.LastRightClickedItem != null)
-        {
-            // 立即打开对话框，DLC 列表在后台加载（转圈），不再先等 API 再弹窗
-            ShowInstallInfoDialog(VM.LastRightClickedItem);
-        }
-    }
-
-    private async void ShowInfoDialog(LibraryItem item)
-    {
-        if (this.XamlRoot == null) return;
-        var dialog = new ContentDialog
-        {
-            XamlRoot = this.XamlRoot,
-            Title = $"{item.GameName} ({item.AppId})",
-            PrimaryButtonText = "Steam 商店",
-            SecondaryButtonText = "SteamDB",
-            CloseButtonText = "关闭",
-            Content = new StackPanel { Spacing = 8, Children =
-            {
-                new TextBlock { Text = $"AppID: {item.AppId}" },
-                new TextBlock { Text = $"版本模式: {item.VersionModeText}" }
-            }}
-        };
-
-        Helpers.PopupTheme.Apply(dialog);
-        var result = await dialog.ShowAsync();
-        if (result == ContentDialogResult.Primary)
-        {
-            var url = $"https://store.steampowered.com/app/{item.AppId}";
-            _ = Windows.System.Launcher.LaunchUriAsync(new System.Uri(url));
-        }
-        else if (result == ContentDialogResult.Secondary)
-        {
-            var url = $"https://steamdb.info/app/{item.AppId}/";
-            _ = Windows.System.Launcher.LaunchUriAsync(new System.Uri(url));
-        }
-    }
-
     private async void ShowInstallInfoDialog(LibraryItem item)
     {
         if (this.XamlRoot == null) return;
-        // 顶部信息区
-        var headerPanel = new StackPanel { Spacing = 8, Padding = new Thickness(0, 0, 0, 12) };
-        headerPanel.Children.Add(new TextBlock { Text = $"AppID: {item.AppId}", FontSize = 14, FontWeight = FontWeights.SemiBold });
-        headerPanel.Children.Add(new TextBlock { Text = $"游戏名称: {item.GameName}", FontSize = 13 });
-        headerPanel.Children.Add(new TextBlock { Text = $"版本模式: {item.VersionModeText}", FontSize = 13 });
+        // 顶部信息区：游戏名 / AppID / 版本模式，全部居中（弹窗不再单独放标题，名字就是标题）
+        var headerPanel = new StackPanel { Spacing = 6, Padding = new Thickness(0, 0, 0, 12) };
+        headerPanel.Children.Add(new TextBlock
+        {
+            Text = item.GameName,
+            FontSize = 18,
+            FontWeight = FontWeights.SemiBold,
+            TextAlignment = TextAlignment.Center,
+            TextWrapping = TextWrapping.Wrap
+        });
+        headerPanel.Children.Add(new TextBlock
+        {
+            Text = $"AppID: {item.AppId}",
+            FontSize = 13,
+            TextAlignment = TextAlignment.Center,
+            Foreground = ProbeSecondary.Foreground
+        });
+        headerPanel.Children.Add(new TextBlock
+        {
+            Text = $"版本模式: {item.VersionModeText}",
+            FontSize = 13,
+            TextAlignment = TextAlignment.Center,
+            Foreground = ProbeSecondary.Foreground
+        });
 
         // DLC 过滤器：全部 / 已入库 / 未入库（单选按钮组）
         var allDlcRadio = new RadioButton { Content = "全部 DLC", GroupName = "DlcFilter", IsChecked = true };
@@ -323,7 +300,6 @@ public sealed partial class LibraryPage : Page
         var dialog = new ContentDialog
         {
             XamlRoot = this.XamlRoot,
-            Title = $"入库信息 - {item.GameName}",
             Content = rootPanel,
             CloseButtonText = "关闭",
             PrimaryButtonText = "Steam 商店",
