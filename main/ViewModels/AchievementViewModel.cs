@@ -130,7 +130,7 @@ public partial class AchievementViewModel : ObservableObject
         }
         ApplyFilter();
 
-        _ = BackfillNamesAsync();   // 补名（库页同款）；补到会自动刷新列表
+        _ = FillNamesAsync();   // 补名（本地 appinfo.vdf 优先）；补到会自动刷新列表
 
         // 正版列表要连一次 Steam，放后台拿（拿到再刷新列表）
         if (!_ownedLoaded) _ = LoadOwnedAsync();
@@ -140,12 +140,28 @@ public partial class AchievementViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 还叫 "AppID xxx" 的交给库页同款的批量取名字（结果落名字缓存），补到就刷新列表。
-    /// 故意不用 schema 里的 gamename：那可能是开发代号（实测 3751950 的 gamename 是 OBSIDIAN，
-    /// 实际是刺客信条黑旗记忆重置）。
+    /// 补名：先本地 appinfo.vdf（离线权威、明文；在线那条路走 store.steampowered.com，这台机器上常不通），
+    /// 还缺的再走库页同款的在线批量取名字。故意不用 schema 的 gamename：那可能是开发代号
+    /// （实测 3751950 的 gamename 是 OBSIDIAN，实际是刺客信条黑旗记忆重置）。
     /// </summary>
-    private async Task BackfillNamesAsync()
+    private async Task FillNamesAsync()
     {
+        var nameless = _allGames.Concat(_ownedGames)
+            .Where(g => g.GameName.StartsWith("AppID", StringComparison.Ordinal))
+            .ToList();
+        if (nameless.Count == 0) return;
+
+        // ① 本地 appinfo.vdf
+        var steamPath = _steam.GetSteamPath() ?? "";
+        var local = await Task.Run(() => AppInfoVdf.GetNames(steamPath, nameless.Select(g => g.AppId).ToList()));
+        if (local.Count > 0)
+        {
+            foreach (var item in nameless)
+                if (local.TryGetValue(item.AppId, out var localName)) item.GameName = localName;
+            ApplyFilter();
+        }
+
+        // ② 还缺的走在线补名（能补多少算多少）
         var ids = _allGames.Concat(_ownedGames)
             .Where(g => g.GameName.StartsWith("AppID", StringComparison.Ordinal))
             .Select(g => g.AppId)
@@ -241,7 +257,7 @@ public partial class AchievementViewModel : ObservableObject
         }
         LogService.AddAppLog($"正版游戏：候选={candidates.Count} 拥有={_ownedGames.Count}");
         ApplyFilter();
-        _ = BackfillNamesAsync();
+        _ = FillNamesAsync();
     }
 
     /// <summary>Steam 库根目录（含 libraryfolders.vdf 里记录的其他盘）</summary>
