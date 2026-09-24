@@ -100,8 +100,13 @@
                         </StackPanel>
                     </StackPanel>
 
+                    <!-- InfoBar 自带的严重度配色在浅色下是"深底 + 深字"（看不清），
+                         直接套卡片配色，警示感由图标颜色传达 -->
                     <InfoBar Grid.Row="1" IsClosable="False" IsOpen="{Binding HasNotice}"
-                             Severity="{Binding NoticeSeverity}" Message="{Binding Notice}" />
+                             Severity="{Binding NoticeSeverity}" Message="{Binding Notice}"
+                             Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                             BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                             BorderThickness="1" CornerRadius="8" />
 
                     <ListView Grid.Row="2" SelectionMode="None" ItemsSource="{Binding Rows}">
                         <ListView.ItemTemplate>
