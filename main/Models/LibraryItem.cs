@@ -24,6 +24,9 @@ public class LibraryItem : ObservableObject
     public string AppIdDisplay => $"AppID: {AppId}";
 
     public string UnlockerType { get; set; } = "ost"; // ost = OpenSteamTool
+
+    /// <summary>来源标签（成就页用来区分「lua」入库游戏 / 「正版」客户端认为拥有的游戏）；为空则不显示</summary>
+    public string SourceTag { get; set; } = "";
     private string _versionMode = "auto";
     public string VersionMode // auto, fixed
     {

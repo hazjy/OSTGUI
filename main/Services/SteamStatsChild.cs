@@ -35,12 +35,42 @@ internal static class SteamStatsChild
 {
     private const int WaitStatsMs = 15000;
 
-    // ── 子进程入口：--stats-dump / --stats-apply / --stats-schema-dump ──────────
+    // ── 子进程入口：--stats-dump / --stats-apply / --stats-schema-dump / --stats-owned ──────────
     public static int Run(string[] args)
     {
         var mode = args[1];
         var appId = args[2];
         var apply = mode.Equals("--stats-apply", StringComparison.OrdinalIgnoreCase);
+
+        // 批量问"这些 appid 里哪些是拥有的"：只连一次 Steam，不请求统计、不改任何东西
+        if (mode.Equals("--stats-owned", StringComparison.OrdinalIgnoreCase))
+        {
+            var steamPath = args[2];          // 这个模式第 2 个参数是 Steam 路径
+            var inFile = args[3];
+            var outOwnedFile = args[4];
+            var owned = new List<string>();
+            try
+            {
+                var candidates = JsonSerializer.Deserialize<List<string>>(File.ReadAllText(inFile)) ?? new();
+                Steam.InstallPath = steamPath;
+                using var client = new Client();
+                client.Initialize(0);                            // 0 = 不锁 appid
+                foreach (var id in candidates)
+                {
+                    if (!uint.TryParse(id, out var u)) continue;
+                    if (client.SteamApps008.IsSubscribedApp(u)) owned.Add(id);
+                }
+                LogService.AddAppLog($"stats-owned 候选={candidates.Count} 拥有={owned.Count}");
+            }
+            catch (Exception ex)
+            {
+                LogService.AddAppLog($"stats-owned 失败: {ex.Message}");
+                File.WriteAllText(outOwnedFile, JsonSerializer.Serialize(new List<string>()));
+                return 1;
+            }
+            File.WriteAllText(outOwnedFile, JsonSerializer.Serialize(owned));
+            return 0;
+        }
 
         if (mode.Equals("--stats-schema-dump", StringComparison.OrdinalIgnoreCase))
         {

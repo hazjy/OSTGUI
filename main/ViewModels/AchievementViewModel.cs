@@ -5,6 +5,7 @@ using OSTGUI.Models;
 using OSTGUI.Services;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Text.RegularExpressions;
 
 namespace OSTGUI.ViewModels;
 
@@ -53,14 +54,20 @@ public partial class AchievementViewModel : ObservableObject
     private readonly SteamStatsService _stats;
 
     private List<LibraryItem> _allGames = new();
+    private List<LibraryItem> _ownedGames = new();
     private Dictionary<string, bool> _baseline = new();
     private string _steamId = "";
     private bool _suppress;
+    private bool _ownedLoaded;
 
     [ObservableProperty] private ObservableCollection<LibraryItem> _games = new();
     [ObservableProperty] private LibraryItem? _selectedGame;
     [ObservableProperty] private ObservableCollection<AchievementRow> _rows = new();
     [ObservableProperty] private string _filter = "";
+    /// <summary>显示入库（lua）的游戏</summary>
+    [ObservableProperty] private bool _showLua = true;
+    /// <summary>显示客户端认为正版拥有的游戏</summary>
+    [ObservableProperty] private bool _showOwned = true;
     [ObservableProperty] private string _gameTitle = "未选择游戏";
     [ObservableProperty] private string _progressText = "";
     [ObservableProperty] private double _progressValue;
@@ -87,6 +94,8 @@ public partial class AchievementViewModel : ObservableObject
     partial void OnNoticeChanged(string value) => OnPropertyChanged(nameof(HasNotice));
     partial void OnHasChangesChanged(bool value) => OnPropertyChanged(nameof(DirtyText));
     partial void OnFilterChanged(string value) => ApplyFilter();
+    partial void OnShowLuaChanged(bool value) => ApplyFilter();
+    partial void OnShowOwnedChanged(bool value) => ApplyFilter();
     partial void OnSelectedGameChanged(LibraryItem? value) => _ = LoadGameAsync(value);
 
     public async Task InitializeAsync()
@@ -96,23 +105,119 @@ public partial class AchievementViewModel : ObservableObject
         _allGames = items.Where(i => i.AppId != "N/A").ToList();
         foreach (var item in _allGames)
         {
+            item.SourceTag = "lua";
             if (_names.TryGet(item.AppId, out var name) && !string.IsNullOrWhiteSpace(name))
                 item.GameName = name;
         }
         ApplyFilter();
 
+        // 正版列表要连一次 Steam，放后台拿（拿到再刷新列表）
+        if (!_ownedLoaded) _ = LoadOwnedAsync();
+
         // 每次进页面都重读当前游戏（原来的「重试」按钮就是这个）：启动过一次游戏后再回来就能拿到 schema
         await LoadGameAsync(SelectedGame);
+    }
+
+    /// <summary>
+    /// 正版（客户端认为拥有的）游戏：候选 = 本地有成就定义的 appid ∪ 已安装的 appid，
+    /// 再用子进程批量问一次"哪些是拥有的"（不请求统计、不改任何东西）。
+    /// </summary>
+    private async Task LoadOwnedAsync()
+    {
+        var steamPath = _steam.GetSteamPath();
+        if (string.IsNullOrEmpty(steamPath) || !SteamRunning) return;   // 不标记已加载，下次进页面再试
+        _ownedLoaded = true;
+
+        var lua = _allGames.Select(g => g.AppId).ToHashSet(StringComparer.Ordinal);
+        var candidates = new Dictionary<string, LibraryItem>(StringComparer.Ordinal);
+
+        // ① 本地已有成就定义的游戏（appcache\stats\UserGameStatsSchema_<appid>.bin）
+        try
+        {
+            foreach (var file in Directory.GetFiles(
+                         Path.Combine(steamPath, "appcache", "stats"), "UserGameStatsSchema_*.bin"))
+            {
+                var id = Path.GetFileNameWithoutExtension(file)["UserGameStatsSchema_".Length..];
+                if (id.Length == 0 || lua.Contains(id)) continue;
+                candidates[id] = new LibraryItem { AppId = id, GameName = $"AppID {id}", SourceTag = "正版" };
+            }
+        }
+        catch (Exception ex) { LogService.AddAppLog($"正版候选①失败: {ex.Message}"); }
+
+        // ② 已安装的游戏（appmanifest_<appid>.acf，顺带取游戏名）
+        try
+        {
+            foreach (var root in SteamLibraryRoots(steamPath))
+            foreach (var file in Directory.GetFiles(Path.Combine(root, "steamapps"), "appmanifest_*.acf"))
+            {
+                var text = File.ReadAllText(file);
+                var idMatch = Regex.Match(text, "\"appid\"\\s*\"(\\d+)\"");
+                if (!idMatch.Success) continue;
+                var id = idMatch.Groups[1].Value;
+                if (lua.Contains(id)) continue;
+                var nameMatch = Regex.Match(text, "\"name\"\\s*\"([^\"]*)\"");
+                candidates[id] = new LibraryItem
+                {
+                    AppId = id,
+                    GameName = nameMatch.Success && nameMatch.Groups[1].Value.Length > 0
+                        ? nameMatch.Groups[1].Value
+                        : $"AppID {id}",
+                    SourceTag = "正版",
+                };
+            }
+        }
+        catch (Exception ex) { LogService.AddAppLog($"正版候选②失败: {ex.Message}"); }
+
+        if (candidates.Count == 0) return;
+
+        var owned = await _stats.OwnedAppsAsync(candidates.Keys.ToList());
+        _ownedGames = candidates.Where(kv => owned.Contains(kv.Key)).Select(kv => kv.Value).ToList();
+        foreach (var g in _ownedGames)
+        {
+            if (_names.TryGet(g.AppId, out var name) && !string.IsNullOrWhiteSpace(name))
+                g.GameName = name;
+        }
+        LogService.AddAppLog($"正版游戏：候选={candidates.Count} 拥有={_ownedGames.Count}");
+        ApplyFilter();
+    }
+
+    /// <summary>Steam 库根目录（含 libraryfolders.vdf 里记录的其他盘）</summary>
+    private static List<string> SteamLibraryRoots(string steamPath)
+    {
+        var roots = new List<string> { steamPath };
+        try
+        {
+            var vdf = Path.Combine(steamPath, "steamapps", "libraryfolders.vdf");
+            if (File.Exists(vdf))
+            {
+                foreach (Match m in Regex.Matches(File.ReadAllText(vdf), "\"path\"\\s*\"([^\"]+)\""))
+                {
+                    var p = m.Groups[1].Value.Replace("\\\\", "\\");
+                    if (!roots.Contains(p, StringComparer.OrdinalIgnoreCase)) roots.Add(p);
+                }
+            }
+        }
+        catch { }
+        return roots;
     }
 
     private void ApplyFilter()
     {
         var q = Filter?.Trim() ?? "";
         var keep = SelectedGame;
+
+        var merged = new List<LibraryItem>();
+        if (ShowLua) merged.AddRange(_allGames);
+        if (ShowOwned)
+        {
+            var have = merged.Select(g => g.AppId).ToHashSet(StringComparer.Ordinal);
+            merged.AddRange(_ownedGames.Where(g => !have.Contains(g.AppId)));
+        }
+
         var list = string.IsNullOrEmpty(q)
-            ? _allGames
-            : _allGames.Where(g => g.AppId.Contains(q, StringComparison.OrdinalIgnoreCase)
-                                   || g.GameName.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
+            ? merged
+            : merged.Where(g => g.AppId.Contains(q, StringComparison.OrdinalIgnoreCase)
+                                || g.GameName.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
         Games = new ObservableCollection<LibraryItem>(list);
         if (keep != null && Games.Contains(keep)) SelectedGame = keep;
     }

@@ -32,8 +32,21 @@
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
-                    <TextBox Grid.Row="0" PlaceholderText="按名称或 AppID 过滤"
-                             Text="{Binding Filter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                    <Grid Grid.Row="0" ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0" PlaceholderText="按名称或 AppID 过滤"
+                                 Text="{Binding Filter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <CheckBox Grid.Column="1" MinWidth="0" Content="lua" VerticalAlignment="Center"
+                                  IsChecked="{Binding ShowLua, Mode=TwoWay}"
+                                  ToolTipService.ToolTip="显示入库（lua）的游戏" />
+                        <CheckBox Grid.Column="2" MinWidth="0" Content="正版" VerticalAlignment="Center"
+                                  IsChecked="{Binding ShowOwned, Mode=TwoWay}"
+                                  ToolTipService.ToolTip="显示客户端认为你拥有的游戏" />
+                    </Grid>
 
                     <ListView Grid.Row="1" SelectionMode="Single"
                               ItemsSource="{Binding Games}"
@@ -42,8 +55,12 @@
                             <DataTemplate>
                                 <StackPanel Margin="0,6" Spacing="2">
                                     <TextBlock Text="{Binding GameName}" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Text="{Binding AppIdDisplay}" FontSize="12"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="{Binding AppIdDisplay}" FontSize="12"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        <TextBlock Text="{Binding SourceTag}" FontSize="12"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
                                 </StackPanel>
                             </DataTemplate>
                         </ListView.ItemTemplate>

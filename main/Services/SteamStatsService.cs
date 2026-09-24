@@ -21,6 +21,62 @@ public class SteamStatsService
     public Task<StatsChildResult?> ApplyAsync(string appId, IReadOnlyList<AchievementRecord> changes) =>
         RunAsync("--stats-apply", appId, changes);
 
+    /// <summary>批量问"这些 appid 里哪些是拥有的"。失败/Steam 没跑 → 返回空集合（调用方按"没有正版"处理）。</summary>
+    public async Task<HashSet<string>> OwnedAppsAsync(IReadOnlyList<string> appIds)
+    {
+        var empty = new HashSet<string>();
+        if (appIds.Count == 0) return empty;
+
+        var steamPath = _steam.GetSteamPath();
+        if (string.IsNullOrEmpty(steamPath)) return empty;
+
+        var exe = Environment.ProcessPath ?? Path.Combine(AppContext.BaseDirectory, "OSTGUI.exe");
+        var inFile = Path.Combine(Path.GetTempPath(), $"ost_owned_in_{Guid.NewGuid():N}.json");
+        var outFile = Path.Combine(Path.GetTempPath(), $"ost_owned_out_{Guid.NewGuid():N}.json");
+
+        await Gate.WaitAsync();
+        try
+        {
+            await File.WriteAllTextAsync(inFile, JsonSerializer.Serialize(appIds));
+            var psi = new ProcessStartInfo
+            {
+                FileName = exe,
+                Arguments = $"--stats-owned \"{steamPath}\" \"{inFile}\" \"{outFile}\"",   // 注意：这个模式第 2 个参数是 Steam 路径
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            using var proc = Process.Start(psi);
+            if (proc == null) return empty;
+
+            using var cts = new CancellationTokenSource(TimeoutMs);
+            try
+            {
+                await proc.WaitForExitAsync(cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                try { proc.Kill(true); } catch { }
+                LogService.AddAppLog("stats-owned 子进程超时");
+                return empty;
+            }
+
+            if (!File.Exists(outFile)) return empty;
+            var list = JsonSerializer.Deserialize<List<string>>(await File.ReadAllTextAsync(outFile)) ?? new List<string>();
+            return new HashSet<string>(list, StringComparer.Ordinal);
+        }
+        catch (Exception ex)
+        {
+            LogService.AddAppLog($"stats-owned 异常: {ex.Message}");
+            return empty;
+        }
+        finally
+        {
+            try { File.Delete(outFile); } catch { }
+            try { File.Delete(inFile); } catch { }
+            Gate.Release();
+        }
+    }
+
     private async Task<StatsChildResult?> RunAsync(string mode, string appId, IReadOnlyList<AchievementRecord>? changes)
     {
         var steamPath = _steam.GetSteamPath();
