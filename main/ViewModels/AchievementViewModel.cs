@@ -67,7 +67,11 @@ public partial class AchievementViewModel : ObservableObject
     [ObservableProperty] private ObservableCollection<LibraryItem> _games = new();
     [ObservableProperty] private LibraryItem? _selectedGame;
     [ObservableProperty] private ObservableCollection<AchievementRow> _rows = new();
+    /// <summary>列表实际显示的成就（= Rows 经过 RowFilter 过滤；保存仍按 Rows 走）</summary>
+    [ObservableProperty] private ObservableCollection<AchievementRow> _visibleRows = new();
     [ObservableProperty] private string _filter = "";
+    /// <summary>成就列表的过滤词</summary>
+    [ObservableProperty] private string _rowFilter = "";
     /// <summary>显示入库（lua）的游戏</summary>
     [ObservableProperty] private bool _showLua = true;
     /// <summary>显示客户端认为正版拥有的游戏</summary>
@@ -99,6 +103,14 @@ public partial class AchievementViewModel : ObservableObject
     partial void OnNoticeChanged(string value) => OnPropertyChanged(nameof(HasNotice));
     partial void OnHasChangesChanged(bool value) => OnPropertyChanged(nameof(DirtyText));
     partial void OnFilterChanged(string value) => ApplyFilter();
+    partial void OnRowFilterChanged(string value) => ApplyRowFilter();
+
+    /// <summary>Rows 被整体替换（或增删）时重新过滤——只挂这一处，省得每个赋值点都记得调</summary>
+    partial void OnRowsChanged(ObservableCollection<AchievementRow> value)
+    {
+        value.CollectionChanged += (_, _) => ApplyRowFilter();
+        ApplyRowFilter();
+    }
     partial void OnShowLuaChanged(bool value) => ApplyFilter();
     partial void OnShowOwnedChanged(bool value) => ApplyFilter();
     partial void OnSelectedGameChanged(LibraryItem? value) => _ = LoadGameAsync(value);
@@ -278,6 +290,17 @@ public partial class AchievementViewModel : ObservableObject
         }
         catch { }
         return roots;
+    }
+
+    private void ApplyRowFilter()
+    {
+        var q = RowFilter?.Trim() ?? "";
+        VisibleRows = string.IsNullOrEmpty(q)
+            ? new ObservableCollection<AchievementRow>(Rows)
+            : new ObservableCollection<AchievementRow>(Rows.Where(r =>
+                r.Name.Contains(q, StringComparison.OrdinalIgnoreCase)
+                || r.Title.Contains(q, StringComparison.OrdinalIgnoreCase)
+                || r.Subtitle.Contains(q, StringComparison.OrdinalIgnoreCase)));
     }
 
     private void ApplyFilter()

@@ -76,6 +76,7 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
@@ -108,7 +109,10 @@
                              BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                              BorderThickness="1" CornerRadius="8" />
 
-                    <ListView Grid.Row="2" SelectionMode="None" ItemsSource="{Binding Rows}">
+                    <TextBox Grid.Row="2" PlaceholderText="按成就名称或描述过滤"
+                             Text="{Binding RowFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+
+                    <ListView Grid.Row="3" SelectionMode="None" ItemsSource="{Binding VisibleRows}">
                         <ListView.ItemTemplate>
                             <DataTemplate>
                                 <Border Padding="0,8" BorderThickness="0,0,0,1"
