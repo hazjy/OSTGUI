@@ -13,7 +13,7 @@
         <StackPanel Grid.Row="0" Spacing="4">
             <TextBlock Text="成就" FontSize="32" FontWeight="Bold" />
             <TextBlock FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                       Text="勾选只改本地留底；点「保存到 Steam」才写回客户端" />
+                       Text="需要 Steam 在线；点击「保存到 Steam」才会实际生效" />
         </StackPanel>
 
         <Grid Grid.Row="1" ColumnSpacing="16">
