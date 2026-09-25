@@ -1,0 +1,202 @@
+<Page
+    x:Class="OSTGUI.Pages.TrainerPage"
+    NavigationCacheMode="Enabled"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:controls="using:CommunityToolkit.WinUI.Controls">
+
+    <Grid Margin="40,32,40,40" RowSpacing="16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Spacing="4">
+            <TextBlock Text="修改器" FontSize="32" FontWeight="Bold" />
+            <TextBlock FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                       Text="来源 flingtrainer.com；下载的是第三方程序，杀软可能误报——只有你点「启动」或绑定启用时才会运行" />
+        </StackPanel>
+
+        <Grid Grid.Row="1" ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="380" />
+                <ColumnDefinition Width="*" />
+            </Grid.ColumnDefinitions>
+
+            <!-- 左：来源切换 + 搜索 + 条目 -->
+            <Border Grid.Column="0" Padding="12" CornerRadius="8"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                <Grid RowSpacing="8">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <controls:Segmented Grid.Row="0" x:Name="SourceSegmented" HorizontalAlignment="Stretch"
+                                        SelectionChanged="SourceSegmented_SelectionChanged">
+                        <controls:SegmentedItem Content="热门" IsSelected="True" Height="40" MinHeight="40" />
+                        <controls:SegmentedItem Content="新品" Height="40" MinHeight="40" />
+                        <controls:SegmentedItem Content="搜索" Height="40" MinHeight="40" />
+                        <controls:SegmentedItem Content="已下载" Height="40" MinHeight="40" />
+                    </controls:Segmented>
+
+                    <Grid Grid.Row="1" ColumnSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBox Grid.Column="0" PlaceholderText="游戏名" KeyDown="QueryBox_KeyDown"
+                                 Text="{Binding Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
+                        <Button Grid.Column="1" Command="{Binding SearchCommand}">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE721;" FontSize="14" />
+                                <TextBlock Text="搜索" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+
+                    <ListView Grid.Row="2" SelectionMode="None" ItemsSource="{Binding Items}">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="0,8" BorderThickness="0,0,0,1"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                    <Grid ColumnSpacing="4">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Column="0" Spacing="2">
+                                            <TextBlock Text="{Binding GameName}" TextTrimming="CharacterEllipsis" />
+                                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                                <TextBlock Text="{Binding DisplayDate}" FontSize="12"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                <TextBlock Text="{Binding SizeText}" FontSize="12"
+                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                            </StackPanel>
+                                            <ProgressBar Maximum="100" Value="{Binding DownloadProgress}" Height="2" />
+                                        </StackPanel>
+
+                                        <!-- 纯图标按钮：都给 AutomationProperties.Name（UIA 才读得到） -->
+                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                                            <Button Click="Download_Click" Tag="{Binding}"
+                                                    AutomationProperties.Name="下载" ToolTipService.ToolTip="下载"
+                                                    Width="28" Height="28" MinWidth="0" Padding="0"
+                                                    Background="Transparent" BorderThickness="0">
+                                                <FontIcon Glyph="&#xE896;" FontSize="14" />
+                                            </Button>
+                                            <Button Click="Launch_Click" Tag="{Binding}"
+                                                    AutomationProperties.Name="启动" ToolTipService.ToolTip="启动"
+                                                    Width="28" Height="28" MinWidth="0" Padding="0"
+                                                    Background="Transparent" BorderThickness="0">
+                                                <FontIcon Glyph="&#xE768;" FontSize="14" />
+                                            </Button>
+                                            <Button Click="Reveal_Click" Tag="{Binding}"
+                                                    AutomationProperties.Name="打开所在目录" ToolTipService.ToolTip="打开所在目录"
+                                                    Width="28" Height="28" MinWidth="0" Padding="0"
+                                                    Background="Transparent" BorderThickness="0">
+                                                <FontIcon Glyph="&#xE8B7;" FontSize="14" />
+                                            </Button>
+                                            <Button Click="Delete_Click" Tag="{Binding}"
+                                                    AutomationProperties.Name="删除" ToolTipService.ToolTip="删除"
+                                                    Width="28" Height="28" MinWidth="0" Padding="0"
+                                                    Background="Transparent" BorderThickness="0">
+                                                <FontIcon Glyph="&#xE74D;" FontSize="14" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+
+                    <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8">
+                        <ProgressRing IsActive="{Binding IsBusy}" Width="16" Height="16" VerticalAlignment="Center" />
+                        <TextBlock Text="{Binding StatusText}" FontSize="12" VerticalAlignment="Center"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <!-- 右：进程绑定 -->
+            <Border Grid.Column="1" Padding="16" CornerRadius="8"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                <Grid RowSpacing="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+
+                    <Grid Grid.Row="0" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+
+                        <StackPanel Grid.Column="0" Spacing="2" VerticalAlignment="Center">
+                            <TextBlock Text="进程绑定" FontSize="20" FontWeight="SemiBold" />
+                            <TextBlock Text="{Binding MonitorStatus}" FontSize="12"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+
+                        <ToggleSwitch Grid.Column="1" MinWidth="0" VerticalAlignment="Center"
+                                      IsOn="{Binding MonitorEnabled, Mode=TwoWay}"
+                                      ToolTipService.ToolTip="开启后：游戏运行时自动启动绑定的修改器，游戏退出就结束它（GUI 关掉也继续）" />
+
+                        <Button Grid.Column="2" VerticalAlignment="Center" Click="AddBinding_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <FontIcon Glyph="&#xE710;" FontSize="14" />
+                                <TextBlock Text="添加绑定" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+
+                    <ListView Grid.Row="1" SelectionMode="None" ItemsSource="{Binding Bindings}">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Border Padding="0,8" BorderThickness="0,0,0,1"
+                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <CheckBox Grid.Column="0" MinWidth="0" MinHeight="0" VerticalAlignment="Center"
+                                                  IsChecked="{Binding IsEnabled, Mode=OneWay}"
+                                                  Click="BindingEnabled_Click" Tag="{Binding}"
+                                                  AutomationProperties.Name="启用该绑定" />
+
+                                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                            <TextBlock Text="{Binding GameName}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{Binding Subtitle}" FontSize="12" TextTrimming="CharacterEllipsis"
+                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                        </StackPanel>
+
+                                        <Button Grid.Column="2" Click="RemoveBinding_Click" Tag="{Binding}"
+                                                AutomationProperties.Name="删除绑定" ToolTipService.ToolTip="删除绑定"
+                                                Width="28" Height="28" MinWidth="0" Padding="0" VerticalAlignment="Center"
+                                                Background="Transparent" BorderThickness="0">
+                                            <FontIcon Glyph="&#xE74D;" FontSize="14" />
+                                        </Button>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+
+                    <TextBlock Grid.Row="2" FontSize="12" TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                               Text="绑定后：游戏进程一出现就启动对应修改器，游戏退出就结束它（只结束它自己启动的那个）。开关打开时 GUI 关闭后仍会继续，监控进程可在任务管理器里看到（OSTGUI.exe --trainer-monitor）。" />
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Page>

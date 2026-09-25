@@ -712,6 +712,7 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
             "search" => typeof(Pages.SearchPage),
             "library" => typeof(Pages.LibraryPage),
             "achievement" => typeof(Pages.AchievementPage),
+            "trainer" => typeof(Pages.TrainerPage),
             "online" => typeof(Pages.OnlinePage),
             "denuvo" => typeof(Pages.DenuvoPage),
             "nosteam" => typeof(Pages.NoSteamPage),

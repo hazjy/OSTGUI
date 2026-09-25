@@ -58,6 +58,13 @@ public partial class App : Application
             return;
         }
 
+        // 修改器监控子进程：GUI 关掉后仍按绑定自动起停修改器（实现见 Services/TrainerMonitor.cs）
+        if (cmdArgs.Length >= 2 && cmdArgs[1].Equals("--trainer-monitor", StringComparison.OrdinalIgnoreCase))
+        {
+            Environment.Exit(TrainerMonitor.Run());
+            return;
+        }
+
         // 先完整读取配置文件，再创建窗口，
         // 避免窗口先以默认状态显示、随后又被配置恢复导致闪烁
         var services = new ServiceCollection();
@@ -84,6 +91,9 @@ public partial class App : Application
         services.AddSingleton<OnlineFixService>();
         services.AddSingleton<AchievementStore>();
         services.AddSingleton<SteamStatsService>();
+        services.AddSingleton<TrainerCatalogService>();
+        services.AddSingleton<TrainerDownloadService>();
+        services.AddSingleton<TrainerBindingService>();
         services.AddSingleton<NoSteamLauncherService>();
         services.AddSingleton<SteamlessService>();
         services.AddSingleton<GBEDeploymentService>();
@@ -96,6 +106,7 @@ public partial class App : Application
         services.AddTransient<NoSteamViewModel>();
         services.AddTransient<SettingsViewModel>();
         services.AddTransient<AchievementViewModel>();
+        services.AddTransient<TrainerViewModel>();
         Services = services.BuildServiceProvider();
 
         // 上次的文件法联机会话（AppID Changer）若没还原干净，这里补一刀

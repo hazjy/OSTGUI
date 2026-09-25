@@ -80,6 +80,10 @@
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE7C1;" /></NavigationViewItem.Icon>
                     <NavigationViewItem.Content>成就</NavigationViewItem.Content>
                 </NavigationViewItem>
+                <NavigationViewItem x:Name="NavTrainer" Tag="trainer">
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE943;" /></NavigationViewItem.Icon>
+                    <NavigationViewItem.Content>修改器</NavigationViewItem.Content>
+                </NavigationViewItem>
                 <NavigationViewItem x:Name="NavOnline" Tag="online">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE774;" /></NavigationViewItem.Icon>
                     <NavigationViewItem.Content>联机</NavigationViewItem.Content>

@@ -66,6 +66,8 @@ public class AppConfig
     // 成就页左侧列表的两个来源勾选（lua 入库 / 正版拥有），记住上次的选择
     public bool AchievementShowLua { get; set; } = true;
     public bool AchievementShowOwned { get; set; } = true;
+    // 修改器监控：退出 GUI 后仍按绑定自动起停修改器（默认关；开了才会起监控子进程）
+    public bool TrainerMonitorEnabled { get; set; }
 
     // === 应用程序设置 ===
     public int LogMaxLines { get; set; } = 1000;
