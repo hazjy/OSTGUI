@@ -63,7 +63,7 @@ public partial class TrainerViewModel : ObservableObject
     }
 
     private void UpdateDownloadDirText() =>
-        DownloadDirText = "下载目录：" + _downloads.Dir;
+        DownloadDirText = "路径：" + _downloads.Dir;
 
     public TrainerViewModel(
         TrainerCatalogService catalog, TrainerDownloadService downloads, TrainerBindingService bindingService,
@@ -136,7 +136,7 @@ public partial class TrainerViewModel : ObservableObject
                 // 抓取失败（站点/网络不可用）不能让异常冒出去：这里是 fire-and-forget 调用
                 LogService.AddAppLog($"trainer 列表加载失败: {ex.Message}");
                 Items.Clear();
-                StatusText = "抓取失败：网络或站点不可用（详见日志）";
+                StatusText = SearchStatusText();
                 return;
             }
 
@@ -159,8 +159,8 @@ public partial class TrainerViewModel : ObservableObject
     /// <summary>搜索视图的状态栏文案（含"没找到"——页面真结果 0 条时的正常情况，不是故障）</summary>
     private string SearchStatusText()
     {
-        if (_loadedQuery.Length == 0) return "输入游戏名后点搜索";
-        if (Items.Count == 0) return $"没找到「{_loadedQuery}」对应的修改器（站点上确实有却搜不到时，可能是站点改版，详见日志）";
+        if (_loadedQuery.Length == 0) return "使用搜索框搜索...";
+        if (Items.Count == 0) return $"未找到[{_loadedQuery}]的结果；详情请看日志";
         return $"搜索「{_loadedQuery}」{Items.Count} 条";
     }
 
@@ -184,7 +184,7 @@ public partial class TrainerViewModel : ObservableObject
             var download = await _catalog.GetDownloadAsync(trainer.PageUrl);
             if (download == null)
             {
-                ToastService.ShowError("下载失败", "详情页里没找到附件链接（站点结构可能已变）");
+                StatusText = "下载失败";
                 return;
             }
 
@@ -194,7 +194,7 @@ public partial class TrainerViewModel : ObservableObject
                 download.Value.Url, download.Value.FileName, trainer.PageUrl, progress);
             if (path == null)
             {
-                ToastService.ShowError("下载失败", error.Length > 0 ? error : "详见日志");
+                StatusText = "下载失败";
                 return;
             }
 
@@ -215,11 +215,7 @@ public partial class TrainerViewModel : ObservableObject
     private void Launch(TrainerInfo? trainer)
     {
         var exe = trainer?.LocalPath ?? "";
-        if (string.IsNullOrEmpty(exe) || !File.Exists(exe))
-        {
-            ToastService.ShowWarning("无法启动", "还没下载这个修改器");
-            return;
-        }
+        if (string.IsNullOrEmpty(exe) || !File.Exists(exe)) return;
 
         try
         {
@@ -251,7 +247,7 @@ public partial class TrainerViewModel : ObservableObject
         if (trainer == null) return;
         if (IsBusy)
         {
-            StatusText = "正在忙（下载/搜索中），稍后再点「更新」";
+            StatusText = "有任务进行中，请稍后再试";
             return;
         }
 
@@ -263,12 +259,10 @@ public partial class TrainerViewModel : ObservableObject
             var page = trainer.PageUrl;
             if (string.IsNullOrEmpty(page))
             {
-                StatusText = $"正在用官方 RSS 找 {trainer.GameName} 的文章…";
                 page = await FindPageUrlAsync(trainer.GameName);
                 if (string.IsNullOrEmpty(page))
                 {
-                    StatusText = "更新失败：RSS 里没找到这个修改器";
-                    ToastService.ShowWarning("找不到来源", $"官方 RSS 里没搜到「{trainer.GameName}」");
+                    StatusText = "更新失败：修改器未找到";
                     return;
                 }
             }
@@ -276,8 +270,7 @@ public partial class TrainerViewModel : ObservableObject
             var latest = await _catalog.GetDownloadAsync(page);
             if (latest == null)
             {
-                StatusText = "更新失败：文章页里没找到附件";
-                ToastService.ShowError("更新失败", "文章页里没找到附件链接（站点结构可能已变）");
+                StatusText = "更新失败：修改器未找到";
                 return;
             }
 
@@ -290,13 +283,12 @@ public partial class TrainerViewModel : ObservableObject
             }
 
             var progress = MakeProgress("正在更新", trainer.GameName);
-            var (path, error) = await _downloads.DownloadAsync(latest.Value.Url, latest.Value.FileName, page, progress);
+            var (path, _) = await _downloads.DownloadAsync(latest.Value.Url, latest.Value.FileName, page, progress);
 
             if (path == null)
             {
                 // 失败时旧文件原样不动（新文件先落盘、成功后才动旧引用）
-                StatusText = "更新失败：网络或站点异常（详见日志）";
-                ToastService.ShowError("更新失败", error.Length > 0 ? error : "详见日志");
+                StatusText = "更新失败：连接异常（详见日志）";
                 return;
             }
 
@@ -369,7 +361,6 @@ public partial class TrainerViewModel : ObservableObject
 
         RefreshLocalTrainers();
         if (ViewIndex == 1) _ = LoadViewAsync();
-        ToastService.ShowSuccess("已删除", trainer.GameName);
     }
 
     // ── 绑定 ────────────────────────────────────────────────────────────────
@@ -414,7 +405,6 @@ public partial class TrainerViewModel : ObservableObject
         if (binding == null) return;
         Bindings.Remove(binding);
         SaveBindings();
-        ToastService.ShowSuccess("已删除绑定", binding.GameName);
     }
 
     /// <summary>绑定行的启用勾选</summary>
@@ -503,7 +493,7 @@ public partial class TrainerViewModel : ObservableObject
         var monitor = pid == null
             ? (MonitorEnabled ? "监控未运行" : "监控已关闭")
             : "监控已运行";
-        MonitorStatus = $"绑定 {Bindings.Count} 条（启用 {enabled}）· {monitor}" + (pid == null ? "" : $"（pid {pid}）");
+        MonitorStatus = $"共{Bindings.Count}条，启用{enabled}条 · {monitor}" + (pid == null ? "" : $"（pid {pid}）");
     }
 
     private void RefreshLocalTrainers()
@@ -528,13 +518,7 @@ public partial class TrainerViewModel : ObservableObject
     }
 
     /// <summary>「已下载」该显示的那句底数状态</summary>
-    private string LocalStatusText()
-    {
-        var q = LocalFilter?.Trim() ?? "";
-        return q.Length > 0
-            ? $"已下载 {LocalTrainers.Count} 个（过滤「{q}」后 {LocalItems.Count} 个）"
-            : $"已下载 {LocalItems.Count} 个修改器";
-    }
+    private string LocalStatusText() => $"已下载 {LocalItems.Count} 个修改器";
 
     /// <summary>把条目与本地已下载文件对上（同名的就算已下载）</summary>
     private IEnumerable<TrainerInfo> MarkDownloaded(IEnumerable<TrainerInfo> list)

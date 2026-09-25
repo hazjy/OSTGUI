@@ -85,7 +85,7 @@
         <StackPanel Grid.Row="0" Spacing="4">
             <TextBlock Text="修改器" FontSize="32" FontWeight="Bold" />
             <TextBlock FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                       Text="来源 flingtrainer.com；下载的是第三方程序，杀软可能误报——只有你点「启动」或绑定启用时才会运行" />
+                       Text="下载并管理风灵月影修改器" />
         </StackPanel>
 
         <Grid Grid.Row="1" ColumnSpacing="16">
@@ -118,7 +118,7 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <TextBox Grid.Column="0" PlaceholderText="游戏名" KeyDown="QueryBox_KeyDown"
+                        <TextBox Grid.Column="0" PlaceholderText="游戏名称（英文）" KeyDown="QueryBox_KeyDown"
                                  Text="{Binding Query, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                         <Button Grid.Column="1" Command="{Binding SearchCommand}">
                             <StackPanel Orientation="Horizontal" Spacing="8">
@@ -130,7 +130,7 @@
 
                     <!-- 视图 1：过滤本地（只筛已下载，不发网络请求） -->
                     <TextBox x:Name="LocalFilterRow" Grid.Row="1" Visibility="Collapsed"
-                             PlaceholderText="过滤已下载" TextChanged="LocalFilterBox_TextChanged" />
+                             PlaceholderText="修改器名称" TextChanged="LocalFilterBox_TextChanged" />
 
                     <!-- 两个视图各有自己的列表与集合，互不写入（search: Items / local: LocalItems） -->
                     <ListView x:Name="ResultsList" Grid.Row="2" SelectionMode="None"
@@ -190,14 +190,9 @@
 
                         <ToggleSwitch Grid.Column="1" MinWidth="0" VerticalAlignment="Center"
                                       IsOn="{Binding MonitorEnabled, Mode=TwoWay}"
-                                      ToolTipService.ToolTip="开启后：游戏运行时自动启动绑定的修改器，游戏退出就结束它（GUI 关掉也继续）" />
+                                      ToolTipService.ToolTip="开启时：建立后台服务，使修改器随游戏启停；GUI不运行时也有效" />
 
-                        <Button Grid.Column="2" VerticalAlignment="Center" Click="AddBinding_Click">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <FontIcon Glyph="&#xE710;" FontSize="14" />
-                                <TextBlock Text="添加绑定" />
-                            </StackPanel>
-                        </Button>
+                        <Button Grid.Column="2" VerticalAlignment="Center" Content="添加绑定" Click="AddBinding_Click" />
                     </Grid>
 
                     <ListView Grid.Row="1" SelectionMode="None" ItemsSource="{Binding Bindings}">
@@ -234,7 +229,7 @@
 
                     <TextBlock Grid.Row="2" FontSize="12" TextWrapping="Wrap"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                               Text="绑定后：游戏进程一出现就启动对应修改器，游戏退出就结束它（只结束它自己启动的那个）。开关打开时 GUI 关闭后仍会继续，监控进程可在任务管理器里看到（OSTGUI.exe --trainer-monitor）。" />
+                               Text="绑定后，修改器可随游戏启停。要使该功能启用，请打开“进程绑定”开关" />
                 </Grid>
             </Border>
         </Grid>

@@ -75,7 +75,6 @@ public sealed partial class TrainerPage : Page
         var data = new Windows.ApplicationModel.DataTransfer.DataPackage();
         data.SetText(name);
         Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(data);
-        ToastService.ShowSuccess("已复制", name);
     }
 
     /// <summary>菜单项没有 Tag，条目来自页面级的 _menuItem（由 More_Click 设置）</summary>
@@ -147,23 +146,17 @@ public sealed partial class TrainerPage : Page
     {
         if (XamlRoot == null) return;
 
-        if (VM.LocalTrainers.Count == 0)
-        {
-            ToastService.ShowWarning("先下载一个修改器", "「已下载」里还没有可绑定的修改器");
-            return;
-        }
-
         // 修改器：输入名称 + 「查询」（名称从「已下载」里用「复制名称」拿，比在下拉里翻找省事）
         var trainerBox = new TextBox
         {
-            PlaceholderText = "修改器名称（在「已下载」里用「更多 → 复制名称」）",
+            PlaceholderText = "请在更多（三个点）里复制",
             HorizontalAlignment = HorizontalAlignment.Stretch,
             MinWidth = 320,
         };
         var lookupButton = new Button { Content = "查询" };
         var lookupText = new TextBlock
         {
-            Text = "（还没查询）",
+            Text = "",
             FontSize = 12,
             TextWrapping = TextWrapping.Wrap,
             // 刻意不设 Foreground：Application.Current.Resources 取到的是系统主题的画刷，
@@ -188,8 +181,8 @@ public sealed partial class TrainerPage : Page
         }
 
         lookupButton.Click += (_, _) => Lookup();
-        var exeText = new TextBlock { Text = "（还没选）", FontSize = 12, TextWrapping = TextWrapping.Wrap };
-        var pickButton = new Button { Content = "选择游戏主程序（exe）…" };
+        var exeText = new TextBlock { Text = "", FontSize = 12, TextWrapping = TextWrapping.Wrap };
+        var pickButton = new Button { Content = "选择" };
         var gameExe = "";
 
         pickButton.Click += async (_, _) =>
@@ -207,10 +200,10 @@ public sealed partial class TrainerPage : Page
         };
 
         var panel = new StackPanel { Spacing = 10 };
-        panel.Children.Add(new TextBlock { Text = "修改器" });
+        panel.Children.Add(new TextBlock { Text = "修改器名称" });
         panel.Children.Add(trainerRow);
         panel.Children.Add(lookupText);
-        panel.Children.Add(new TextBlock { Text = "游戏主程序（游戏一启动就自动运行这个修改器）" });
+        panel.Children.Add(new TextBlock { Text = "游戏主程序" });
         panel.Children.Add(pickButton);
         panel.Children.Add(exeText);
 
@@ -223,20 +216,15 @@ public sealed partial class TrainerPage : Page
             CloseButtonText = "取消",
         };
 
+        // 校验就地做：不满足就让弹窗不关（没查询/查不到时顺手查一次，结果显示在下方小字里）
+        dialog.PrimaryButtonClick += (_, args) =>
+        {
+            if (resolvedPath.Length == 0) Lookup();
+            if (resolvedPath.Length == 0 || gameExe.Length == 0 || !File.Exists(gameExe)) args.Cancel = true;
+        };
+
         Helpers.PopupTheme.Apply(dialog);
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
-
-        if (resolvedPath.Length == 0 || !File.Exists(resolvedPath))
-        {
-            ToastService.ShowError("绑定失败", "先填修改器名称并点「查询」，查询到文件才能绑定");
-            return;
-        }
-
-        if (gameExe.Length == 0 || !File.Exists(gameExe))
-        {
-            ToastService.ShowError("绑定失败", "还没选游戏主程序（exe）");
-            return;
-        }
 
         VM.AddOrUpdateBinding(trainerBox.Text!.Trim(), gameExe, enabled: true);
 
