@@ -47,8 +47,8 @@
             <controls:Segmented Grid.Row="0" x:Name="NoSteamSegmented"
                                 HorizontalAlignment="Stretch"
                                 SelectionChanged="NoSteamSegmented_SelectionChanged">
-                <controls:SegmentedItem Content="免Steam" IsSelected="True" />
-                <controls:SegmentedItem Content="免育碧（实验性）" />
+                <controls:SegmentedItem Content="免Steam" IsSelected="True" Height="40" MinHeight="40" />
+                <controls:SegmentedItem Content="免育碧（实验性）" Height="40" MinHeight="40" />
             </controls:Segmented>
 
             <ScrollViewer Grid.Row="1" x:Name="NoSteamPanel" VerticalScrollMode="Auto" VerticalScrollBarVisibility="Auto">

@@ -29,8 +29,8 @@
             <controls:Segmented Grid.Row="0" x:Name="DenuvoSegmented"
                                 HorizontalAlignment="Stretch"
                                 SelectionChanged="DenuvoSegmented_SelectionChanged">
-                <controls:SegmentedItem Content="正版账户授权" IsSelected="True" />
-                <controls:SegmentedItem Content="导入/导出授权" />
+                <controls:SegmentedItem Content="正版账户授权" IsSelected="True" Height="40" MinHeight="40" />
+                <controls:SegmentedItem Content="导入/导出授权" Height="40" MinHeight="40" />
             </controls:Segmented>
             <Grid Grid.Row="1">
                 <Grid x:Name="AccountsPanel">

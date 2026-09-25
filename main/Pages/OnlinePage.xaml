@@ -24,8 +24,8 @@
             <controls:Segmented Grid.Row="0" x:Name="OnlineSegmented"
                                 HorizontalAlignment="Stretch"
                                 SelectionChanged="OnlineSegmented_SelectionChanged">
-                <controls:SegmentedItem Content="内核原生" IsSelected="True" />
-                <controls:SegmentedItem Content="其他" />
+                <controls:SegmentedItem Content="内核原生" IsSelected="True" Height="40" MinHeight="40" />
+                <controls:SegmentedItem Content="其他" Height="40" MinHeight="40" />
             </controls:Segmented>
 
             <!-- 两种联机方式各是一个独立 UserControl：各自的 x:Name/命名空间互不可见，
