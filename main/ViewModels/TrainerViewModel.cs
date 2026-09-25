@@ -490,6 +490,9 @@ public partial class TrainerViewModel : ObservableObject
         catch { return null; }   // 进程不在了 / pid 文件过期
     }
 
+    /// <summary>只刷新监控状态（不碰起停）——页面每 2 秒轮询用：进程被任务管理器结束后按钮要跟着变</summary>
+    public void RefreshMonitorStatus() => UpdateMonitorStatus();
+
     private void UpdateMonitorStatus(int? pid = null)
     {
         pid ??= FindMonitorPid();

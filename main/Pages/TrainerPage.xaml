@@ -238,7 +238,7 @@
 
                     <TextBlock Grid.Row="2" FontSize="12" TextWrapping="Wrap"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                               Text="绑定后，修改器可随游戏启停。要使该功能启用，请打开“进程绑定”开关" />
+                               Text="绑定后，修改器可随游戏启停。要使该功能启用，请运行监控进程" />
                 </Grid>
             </Border>
         </Grid>

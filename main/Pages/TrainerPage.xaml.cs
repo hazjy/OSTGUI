@@ -20,7 +20,30 @@ public sealed partial class TrainerPage : Page
         this.InitializeComponent();
         VM = vm;
         DataContext = VM;
-        Loaded += async (_, _) => await VM.InitializeAsync();
+        Loaded += async (_, _) =>
+        {
+            await VM.InitializeAsync();
+            StartMonitorWatch();
+        };
+        Unloaded += (_, _) => _monitorWatch?.Stop();
+    }
+
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _monitorWatch;
+
+    /// <summary>
+    /// 每 2 秒对一次监控进程的**真实**状态（只读 pid，不碰起停）：
+    /// 用户在任务管理器里把监控结束了，按钮与状态行也要跟着变 —— 不然界面会一直显示"已运行"。
+    /// </summary>
+    private void StartMonitorWatch()
+    {
+        if (_monitorWatch == null)
+        {
+            _monitorWatch = DispatcherQueue.CreateTimer();
+            _monitorWatch.Interval = TimeSpan.FromSeconds(2);
+            _monitorWatch.IsRepeating = true;
+            _monitorWatch.Tick += (_, _) => VM.RefreshMonitorStatus();
+        }
+        _monitorWatch.Start();
     }
 
     private void SourceSegmented_SelectionChanged(object sender, SelectionChangedEventArgs e)
