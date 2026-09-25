@@ -148,9 +148,6 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
                             <ProgressRing IsActive="{Binding IsBusy}" Width="16" Height="16" VerticalAlignment="Center" />
-                            <!-- 细进度条：下载/更新时给出"确实在动"的反馈（0 时是空的，不需要转换器） -->
-                            <ProgressBar Width="110" Height="2" Maximum="100" Value="{Binding WorkProgress}"
-                                         VerticalAlignment="Center" />
                             <TextBlock Text="{Binding StatusText}" FontSize="12" VerticalAlignment="Center"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>

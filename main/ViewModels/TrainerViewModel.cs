@@ -42,8 +42,6 @@ public partial class TrainerViewModel : ObservableObject
     [ObservableProperty] private string _localFilter = "";
     [ObservableProperty] private int _viewIndex;          // 0 搜索 / 1 已下载
     [ObservableProperty] private bool _isBusy;
-    /// <summary>左侧状态行那根细进度条（0-100；只有下载/更新这种有明确进度的操作会动）</summary>
-    [ObservableProperty] private double _workProgress;
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private string _monitorStatus = "";
 
@@ -209,7 +207,6 @@ public partial class TrainerViewModel : ObservableObject
         {
             trainer.IsDownloading = false;
             IsBusy = false;
-            WorkProgress = 0;
         }
     }
 
@@ -311,7 +308,6 @@ public partial class TrainerViewModel : ObservableObject
         finally
         {
             IsBusy = false;
-            WorkProgress = 0;
         }
     }
 
@@ -327,13 +323,9 @@ public partial class TrainerViewModel : ObservableObject
                 ?? hits.FirstOrDefault())?.PageUrl;
     }
 
-    /// <summary>进度回调（下载与更新共用）：同时推状态行文字与细进度条</summary>
+    /// <summary>进度回调（下载与更新共用）：进度只体现在状态行文字里</summary>
     private IProgress<double> MakeProgress(string verb, string gameName) =>
-        new Progress<double>(p =>
-        {
-            WorkProgress = p;
-            StatusText = $"{verb} {gameName} {p:0}%";
-        });
+        new Progress<double>(p => StatusText = $"{verb} {gameName} {p:0}%");
 
     [RelayCommand]
     private void Reveal(TrainerInfo? trainer)
