@@ -44,7 +44,7 @@
 | `TicketService` / `OstFileService` / `SteamTicketExtractor` | Denuvo 授权管理 / .ost 导入导出 / 在线提取 |
 | `ConfigService` / `LogService` / `ToastService` / `GameNameCacheService` | 配置 / 日志 / 通知 / 名称缓存 |
 | `AchievementStore` / `SteamStatsSchema` / `SteamStatsService` + `SteamStatsChild` | 成就编辑：本地留底 JSON / 解析本地 schema（二进制 KV）/ 父进程 spawn 子进程；子进程侧用 `ISteamUserStats013` 读写 Steam 成就 |
-| `TrainerCatalogService` / `TrainerDownloadService` | 修改器目录（flingtrainer：首页热门 / RSS 新品 / 搜索 / 详情页附件直链）与下载：内容嗅探 zip → 解压 → `.part` 原子落盘，存 `%LOCALAPPDATA%\OSTGUI\trainers\` |
+| `TrainerCatalogService` / `TrainerDownloadService` | 修改器目录（flingtrainer：搜索 / 详情页附件直链；首页热门与 RSS 新品已按需求砍掉）与下载：内容嗅探 zip → 解压 → `.part` 原子落盘，存 `%LOCALAPPDATA%\OSTGUI\trainers\` |
 | `TrainerBindingService` / `TrainerMonitor` | 进程绑定：`bindings.json`（GUI 唯一写者、监控按 mtime 热重载）+ 监控子进程 `OSTGUI.exe --trainer-monitor`（每 2s：游戏在→起修改器；游戏退→只结束自己启动过的那个；无启用绑定自退；`Global\OSTGUI_TrainerMonitor` 单实例） |
 
 ## 4. 已知限制（仍然有效的）

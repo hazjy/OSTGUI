@@ -37,9 +37,7 @@
 
                     <controls:Segmented Grid.Row="0" x:Name="SourceSegmented" HorizontalAlignment="Stretch"
                                         SelectionChanged="SourceSegmented_SelectionChanged">
-                        <controls:SegmentedItem Content="热门" IsSelected="True" Height="40" MinHeight="40" />
-                        <controls:SegmentedItem Content="新品" Height="40" MinHeight="40" />
-                        <controls:SegmentedItem Content="搜索" Height="40" MinHeight="40" />
+                        <controls:SegmentedItem Content="搜索" IsSelected="True" Height="40" MinHeight="40" />
                         <controls:SegmentedItem Content="已下载" Height="40" MinHeight="40" />
                     </controls:Segmented>
 

@@ -8,7 +8,7 @@ using OSTGUI.Services;
 namespace OSTGUI.ViewModels;
 
 /// <summary>
-/// 修改器页：热门 / 新品 / 搜索 / 已下载四种列表 + 下载、启动、删除 + 「进程绑定」
+/// 修改器页：搜索 / 已下载两个列表 + 下载、启动、删除 + 「进程绑定」
 /// （把修改器绑到某个游戏，游戏一跑就自动启动它，见 Services/TrainerMonitor.cs）。
 /// </summary>
 public partial class TrainerViewModel : ObservableObject
@@ -33,7 +33,7 @@ public partial class TrainerViewModel : ObservableObject
     public ObservableCollection<TrainerInfo> LocalTrainers { get; } = new();
 
     [ObservableProperty] private string _query = "";
-    [ObservableProperty] private int _viewIndex;          // 0 热门 / 1 新品 / 2 搜索 / 3 已下载
+    [ObservableProperty] private int _viewIndex;          // 0 搜索 / 1 已下载
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private string _monitorStatus = "";
@@ -98,7 +98,7 @@ public partial class TrainerViewModel : ObservableObject
     {
         if (IsBusy) return;
 
-        if (ViewIndex == 3)
+        if (ViewIndex == 1)
         {
             RefreshLocalTrainers();
             Items.Clear();
@@ -113,13 +113,8 @@ public partial class TrainerViewModel : ObservableObject
             List<TrainerInfo> list;
             try
             {
-                list = ViewIndex switch
-                {
-                    0 => await _catalog.GetHotAsync(),
-                    1 => await _catalog.GetNewAsync(),
-                    2 => await _catalog.SearchAsync(Query),
-                    _ => new List<TrainerInfo>(),
-                };
+                // 只有两个视图：0 = 搜索，1 = 已下载（已在上面的分支里处理）
+                list = ViewIndex == 0 ? await _catalog.SearchAsync(Query) : new List<TrainerInfo>();
             }
             catch (Exception ex)
             {
@@ -133,14 +128,10 @@ public partial class TrainerViewModel : ObservableObject
             Items.Clear();
             foreach (var t in MarkDownloaded(list)) Items.Add(t);
 
-            StatusText = ViewIndex switch
-            {
-                0 => $"热门 {Items.Count} 条",
-                1 => $"新品 {Items.Count} 条",
-                2 => string.IsNullOrWhiteSpace(Query) ? "输入游戏名后点搜索" : $"搜索「{Query}」{Items.Count} 条",
-                _ => "",
-            };
-            if (ViewIndex is 0 or 1 or 2 && Items.Count == 0)
+            StatusText = string.IsNullOrWhiteSpace(Query)
+                ? "输入游戏名后点搜索"
+                : $"搜索「{Query}」{Items.Count} 条";
+            if (Items.Count == 0 && !string.IsNullOrWhiteSpace(Query))
                 StatusText += "（没抓到内容，可能是站点改版或网络异常，详见日志）";
         }
         finally
@@ -152,8 +143,8 @@ public partial class TrainerViewModel : ObservableObject
     [RelayCommand]
     private async Task SearchAsync()
     {
-        ViewIndex = 2;
-        await LoadViewAsync();
+        if (ViewIndex == 0) await LoadViewAsync();   // 已经在搜索页 → 直接重搜
+        else ViewIndex = 0;                          // 从「已下载」切回来：切页本身就会加载
     }
 
     [RelayCommand]
@@ -236,7 +227,7 @@ public partial class TrainerViewModel : ObservableObject
         _downloads.Delete(trainer.LocalPath);
         trainer.LocalPath = "";
         RefreshLocalTrainers();
-        if (ViewIndex == 3) _ = LoadViewAsync();
+        if (ViewIndex == 1) _ = LoadViewAsync();
         ToastService.ShowSuccess("已删除", trainer.GameName);
     }
 

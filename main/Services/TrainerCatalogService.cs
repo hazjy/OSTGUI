@@ -1,17 +1,15 @@
 using System.Net;
 using System.Text.RegularExpressions;
-using System.Xml.Linq;
 using OSTGUI.Models;
 
 namespace OSTGUI.Services;
 
 /// <summary>
-/// flingtrainer.com 的目录抓取：热门（首页 widget）/ 新品（RSS）/ 搜索。
+/// flingtrainer.com 的目录抓取：搜索 + 详情页附件直链。
+/// （首页「热门」与 RSS「新品」曾实现并实测可用，2026-09-25 按需求砍掉，需要时见 git 历史恢复。）
 ///
 /// 为什么是正则而不是 HTML 解析库：本机 nuget 不通，加不了 HtmlAgilityPack（Fluent-Steam-Lua 用的就是它）；
-/// 这里的正则只锚定站点固定的几个 class/路径，且**只解析该来源**。
-/// 新品走 RSS（<c>/feed/</c>）——WordPress 自带、是 XML，用 stdlib 的 XDocument 解析，比抓 HTML 稳得多。
-/// 站点改版时表现是"条目为空"，日志里会留 HTTP 状态与页面长度。
+/// 这里的正则只锚定站点固定的 class/路径。站点改版时表现是"条目为空"，日志里会留 HTTP 状态与页面长度。
 /// </summary>
 public class TrainerCatalogService
 {
@@ -20,43 +18,7 @@ public class TrainerCatalogService
 
     public TrainerCatalogService(HttpClient http) => _http = http;
 
-    /// <summary>热门（首页 popular-posts 小工具里的 wpp-post-title 链接）</summary>
-    public async Task<List<TrainerInfo>> GetHotAsync(int count = 10, CancellationToken ct = default)
-    {
-        var html = await GetAsync(BaseUrl + "/", ct);
-        return ParseLinks(html, "<a href=\"(" + BaseUrl + "/trainer/[^\"]+)\" class=\"wpp-post-title\"[^>]*>(.*?)</a>", count);
-    }
-
-    /// <summary>新品（RSS：标题 + 链接 + 发布时间）</summary>
-    public async Task<List<TrainerInfo>> GetNewAsync(int count = 10, CancellationToken ct = default)
-    {
-        var xml = await GetAsync(BaseUrl + "/feed/", ct);
-        var result = new List<TrainerInfo>();
-        try
-        {
-            var doc = XDocument.Parse(xml);
-            foreach (var item in doc.Descendants("item").Take(count))
-            {
-                var title = Clean((string?)item.Element("title") ?? "");
-                var link = ((string?)item.Element("link") ?? "").Split('?')[0];   // 去掉 rss 的 utm 尾巴
-                if (title.Length == 0 || link.Length == 0) continue;
-
-                result.Add(new TrainerInfo
-                {
-                    GameName = StripTrainerSuffix(title),
-                    PageUrl = link,
-                    UpdateDate = FormatDate((string?)item.Element("pubDate") ?? ""),
-                });
-            }
-        }
-        catch (Exception ex)
-        {
-            LogService.AddAppLog($"trainer 新品 RSS 解析失败: {ex.Message}");
-        }
-        return result;
-    }
-
-    /// <summary>搜索（?s= 结果页里的 /trainer/ 链接）</summary>
+    /// <summary>搜索（?s= 结果页里的 /trainer/ 链接；实测 38 命中 / 16 去重）</summary>
     public async Task<List<TrainerInfo>> SearchAsync(string query, int count = 20, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(query)) return new List<TrainerInfo>();
@@ -123,7 +85,7 @@ public class TrainerCatalogService
             var name = Clean(Regex.Replace(m.Groups[2].Value, "<[^>]+>", "").Trim());
             var url = WebUtility.HtmlDecode(m.Groups[1].Value);
             if (name.Length == 0 || url.Length == 0) continue;
-            if (result.Any(r => r.PageUrl == url)) continue;   // 首页同一链接会重复出现（图片 + 标题）
+            if (result.Any(r => r.PageUrl == url)) continue;   // 结果页里同一链接会出现多次
 
             result.Add(new TrainerInfo { GameName = StripTrainerSuffix(name), PageUrl = url });
             if (result.Count >= count) break;
@@ -150,7 +112,4 @@ public class TrainerCatalogService
         var cleaned = new string(name.Select(c => bad.Contains(c) ? '_' : c).ToArray()).Trim();
         return cleaned.Length == 0 ? "trainer.exe" : cleaned;
     }
-
-    private static string FormatDate(string pubDate) =>
-        DateTime.TryParse(pubDate, out var dt) ? dt.ToString("yyyy.MM.dd") : "";
 }
