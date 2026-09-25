@@ -35,7 +35,8 @@ public static class TrainerMonitor
         var service = new TrainerBindingService();
         var bindings = new List<TrainerBinding>();
         var lastWrite = DateTime.MinValue;
-        var started = new Dictionary<string, Process>(StringComparer.OrdinalIgnoreCase);   // 修改器路径 → 进程
+        var started = new Dictionary<string, Process>(StringComparer.OrdinalIgnoreCase);   // 修改器名称 → 进程
+        var idleLogged = false;
 
         try
         {
@@ -53,11 +54,18 @@ public static class TrainerMonitor
                 }
                 catch { }
 
+                // 没有启用的绑定就**待命**，不再自退：这个进程的生死由 GUI 的开关决定
+                // （自退的话，用户把开关打开后它会立刻消失，界面就一直显示"未运行"）
                 var enabled = bindings.Where(b => b.IsEnabled).ToList();
-                if (enabled.Count == 0)
+                if (enabled.Count == 0 && !idleLogged)
                 {
-                    LogService.AddAppLog("trainer 监控：没有启用的绑定，退出");
-                    break;
+                    LogService.AddAppLog("trainer 监控：当前没有启用的绑定，待命（开关关掉才会退出）");
+                    idleLogged = true;
+                }
+                else if (enabled.Count > 0 && idleLogged)
+                {
+                    idleLogged = false;
+                    LogService.AddAppLog($"trainer 监控：有 {enabled.Count} 条启用绑定，开始工作");
                 }
 
                 foreach (var binding in enabled)

@@ -416,13 +416,15 @@ public partial class TrainerViewModel : ObservableObject
 
     private static string PidPath => Path.Combine(TrainerDownloadService.DefaultDir, "monitor.pid");
 
-    /// <summary>按开关与"是否有启用绑定"起停监控子进程；关掉时主动结束它，不留后台进程</summary>
+    /// <summary>
+    /// 按**开关本身**起停监控子进程：开着就一定有监控在跑（哪怕还没有绑定，它待命），
+    /// 关掉就把它结束掉、不留后台进程。
+    /// </summary>
     public void ApplyMonitorState()
     {
-        var shouldRun = MonitorEnabled && Bindings.Any(b => b.IsEnabled);
         var running = FindMonitorPid();
 
-        if (shouldRun && running == null)
+        if (MonitorEnabled && running == null)
         {
             try
             {
@@ -439,9 +441,15 @@ public partial class TrainerViewModel : ObservableObject
             {
                 LogService.AddAppLog($"trainer 监控启动失败: {ex.Message}");
             }
-            running = FindMonitorPid();
+
+            // 子进程写 pid 文件要一点时间，等一下再报状态（否则会误报"未运行"）
+            for (var i = 0; i < 10 && running == null; i++)
+            {
+                Thread.Sleep(200);
+                running = FindMonitorPid();
+            }
         }
-        else if (!shouldRun && running != null)
+        else if (!MonitorEnabled && running != null)
         {
             try
             {
@@ -463,7 +471,10 @@ public partial class TrainerViewModel : ObservableObject
             if (!int.TryParse(File.ReadAllText(PidPath).Trim(), out var pid)) return null;
 
             var proc = Process.GetProcessById(pid);
-            return proc.HasExited ? null : pid;
+            if (proc.HasExited) return null;
+
+            // pid 可能被复用：确认还是我们的进程
+            return proc.ProcessName.Equals("OSTGUI", StringComparison.OrdinalIgnoreCase) ? pid : null;
         }
         catch { return null; }   // 进程不在了 / pid 文件过期
     }
@@ -472,10 +483,11 @@ public partial class TrainerViewModel : ObservableObject
     {
         pid ??= FindMonitorPid();
         var enabled = Bindings.Count(b => b.IsEnabled);
+
         var monitor = pid == null
-            ? "监控未运行"
-            : $"监控运行中（pid {pid}）";
-        MonitorStatus = $"绑定 {Bindings.Count} 条（启用 {enabled}）· {monitor}";
+            ? (MonitorEnabled ? "监控未运行" : "监控已关闭")
+            : "监控已运行";
+        MonitorStatus = $"绑定 {Bindings.Count} 条（启用 {enabled}）· {monitor}" + (pid == null ? "" : $"（pid {pid}）");
     }
 
     private void RefreshLocalTrainers()
