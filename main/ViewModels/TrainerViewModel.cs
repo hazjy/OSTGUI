@@ -188,7 +188,7 @@ public partial class TrainerViewModel : ObservableObject
                 return;
             }
 
-            // 进度改显示在状态栏与小进度条上（行里不放进度条：搜索结果行要和已下载行长得一样）
+            // 进度本身就显示在这一行小字上（正在下载 xxx 42%）；下完先留着（100%），2 秒后再换回搜索结果条数
             var progress = MakeProgress("正在下载", trainer.GameName);
             var (path, error) = await _downloads.DownloadAsync(
                 download.Value.Url, download.Value.FileName, trainer.PageUrl, progress);
@@ -200,7 +200,7 @@ public partial class TrainerViewModel : ObservableObject
 
             trainer.LocalPath = path;
             RefreshLocalTrainers();
-            if (ViewIndex == 0) StatusText = SearchStatusText();   // 把"正在下载 x%"换回搜索结果说明
+            _ = RevertSearchStatusLaterAsync();
             ToastService.ShowSuccess("下载完成", Path.GetFileName(path));
         }
         finally
@@ -321,6 +321,16 @@ public partial class TrainerViewModel : ObservableObject
         var hits = await _catalog.SearchAsync(query);
         return (hits.FirstOrDefault(h => TrainerNames.Normalize(h.GameName) == target)
                 ?? hits.FirstOrDefault())?.PageUrl;
+    }
+
+    /// <summary>
+    /// 下载/更新完成后隔 2 秒把状态行换回「搜索 xxx N 条」。
+    /// 留这 2 秒是为了让人看到进度走到 100%（否则刚下完就被换掉，像是没下完）。
+    /// </summary>
+    private async Task RevertSearchStatusLaterAsync()
+    {
+        await Task.Delay(2000);
+        if (ViewIndex == 0 && !IsBusy) StatusText = SearchStatusText();
     }
 
     /// <summary>进度回调（下载与更新共用）：进度只体现在状态行文字里</summary>
