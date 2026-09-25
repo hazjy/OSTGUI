@@ -126,13 +126,13 @@ public partial class AchievementViewModel : ObservableObject
     partial void OnShowLuaChanged(bool value)
     {
         ApplyFilter();
-        _ = SaveTogglesAsync();
+        RememberToggles();
     }
 
     partial void OnShowOwnedChanged(bool value)
     {
         ApplyFilter();
-        _ = SaveTogglesAsync();
+        RememberToggles();
     }
 
     /// <summary>重扫左侧列表（入库 + 正版）并重读当前游戏</summary>
@@ -153,18 +153,14 @@ public partial class AchievementViewModel : ObservableObject
         }
     }
 
-    /// <summary>记住两个来源勾选，下次进页面沿用</summary>
-    private async Task SaveTogglesAsync()
+    /// <summary>
+    /// 只改内存里的配置：退出时由 MainWindow 统一 SaveAsync 落盘（与窗口尺寸、导航栏状态等的机制一致），
+    /// 避免每点一次勾选就写一次配置文件
+    /// </summary>
+    private void RememberToggles()
     {
-        try
-        {
-            await _config.UpdateAndSaveAsync(c =>
-            {
-                c.AchievementShowLua = ShowLua;
-                c.AchievementShowOwned = ShowOwned;
-            });
-        }
-        catch (Exception ex) { LogService.AddAppLog($"成就页记住勾选失败: {ex.Message}"); }
+        _config.Config.AchievementShowLua = ShowLua;
+        _config.Config.AchievementShowOwned = ShowOwned;
     }
     partial void OnSelectedGameChanged(LibraryItem? value) => _ = LoadGameAsync(value);
 
