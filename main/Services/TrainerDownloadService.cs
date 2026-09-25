@@ -225,11 +225,13 @@ public class TrainerDownloadService
     /// <paramref name="referer"/> 传详情页地址（防盗链要用）。先写 <c>.part</c>、成功再落最终名。
     /// </summary>
     public async Task<(string? Path, string Error)> DownloadAsync(
-        string url, string fileName, string referer, IProgress<double>? progress, CancellationToken ct = default)
+        string url, string fileName, string referer, IProgress<(double Percent, long Bytes)>? progress,
+        CancellationToken ct = default)
     {
         Directory.CreateDirectory(Dir);
         var bare = Path.GetFileNameWithoutExtension(fileName);      // 附件标题没有扩展名，先按无扩展名处理
         var temp = Path.Combine(Dir, bare + ".part");
+        long read = 0;
 
         try
         {
@@ -245,17 +247,22 @@ public class TrainerDownloadService
             await using (var dst = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
             {
                 var buffer = new byte[81920];
-                long read = 0;
+                var lastReport = DateTime.MinValue;
                 int n;
                 while ((n = await src.ReadAsync(buffer, ct)) > 0)
                 {
                     await dst.WriteAsync(buffer.AsMemory(0, n), ct);
                     read += n;
-                    if (total > 0) progress?.Report(Math.Round((double)read / total * 100, 1));
+
+                    // 限频 150ms：刷太快会把 UI 线程刷爆，反而看不出变化。
+                    // 实测该站的分块响应**没有 Content-Length** → Percent 报 -1，由界面改显示"已下载多少 MB"
+                    if ((DateTime.UtcNow - lastReport).TotalMilliseconds < 150) continue;
+                    lastReport = DateTime.UtcNow;
+                    progress?.Report(total > 0 ? (Math.Round((double)read / total * 100, 1), read) : (-1, read));
                 }
             }
 
-            progress?.Report(100);
+            progress?.Report((100, read));
             var final = Path.Combine(Dir, bare + (IsZip(temp) ? ".zip" : ".exe"));
             File.Move(temp, final, overwrite: true);
             LogService.AddAppLog($"trainer 下载完成 {Path.GetFileName(final)}（{new FileInfo(final).Length / 1024} KB，SHA256 {Sha256(final)[..16]}…）");

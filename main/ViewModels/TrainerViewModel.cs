@@ -333,9 +333,14 @@ public partial class TrainerViewModel : ObservableObject
         if (ViewIndex == 0 && !IsBusy) StatusText = SearchStatusText();
     }
 
-    /// <summary>进度回调（下载与更新共用）：进度只体现在状态行文字里</summary>
-    private IProgress<double> MakeProgress(string verb, string gameName) =>
-        new Progress<double>(p => StatusText = $"{verb} {gameName} {p:0}%");
+    /// <summary>
+    /// 进度回调（下载与更新共用）。整条进度就显示在状态行那行小字上：
+    /// 有 Content-Length 就显示百分数；实测该站是分块响应（没长度）→ 改显示"已下载多少 MB"。
+    /// </summary>
+    private IProgress<(double Percent, long Bytes)> MakeProgress(string verb, string gameName) =>
+        new Progress<(double Percent, long Bytes)>(v => StatusText = v.Percent >= 0
+            ? $"{verb} {gameName} {v.Percent:0}%"
+            : $"{verb} {gameName} {v.Bytes / 1024.0 / 1024.0:0.0} MB");
 
     [RelayCommand]
     private void Reveal(TrainerInfo? trainer)
