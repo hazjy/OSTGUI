@@ -1,15 +1,24 @@
 using System.Net;
 using System.Text.RegularExpressions;
+using System.Xml.Linq;
 using OSTGUI.Models;
 
 namespace OSTGUI.Services;
 
 /// <summary>
-/// flingtrainer.com 的目录抓取：搜索 + 详情页附件直链。
-/// （首页「热门」与 RSS「新品」曾实现并实测可用，2026-09-25 按需求砍掉，需要时见 git 历史恢复。）
+/// flingtrainer.com 的取数：**搜索走站点官方 RSS**，只有详情页才用正则取附件直链。
 ///
-/// 为什么是正则而不是 HTML 解析库：本机 nuget 不通，加不了 HtmlAgilityPack（Fluent-Steam-Lua 用的就是它）；
-/// 这里的正则只锚定站点固定的 class/路径。站点改版时表现是"条目为空"，日志里会留 HTTP 状态与页面长度。
+/// 搜索：<c>?s=&lt;词&gt;&feed=rss2</c>（WordPress 自带 feed）
+/// - 好处：feed 里只有正文条目，**天然不受侧栏"热门/最新/相关"小工具污染**
+///   （之前扒 HTML 时 ?s=elden 真结果 2 条却抓到 16 条、?s=peak 更是把 12 条推荐当结果）；
+/// - 实测与页面结果区一致：elden 2/2、crimson 3/3、wukong 1/1（2026-09-25）；
+/// - stdlib 的 XDocument 解析，没有正则脆性。
+///
+/// 详情页：附件行是 <c>&lt;a class="attachment-link" href=… title=…&gt;</c>，
+/// 属性顺序不固定（实测 href 在前、class 在后）→ 先切整个标签再逐个取属性。
+/// （首页「热门」小工具与「新品」feed 曾实现并实测可用，2026-09-25 按需求砍掉，需要时看 git 历史。）
+///
+/// 站点在 Cloudflare 后面且**间歇性连不上**（同一条命令时而 200 时而"基础连接已经关闭"）→ 抓取重试一次。
 /// </summary>
 public class TrainerCatalogService
 {
@@ -18,54 +27,38 @@ public class TrainerCatalogService
 
     public TrainerCatalogService(HttpClient http) => _http = http;
 
-    /// <summary>结果区的文章块（侧栏/推荐用的是别的 class，不在这里）</summary>
-    private const string ArticlePattern = "<article[^>]*class=\"[^\"]*\\bpost-(?:standard|list)\\b[^\"]*\"[^>]*>(.*?)</article>";
-
-    /// <summary>文章块里的标题链接（h2.post-title &gt; a）</summary>
-    private const string TitleLinkPattern = "<h2[^>]*class=\"[^\"]*post-title[^\"]*\"[^>]*>\\s*<a[^>]*href=\"([^\"]+)\"[^>]*>(.*?)</a>";
-
-    /// <summary>
-    /// 搜索：**只解析结果区的文章块**（<c>article.post-standard</c> / <c>post-list</c>）。
-    ///
-    /// 2026-09-25 修正：原来抓整页所有 <c>/trainer/</c> 链接，会把侧栏的"热门/最新/相关"小工具一起捞进来——
-    /// 实测 <c>?s=elden</c> 真结果只有 2 条却抓到 16 条，<c>?s=peak</c> 真结果 0 条却抓到 12 条（全是推荐）。
-    /// </summary>
+    /// <summary>搜索：官方 RSS（只留 /trainer/ 条目）</summary>
     public async Task<List<TrainerInfo>> SearchAsync(string query, int count = 20, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(query)) return new List<TrainerInfo>();
 
-        var html = await GetAsync($"{BaseUrl}/?s={Uri.EscapeDataString(query.Trim())}", ct);
+        var xml = await GetAsync($"{BaseUrl}/?s={Uri.EscapeDataString(query.Trim())}&feed=rss2", ct);
         var result = new List<TrainerInfo>();
 
-        foreach (Match block in Regex.Matches(html, ArticlePattern, RegexOptions.Singleline))
+        try
         {
-            var body = block.Groups[1].Value;
-            var link = Regex.Match(body, TitleLinkPattern, RegexOptions.Singleline);
-
-            string url, name;
-            if (link.Success)
+            foreach (var item in XDocument.Parse(xml).Descendants("item"))
             {
-                url = WebUtility.HtmlDecode(link.Groups[1].Value);
-                name = Clean(Regex.Replace(link.Groups[2].Value, "<[^>]+>", "").Trim());
-            }
-            else
-            {
-                // 兜底：块内第一个 /trainer/ 链接（仍限定在这一块里，不会带进侧栏）
-                var any = Regex.Match(body, "href=\"(" + BaseUrl + "/trainer/[^\"]+)\"");
-                if (!any.Success) continue;
-                url = WebUtility.HtmlDecode(any.Groups[1].Value);
-                name = "";
-            }
+                var title = ((string?)item.Element("title") ?? "").Trim();
+                var link = ((string?)item.Element("link") ?? "").Split('?')[0];   // 去掉 rss 的 utm 尾巴
+                if (title.Length == 0 || !link.Contains("/trainer/", StringComparison.OrdinalIgnoreCase)) continue;
 
-            if (url.Length == 0 || result.Any(r => r.PageUrl == url)) continue;
-            if (name.Length == 0) name = Uri.UnescapeDataString(url.TrimEnd('/').Split('/').Last());
-
-            result.Add(new TrainerInfo { GameName = StripTrainerSuffix(name), PageUrl = url });
-            if (result.Count >= count) break;
+                result.Add(new TrainerInfo
+                {
+                    GameName = StripTrainerSuffix(title),
+                    PageUrl = link,
+                    UpdateDate = FormatDate((string?)item.Element("pubDate") ?? ""),
+                });
+                if (result.Count >= count) break;
+            }
+        }
+        catch (Exception ex)
+        {
+            LogService.AddAppLog($"trainer 搜索 RSS 解析失败「{query}」: {ex.Message}");
         }
 
         if (result.Count == 0)
-            LogService.AddAppLog($"trainer 搜索「{query}」无结果（页面长度 {html.Length}）");
+            LogService.AddAppLog($"trainer 搜索「{query}」无结果（feed 长度 {xml.Length}）");
         return result;
     }
 
@@ -75,7 +68,6 @@ public class TrainerCatalogService
         if (string.IsNullOrWhiteSpace(pageUrl)) return null;
 
         var html = await GetAsync(pageUrl, ct);
-        // 属性顺序不固定（实测 href 在 class 前、title 在中间），所以先切出整个标签再逐个取属性
         var tag = Regex.Match(html, "<a\\b[^>]*class=\"[^\"]*attachment-link[^\"]*\"[^>]*>", RegexOptions.IgnoreCase).Value;
         if (tag.Length == 0) return null;
 
@@ -87,7 +79,7 @@ public class TrainerCatalogService
         // title 属性就是文件名（如 Elden.Ring.v1.02-v1.16.1.Plus.35.Trainer-FLiNG），没有就退回 URL 末段
         var title = Regex.Match(tag, "title=\"([^\"]+)\"").Groups[1].Value;
         if (title.Length == 0) title = Uri.UnescapeDataString(href.Split('/').Last());
-        return (href, Sanitize(title));
+        return (WebUtility.HtmlDecode(href), Sanitize(title));
     }
 
     /// <summary>
@@ -117,9 +109,6 @@ public class TrainerCatalogService
         throw last ?? new IOException($"抓取失败: {url}");
     }
 
-    private static string Clean(string html) =>
-        WebUtility.HtmlDecode(html).Replace('\u2019', '\'').Replace('\u2018', '\'').Trim();
-
     private static string StripTrainerSuffix(string name)
     {
         const string suffix = " Trainer";
@@ -133,4 +122,7 @@ public class TrainerCatalogService
         var cleaned = new string(name.Select(c => bad.Contains(c) ? '_' : c).ToArray()).Trim();
         return cleaned.Length == 0 ? "trainer.exe" : cleaned;
     }
+
+    private static string FormatDate(string pubDate) =>
+        DateTime.TryParse(pubDate, out var dt) ? dt.ToString("yyyy.MM.dd") : "";
 }
