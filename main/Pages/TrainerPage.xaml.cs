@@ -142,14 +142,41 @@ public sealed partial class TrainerPage : Page
             return;
         }
 
-        var trainerBox = new ComboBox
+        // 修改器：输入名称 + 「查询」（名称从「已下载」里用「复制名称」拿，比在下拉里翻找省事）
+        var trainerBox = new TextBox
         {
-            ItemsSource = VM.LocalTrainers,
-            DisplayMemberPath = "GameName",
+            PlaceholderText = "修改器名称（在「已下载」里用「更多 → 复制名称」）",
             HorizontalAlignment = HorizontalAlignment.Stretch,
             MinWidth = 320,
-            SelectedIndex = 0,
         };
+        var lookupButton = new Button { Content = "查询" };
+        var lookupText = new TextBlock
+        {
+            Text = "（还没查询）",
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            // 刻意不设 Foreground：Application.Current.Resources 取到的是系统主题的画刷，
+            // 浅色应用 + 深色系统会把字染错（项目里踩过），交给弹窗主题继承
+        };
+        var trainerRow = new Grid { ColumnSpacing = 8 };
+        trainerRow.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+        trainerRow.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+        Grid.SetColumn(trainerBox, 0);
+        Grid.SetColumn(lookupButton, 1);
+        trainerRow.Children.Add(trainerBox);
+        trainerRow.Children.Add(lookupButton);
+
+        var resolvedPath = "";
+
+        void Lookup()
+        {
+            resolvedPath = VM.FindTrainerPath(trainerBox.Text ?? "") ?? "";
+            lookupText.Text = resolvedPath.Length > 0
+                ? $"找到：{resolvedPath}"
+                : "没找到这个名称的修改器（名称要完全一致，可在「已下载」里复制）";
+        }
+
+        lookupButton.Click += (_, _) => Lookup();
         var exeText = new TextBlock { Text = "（还没选）", FontSize = 12, TextWrapping = TextWrapping.Wrap };
         var pickButton = new Button { Content = "选择游戏主程序（exe）…" };
         var gameExe = "";
@@ -170,7 +197,8 @@ public sealed partial class TrainerPage : Page
 
         var panel = new StackPanel { Spacing = 10 };
         panel.Children.Add(new TextBlock { Text = "修改器" });
-        panel.Children.Add(trainerBox);
+        panel.Children.Add(trainerRow);
+        panel.Children.Add(lookupText);
         panel.Children.Add(new TextBlock { Text = "游戏主程序（游戏一启动就自动运行这个修改器）" });
         panel.Children.Add(pickButton);
         panel.Children.Add(exeText);
@@ -187,9 +215,9 @@ public sealed partial class TrainerPage : Page
         Helpers.PopupTheme.Apply(dialog);
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
 
-        if (trainerBox.SelectedItem is not TrainerInfo trainer)
+        if (resolvedPath.Length == 0 || !File.Exists(resolvedPath))
         {
-            ToastService.ShowError("绑定失败", "没有选到修改器");
+            ToastService.ShowError("绑定失败", "先填修改器名称并点「查询」，查询到文件才能绑定");
             return;
         }
 
@@ -199,7 +227,7 @@ public sealed partial class TrainerPage : Page
             return;
         }
 
-        VM.AddOrUpdateBinding(trainer.GameName, gameExe, enabled: true);
+        VM.AddOrUpdateBinding(trainerBox.Text!.Trim(), gameExe, enabled: true);
 
         // 绑了却不启监控＝不生效，容易踩；顺手替用户打开（关掉随时可以）
         if (!VM.MonitorEnabled) VM.MonitorEnabled = true;

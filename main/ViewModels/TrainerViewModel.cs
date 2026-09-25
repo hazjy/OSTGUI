@@ -400,6 +400,9 @@ public partial class TrainerViewModel : ObservableObject
 
     // ── 监控子进程 ──────────────────────────────────────────────────────────
 
+    /// <summary>按名称查修改器的实际路径（绑定对话框的「查询」用；名字就是「复制名称」拿到的那个）</summary>
+    public string? FindTrainerPath(string name) => TrainerDownloadService.FindTrainerPath(name);
+
     private static string PidPath => Path.Combine(TrainerDownloadService.DefaultDir, "monitor.pid");
 
     /// <summary>按开关与"是否有启用绑定"起停监控子进程；关掉时主动结束它，不留后台进程</summary>
