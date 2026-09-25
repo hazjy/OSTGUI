@@ -75,7 +75,8 @@ public class TrainerDownloadService
             {
                 result.Add(new TrainerInfo
                 {
-                    GameName = entry.Name,
+                    // 显示与「复制名称」都用 **exe 文件名**：它既是绑定的名称，也是索引比对的依据
+                    GameName = Path.GetFileName(entry.Path),
                     LocalPath = entry.Path,
                     PageUrl = entry.PageUrl,     // 「更新」要用它回详情页取最新版
                     UpdateDate = File.GetLastWriteTime(entry.Path).ToString("yyyy.MM.dd"),
@@ -170,18 +171,45 @@ public class TrainerDownloadService
         LogService.AddAppLog($"trainer 更新完成：{Path.GetFileName(oldPath)} → {Path.GetFileName(newPath)}（绑定按名称查索引，无需改写）");
     }
 
-    /// <summary>按名称查修改器的实际路径（绑定靠它把"名称"还原成文件；名称就是索引里的 Name）</summary>
+    /// <summary>
+    /// 按名称查修改器的实际路径（绑定靠它把"名称"还原成文件）。
+    ///
+    /// 名称 = **exe 的文件名**（「更多 → 复制名称」复制的就是它）。历史记录里存过附件标题
+    /// （如 <c>Crimson.Desert.Enhanced.v1.0…Trainer-FLiNG</c>，而文件叫 <c>… Trainer.exe</c>），
+    /// 所以比对做归一化（只留字母数字、小写）并允许互为前缀，两种写法都能查到。
+    /// </summary>
     public static string? FindTrainerPath(string name)
     {
         if (string.IsNullOrWhiteSpace(name)) return null;
         try
         {
-            var entry = ReadIndex().FirstOrDefault(e =>
-                string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase));
-            return entry != null && File.Exists(entry.Path) ? entry.Path : null;
+            // 两侧都去掉扩展名再归一化：文件名带 .exe、索引里的名字不带，直接比重就会永远不相等
+            var want = Normalize(Path.GetFileNameWithoutExtension(name));
+            if (want.Length == 0) return null;
+
+            foreach (var entry in ReadIndex())
+            {
+                if (!File.Exists(entry.Path)) continue;
+
+                var byFile = Normalize(Path.GetFileNameWithoutExtension(entry.Path));
+                var byStored = Normalize(Path.GetFileNameWithoutExtension(entry.Name));
+                if (Matches(want, byFile) || Matches(want, byStored)) return entry.Path;
+            }
         }
-        catch { return null; }
+        catch (Exception ex)
+        {
+            LogService.AddAppLog($"trainer 按名称查索引失败: {ex.Message}");
+        }
+        return null;
+
+        static bool Matches(string want, string have) =>
+            have.Length > 0 && (have == want || have.StartsWith(want, StringComparison.Ordinal)
+                                             || want.StartsWith(have, StringComparison.Ordinal));
     }
+
+    /// <summary>归一化：只留字母数字并转小写（用于名称比对，容忍点/空格/下划线的差别）</summary>
+    private static string Normalize(string text) =>
+        new(text.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
 
     private static void TryDelete(string path)
     {
@@ -243,7 +271,8 @@ public class TrainerDownloadService
             LogService.AddAppLog($"trainer 下载完成 {Path.GetFileName(final)}（{new FileInfo(final).Length / 1024} KB，SHA256 {Sha256(final)[..16]}…）");
 
             var result = IsZip(final) ? Extract(final) : final;
-            if (result != null) AddToIndex(bare, result, referer, url);   // referer 就是详情页：「更新」要靠它
+            // 索引里记文件名（=「复制名称」复制的名字，也是绑定的名称）
+            if (result != null) AddToIndex(Path.GetFileName(result), result, referer, url);
             return (result, "");
         }
         catch (OperationCanceledException)

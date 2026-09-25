@@ -280,8 +280,7 @@ public partial class TrainerViewModel : ObservableObject
                 return;
             }
 
-            if (string.Equals(Path.GetFileNameWithoutExtension(oldPath),
-                    Path.GetFileNameWithoutExtension(latest.Value.FileName), StringComparison.OrdinalIgnoreCase))
+            if (IsSameVersion(Path.GetFileName(oldPath), latest.Value.FileName))
             {
                 StatusText = $"已是最新：{trainer.GameName}";
                 ToastService.ShowInfo("已是最新", trainer.GameName);
@@ -299,8 +298,7 @@ public partial class TrainerViewModel : ObservableObject
                 return;
             }
 
-            _downloads.CommitUpdate(oldPath, path, Path.GetFileNameWithoutExtension(latest.Value.FileName),
-                page, latest.Value.Url);
+            _downloads.CommitUpdate(oldPath, path, Path.GetFileName(path), page, latest.Value.Url);
             RefreshLocalTrainers();
             ReloadBindings();              // 名称→路径 的解析结果可能变了，列表跟着刷新
             StatusText = $"已更新：{trainer.GameName} → {Path.GetFileName(path)}";
@@ -327,6 +325,19 @@ public partial class TrainerViewModel : ObservableObject
     /// <summary>比对用归一化：只留字母数字（大小写不敏感）</summary>
     private static string Norm(string text) =>
         new(text.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+
+    /// <summary>
+    /// 本地文件名与文章里最新附件的标题是不是同一个版本。
+    /// 两者写法不同（文件 <c>… Trainer.exe</c> / 附件标题 <c>….Trainer-FLiNG</c>），
+    /// 归一化后互为前缀就算同版本。
+    /// </summary>
+    private static bool IsSameVersion(string fileName, string attachmentTitle)
+    {
+        var a = Norm(Path.GetFileNameWithoutExtension(fileName));
+        var b = Norm(Path.GetFileNameWithoutExtension(attachmentTitle));
+        return a.Length > 0 && b.Length > 0
+            && (a == b || a.StartsWith(b, StringComparison.Ordinal) || b.StartsWith(a, StringComparison.Ordinal));
+    }
 
     [RelayCommand]
     private void Reveal(TrainerInfo? trainer)
