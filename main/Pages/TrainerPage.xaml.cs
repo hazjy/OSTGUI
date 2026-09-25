@@ -25,7 +25,9 @@ public sealed partial class TrainerPage : Page
 
     private void SourceSegmented_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (SourceSegmented.SelectedIndex >= 0) VM.ViewIndex = SourceSegmented.SelectedIndex;
+        // 注意：Segmented 第一项的 IsSelected="True" 会在 InitializeComponent() **期间**就触发本事件，
+        // 那时 VM 还没赋值（构造里 InitializeComponent 在前）——不判空会在导航时抛 NRE、页面打不开
+        if (VM != null && SourceSegmented.SelectedIndex >= 0) VM.ViewIndex = SourceSegmented.SelectedIndex;
     }
 
     private void QueryBox_KeyDown(object sender, KeyRoutedEventArgs e)
