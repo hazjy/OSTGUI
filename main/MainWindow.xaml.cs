@@ -16,6 +16,31 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
     // 页面实例复用交给 Frame 的原生缓存（各页 XAML 里 NavigationCacheMode="Enabled"），
     // 不再自己维护一份 Dictionary<string, Page>（那套还会绕过 Frame 的导航过渡）
 
+    private Microsoft.UI.Dispatching.DispatcherQueueTimer? _noticeTimer;
+
+    /// <summary>
+    /// 应用内通知：窗口顶部弹一条 InfoBar，几秒后自动收起（区别于走系统通知中心的 Toast）。
+    /// 任何页面都能调：<c>(App.MainWindow as MainWindow)?.Notify("已复制", 文件名)</c>
+    /// </summary>
+    public void Notify(string title, string message = "", InfoBarSeverity severity = InfoBarSeverity.Informational)
+    {
+        AppNotice.Severity = severity;
+        AppNotice.Title = title;
+        AppNotice.Message = message;
+        AppNotice.IsOpen = true;
+
+        if (_noticeTimer == null)
+        {
+            _noticeTimer = DispatcherQueue.CreateTimer();
+            _noticeTimer.Interval = TimeSpan.FromSeconds(3.5);   // 够看清，又不长期占着顶部
+            _noticeTimer.IsRepeating = false;
+            _noticeTimer.Tick += (_, _) => AppNotice.IsOpen = false;
+        }
+
+        _noticeTimer.Stop();   // 连续复制时重新计时
+        _noticeTimer.Start();
+    }
+
     public MainWindow()
     {
         this.InitializeComponent();

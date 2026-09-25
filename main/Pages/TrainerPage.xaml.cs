@@ -75,6 +75,7 @@ public sealed partial class TrainerPage : Page
         var data = new Windows.ApplicationModel.DataTransfer.DataPackage();
         data.SetText(name);
         Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(data);
+        (App.MainWindow as MainWindow)?.Notify("已复制", name);   // 应用内通知（窗口顶部）
     }
 
     /// <summary>菜单项没有 Tag，条目来自页面级的 _menuItem（由 More_Click 设置）</summary>

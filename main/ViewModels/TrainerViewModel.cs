@@ -184,8 +184,7 @@ public partial class TrainerViewModel : ObservableObject
             var download = await _catalog.GetDownloadAsync(trainer.PageUrl);
             if (download == null)
             {
-                StatusText = "下载失败";
-                return;
+                return;   // 失败只进日志（用户要求不留提示）
             }
 
             // 进度本身就显示在这一行小字上（正在下载 xxx 42%）；下完先留着（100%），2 秒后再换回搜索结果条数
@@ -194,8 +193,7 @@ public partial class TrainerViewModel : ObservableObject
                 download.Value.Url, download.Value.FileName, trainer.PageUrl, progress);
             if (path == null)
             {
-                StatusText = "下载失败";
-                return;
+                return;   // 失败只进日志（用户要求不留提示）
             }
 
             trainer.LocalPath = path;

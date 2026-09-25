@@ -116,5 +116,13 @@
             <Frame x:Name="ContentFrame" />
 
         </NavigationView>
+
+        <!-- 应用内通知（窗口顶部，几秒后自动收起）：任何页面调 MainWindow.Notify(...) 即可。
+             配色沿用成就页那套修复——InfoBar 自带的严重度配色在浅色下是"深底 + 深字"看不清 -->
+        <InfoBar x:Name="AppNotice" Grid.Row="1" IsOpen="False" IsClosable="True"
+                 VerticalAlignment="Top" HorizontalAlignment="Stretch" Margin="12,8,12,0"
+                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                 BorderThickness="1" CornerRadius="8" />
     </Grid>
 </Window>
