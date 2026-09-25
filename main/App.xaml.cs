@@ -58,12 +58,8 @@ public partial class App : Application
             return;
         }
 
-        // 修改器监控子进程：GUI 关掉后仍按绑定自动起停修改器（实现见 Services/TrainerMonitor.cs）
-        if (cmdArgs.Length >= 2 && cmdArgs[1].Equals("--trainer-monitor", StringComparison.OrdinalIgnoreCase))
-        {
-            Environment.Exit(TrainerMonitor.Run());
-            return;
-        }
+        // 修改器监控子进程（--trainer-monitor）**不在这里**：它走 main/Program.cs 的入口点，
+        // 在 WinUI 初始化之前就返回了（否则一个纯后台进程要背 100 MB 的 UI 栈）
 
         // 修改器自检：名称比对这类"容易悄悄错"的纯逻辑（跑完即退，不建窗口；结果进日志与退出码）
         if (cmdArgs.Length >= 2 && cmdArgs[1].Equals("--trainer-selftest", StringComparison.OrdinalIgnoreCase))
