@@ -357,6 +357,16 @@ public partial class TrainerViewModel : ObservableObject
 
         _downloads.Delete(trainer.LocalPath);
         trainer.LocalPath = "";
+
+        // 文件没了，指向它的绑定就是死绑定 → 一并删掉（绑定的名称就是这里显示的名字，含扩展名差异也算同一条）
+        var stale = Bindings.Where(b => TrainerNames.IsSame(b.TrainerName, trainer.GameName)).ToList();
+        foreach (var binding in stale) Bindings.Remove(binding);
+        if (stale.Count > 0)
+        {
+            SaveBindings();          // 落盘并让监控重载
+            LogService.AddAppLog($"trainer 删除 {trainer.GameName}：同时移除 {stale.Count} 条绑定");
+        }
+
         RefreshLocalTrainers();
         if (ViewIndex == 1) _ = LoadViewAsync();
         ToastService.ShowSuccess("已删除", trainer.GameName);
