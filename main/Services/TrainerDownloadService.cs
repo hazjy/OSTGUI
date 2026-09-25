@@ -40,8 +40,12 @@ public class TrainerDownloadService
         }
     }
 
-    /// <summary>已下载修改器的**索引**（固定放默认目录，不随下载目录变）：只认这里记的条目</summary>
-    private static string IndexPath => Path.Combine(DefaultDir, "trainers.json");
+    /// <summary>
+    /// 已下载修改器的**索引**：放 <c>%LOCALAPPDATA%\OSTGUI\trainers.json</c>（与 config.json 同目录，
+    /// 不随下载目录变，也不放在修改器目录里）。
+    /// </summary>
+    private static string IndexPath { get; } = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OSTGUI", "trainers.json");
 
     private sealed class IndexEntry
     {
@@ -101,7 +105,7 @@ public class TrainerDownloadService
     {
         try
         {
-            Directory.CreateDirectory(DefaultDir);
+            Directory.CreateDirectory(Path.GetDirectoryName(IndexPath)!);
             var temp = IndexPath + ".tmp";
             File.WriteAllText(temp, System.Text.Json.JsonSerializer.Serialize(entries,
                 new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
