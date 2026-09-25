@@ -187,7 +187,7 @@ public partial class SettingsViewModel : ObservableObject
     {
         if (!CanApplyNavigationPaneWidth) return;
         if (int.TryParse(NavigationPaneWidthInput.Trim(), out var v) && v is >= 150 and <= 600)
-            _configService.UpdateAndSaveAsync(c => c.NavigationPaneWidth = v).GetAwaiter().GetResult();
+            _configService.Update(c => c.NavigationPaneWidth = v);
     }
 
     /// <summary>
@@ -328,8 +328,8 @@ public partial class SettingsViewModel : ObservableObject
         if (sources != null)
         {
             // 清理已移除的内置源与自定义源（自定义源功能已下线）
-            if (sources.RemoveAll(s => s.Id == "opensteamtool" || s.IsCustom) > 0)
-                _ = _configService.SaveAsync();
+            // 只改内存，退出时统一落盘
+            sources.RemoveAll(s => s.Id == "opensteamtool" || s.IsCustom);
         }
 
         if (sources == null || sources.Count == 0)
@@ -352,19 +352,16 @@ public partial class SettingsViewModel : ObservableObject
             }
 
             c.ManifestSources = sources;
-            _ = _configService.SaveAsync();
         }
         else
         {
             // 配置已存在：合并预置源，防止旧配置缺少新增的内置源
-            var merged = false;
             foreach (var preset in ManifestSource.GetPresetSources())
             {
                 var existing = sources.FirstOrDefault(s => s.Id == preset.Id);
                 if (existing == null)
                 {
                     sources.Add(preset);
-                    merged = true;
                 }
                 else if (ManifestSource.IsImplementedSource(preset.Id) &&
                          (existing.Name != preset.Name || existing.Description != preset.Description))
@@ -372,11 +369,8 @@ public partial class SettingsViewModel : ObservableObject
                     // 内置源的显示名/说明以代码为准（旧配置里存的是历史文案，如"Sudama 库"）
                     existing.Name = preset.Name;
                     existing.Description = preset.Description;
-                    merged = true;
                 }
             }
-            if (merged)
-                _ = _configService.SaveAsync();
         }
 
         Sources.Clear();
@@ -438,7 +432,7 @@ public partial class SettingsViewModel : ObservableObject
 
         try
         {
-            _configService.UpdateAndSaveAsync(c =>
+            _configService.Update(c =>
             {
                 c.DefaultManifestSource = DefaultSource;
                 c.DefaultAddAllDlc = DefaultAddAllDlc;
@@ -454,7 +448,7 @@ public partial class SettingsViewModel : ObservableObject
                 c.ManifestSources = Sources.ToList();
                 foreach (var source in Sources)
                     c.ManifestSourceEnabled[source.Id] = source.IsEnabled;
-            }).GetAwaiter().GetResult();
+            });
         }
         catch (Exception ex) { LogService.AddLog($"[SaveAllToConfig] 失败: {ex.Message}"); }
     }

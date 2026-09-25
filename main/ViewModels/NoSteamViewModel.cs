@@ -97,19 +97,19 @@ public partial class NoSteamViewModel : ObservableObject
 
     public void SaveOptionsToConfig()
     {
-        _configService.UpdateAndSaveAsync(c =>
+        _configService.Update(c =>
         {
             c.DefaultBackupOriginalExe = BackupOriginalExe;
             c.SkipSteamlessDefault = SkipSteamless;
             c.SkipGBEDefault = SkipGBE;
             c.DryRunDefault = DryRun;
             c.SteamlessTimeoutMinutesDefault = SteamlessTimeoutMinutes;
-        }).GetAwaiter().GetResult();
+        });
     }
 
     public void SaveAdvancedConfigToConfig()
     {
-        _configService.UpdateAndSaveAsync(c =>
+        _configService.Update(c =>
         {
             c.AdvancedAccountName = AdvancedAccountName;
             c.AdvancedSteamId = AdvancedSteamId;
@@ -119,7 +119,7 @@ public partial class NoSteamViewModel : ObservableObject
             c.AdvancedOfflineMode = AdvancedOfflineMode;
             c.AdvancedDisableNetworking = AdvancedDisableNetworking;
             c.AdvancedSteamApiCheckBypass = AdvancedBypassSteamApiCheck;
-        }).GetAwaiter().GetResult();
+        });
     }
 
     partial void OnBackupOriginalExeChanged(bool value)

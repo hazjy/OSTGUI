@@ -70,14 +70,14 @@ public partial class SearchViewModel : ObservableObject
     /// <summary>
     /// 切视图形态。写盘失败不影响切换（内存态优先，下次重开最多回到上一档）
     /// </summary>
-    public async Task SetViewModeAsync(string mode)
+    public Task SetViewModeAsync(string mode)
     {
         mode = mode == "grid" ? "grid" : "list";
-        if (ViewMode == mode) return;
+        if (ViewMode == mode) return Task.CompletedTask;
 
         ViewMode = mode;
-        try { await _configService.UpdateAndSaveAsync(c => c.SearchViewMode = mode); }
-        catch { }
+        _configService.Update(c => c.SearchViewMode = mode);   // 只改内存，退出时统一落盘
+        return Task.CompletedTask;
     }
 
     public SearchViewModel(
@@ -124,13 +124,13 @@ public partial class SearchViewModel : ObservableObject
 
     public void SaveOptionsToConfig()
     {
-        // 同步等待落盘，避免应用关闭/重启时异步保存未完成导致选项丢失
-        _configService.UpdateAndSaveAsync(c =>
+        // 只改内存：退出时统一落盘（也就不存在"关得太快、异步保存没写完"的问题）
+        _configService.Update(c =>
         {
             c.DefaultAddAllDlc = AddAllDlc;
             c.StFixedVersionDefault = FixedVersion;
             c.StDownloadManifestDefault = DownloadManifest;
-        }).GetAwaiter().GetResult();
+        });
     }
 
     // 勾选状态变化时立即保存，防止下次打开页面/重启应用后重置

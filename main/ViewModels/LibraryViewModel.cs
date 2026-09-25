@@ -151,14 +151,14 @@ public partial class LibraryViewModel : ObservableObject
     /// 切入库管理的视图形态：list / grid。写盘失败不影响切换（内存态优先，
     /// 下次重开最多回到上一档，不为此弹错）
     /// </summary>
-    public async Task SetViewModeAsync(string mode)
+    public Task SetViewModeAsync(string mode)
     {
         mode = mode == "grid" ? "grid" : "list";
-        if (ViewMode == mode) return;
+        if (ViewMode == mode) return Task.CompletedTask;
 
         ViewMode = mode;
-        try { await _configService.UpdateAndSaveAsync(c => c.LibraryViewMode = mode); }
-        catch { }
+        _configService.Update(c => c.LibraryViewMode = mode);   // 只改内存，退出时统一落盘
+        return Task.CompletedTask;
     }
 
     /// <summary>

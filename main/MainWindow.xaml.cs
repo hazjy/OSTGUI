@@ -484,12 +484,12 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
 
     private void MainNavView_PaneOpening(object? sender, object e)
     {
-        try { _mainVM.ConfigService.Config.IsNavigationPaneOpen = true; _mainVM.ConfigService.SaveAsync().GetAwaiter().GetResult(); } catch { }
+        try { _mainVM.ConfigService.Config.IsNavigationPaneOpen = true; } catch { }   // 只改内存，退出时统一落盘
     }
 
     private void MainNavView_PaneClosing(object? sender, object e)
     {
-        try { _mainVM.ConfigService.Config.IsNavigationPaneOpen = false; _mainVM.ConfigService.SaveAsync().GetAwaiter().GetResult(); } catch { }
+        try { _mainVM.ConfigService.Config.IsNavigationPaneOpen = false; } catch { }
     }
 
     private void NavView_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)

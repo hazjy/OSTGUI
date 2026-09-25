@@ -86,6 +86,16 @@ public class ConfigService
     }
 
     /// <summary>
+    /// 只改内存，不落盘——退出时由 MainWindow 统一 SaveAsync（与窗口尺寸/导航栏同一机制）。
+    /// 偏好类改动（视图档位、勾选、下拉项等）都走这里，避免每改一下就写一次文件。
+    /// </summary>
+    public void Update(Action<AppConfig> updateAction)
+    {
+        try { updateAction(_config); }
+        catch (Exception ex) { System.Diagnostics.Debug.WriteLine($"更新配置失败: {ex.Message}"); }
+    }
+
+    /// <summary>
     /// 重置为默认配置
     /// </summary>
     public async Task ResetAsync()
