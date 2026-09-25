@@ -124,9 +124,14 @@
                     <TextBox x:Name="LocalFilterRow" Grid.Row="1" Visibility="Collapsed"
                              PlaceholderText="过滤已下载" TextChanged="LocalFilterBox_TextChanged" />
 
-                    <ListView x:Name="ItemsList" Grid.Row="2" SelectionMode="None"
+                    <!-- 两个视图各有自己的列表与集合，互不写入（search: Items / local: LocalItems） -->
+                    <ListView x:Name="ResultsList" Grid.Row="2" SelectionMode="None"
                               ItemsSource="{Binding Items}"
                               ItemTemplate="{StaticResource SearchRowTemplate}" />
+
+                    <ListView x:Name="LocalList" Grid.Row="2" Visibility="Collapsed" SelectionMode="None"
+                              ItemsSource="{Binding LocalItems}"
+                              ItemTemplate="{StaticResource LocalRowTemplate}" />
 
                     <Grid Grid.Row="3" ColumnSpacing="8">
                         <Grid.ColumnDefinitions>

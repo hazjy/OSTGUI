@@ -31,12 +31,13 @@ public sealed partial class TrainerPage : Page
 
         VM.ViewIndex = SourceSegmented.SelectedIndex;
 
-        // 两个视图的输入框与行模板都不一样：
-        // 搜索 = 网页查询 + 只留下载按钮；已下载 = 本地过滤 + 启动/打开目录/删除
+        // 两个视图的输入框与列表都是各自独立的（搜索=Items，已下载=LocalItems），
+        // 只切可见性：共用集合时，搜索请求晚回来会把结果糊到"已下载"上
         var local = SourceSegmented.SelectedIndex == 1;
         WebSearchRow.Visibility = local ? Visibility.Collapsed : Visibility.Visible;
         LocalFilterRow.Visibility = local ? Visibility.Visible : Visibility.Collapsed;
-        ItemsList.ItemTemplate = (DataTemplate)Resources[local ? "LocalRowTemplate" : "SearchRowTemplate"];
+        ResultsList.Visibility = local ? Visibility.Collapsed : Visibility.Visible;
+        LocalList.Visibility = local ? Visibility.Visible : Visibility.Collapsed;
     }
 
     private void LocalFilterBox_TextChanged(object sender, TextChangedEventArgs e)

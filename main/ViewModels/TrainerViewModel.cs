@@ -32,6 +32,13 @@ public partial class TrainerViewModel : ObservableObject
     /// <summary>已下载的修改器（绑定对话框的候选）</summary>
     public ObservableCollection<TrainerInfo> LocalTrainers { get; } = new();
 
+    /// <summary>
+    /// 「已下载」视图**自己的**列表（含本地过滤结果）。
+    /// 刻意不复用搜索用的 <see cref="Items"/>：两边共用一个集合时，搜索的网络请求晚回来
+    /// 会把搜索结果糊到"已下载"上（2026-09-25 实测踩到）。
+    /// </summary>
+    public ObservableCollection<TrainerInfo> LocalItems { get; } = new();
+
     [ObservableProperty] private string _query = "";
     /// <summary>「已下载」视图的本地过滤词（只筛本地，不发请求；与网页搜索的 Query 各管一摊）</summary>
     [ObservableProperty] private string _localFilter = "";
@@ -121,8 +128,7 @@ public partial class TrainerViewModel : ObservableObject
 
         if (ViewIndex == 1)
         {
-            RefreshLocalTrainers();   // 走索引，不扫目录（见 TrainerDownloadService.ListLocal）
-            ApplyLocalFilter();
+            RefreshLocalTrainers();   // 走索引，只动 LocalItems（不碰搜索的 Items）
             return;
         }
 
@@ -143,6 +149,9 @@ public partial class TrainerViewModel : ObservableObject
                 StatusText = "抓取失败：网络或站点不可用（详见日志）";
                 return;
             }
+
+            // 抓取期间用户可能已经切到别的视图：迟到的结果不许再写状态（集合本来就分开了）
+            if (ViewIndex != 0) return;
 
             Items.Clear();
             foreach (var t in MarkDownloaded(list)) Items.Add(t);
@@ -375,24 +384,24 @@ public partial class TrainerViewModel : ObservableObject
     {
         LocalTrainers.Clear();
         foreach (var t in _downloads.ListLocal()) LocalTrainers.Add(t);
-        if (ViewIndex == 1) ApplyLocalFilter();
+        ApplyLocalFilter();
     }
 
-    /// <summary>本地过滤：只筛「已下载」，不动搜索页的 Items（两个视图共用一个 Items 集合）</summary>
+    /// <summary>本地过滤：只动 LocalItems（「已下载」自己的集合），与网页搜索结果互不影响</summary>
     private void ApplyLocalFilter()
     {
-        if (ViewIndex != 1) return;
-
         var q = LocalFilter?.Trim() ?? "";
         var list = string.IsNullOrEmpty(q)
             ? LocalTrainers.ToList()
             : LocalTrainers.Where(t => t.GameName.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
 
-        Items.Clear();
-        foreach (var t in list) Items.Add(t);
-        StatusText = q.Length > 0
-            ? $"已下载 {LocalTrainers.Count} 个（过滤「{q}」后 {list.Count} 个）"
-            : $"已下载 {list.Count} 个修改器";
+        LocalItems.Clear();
+        foreach (var t in list) LocalItems.Add(t);
+
+        if (ViewIndex == 1)
+            StatusText = q.Length > 0
+                ? $"已下载 {LocalTrainers.Count} 个（过滤「{q}」后 {list.Count} 个）"
+                : $"已下载 {list.Count} 个修改器";
     }
 
     /// <summary>把条目与本地已下载文件对上（同名的就算已下载）</summary>
