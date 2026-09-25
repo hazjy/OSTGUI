@@ -167,9 +167,20 @@ public class TrainerDownloadService
             AddedAt = DateTime.Now,
         });
         WriteIndex(entries);
+        LogService.AddAppLog($"trainer 更新完成：{Path.GetFileName(oldPath)} → {Path.GetFileName(newPath)}（绑定按名称查索引，无需改写）");
+    }
 
-        var rewired = new TrainerBindingService().ReplaceTrainerPath(oldPath, newPath);
-        LogService.AddAppLog($"trainer 更新完成：{Path.GetFileName(oldPath)} → {Path.GetFileName(newPath)}（绑定改写 {rewired} 条）");
+    /// <summary>按名称查修改器的实际路径（绑定靠它把"名称"还原成文件；名称就是索引里的 Name）</summary>
+    public static string? FindTrainerPath(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return null;
+        try
+        {
+            var entry = ReadIndex().FirstOrDefault(e =>
+                string.Equals(e.Name, name, StringComparison.OrdinalIgnoreCase));
+            return entry != null && File.Exists(entry.Path) ? entry.Path : null;
+        }
+        catch { return null; }
     }
 
     private static void TryDelete(string path)

@@ -6,6 +6,15 @@
     xmlns:controls="using:CommunityToolkit.WinUI.Controls">
 
     <Page.Resources>
+        <!-- 已下载行的「更多」菜单：MenuFlyout 是页面级的，靠 code-behind 里的 _menuItem 记住点了哪一行 -->
+        <MenuFlyout x:Key="MoreMenu">
+            <MenuFlyoutItem Text="复制名称（exe 文件名）" Click="CopyName_Click" />
+            <MenuFlyoutItem Text="更新" Click="Update_Click" />
+            <MenuFlyoutSeparator />
+            <MenuFlyoutItem Text="删除" Click="Delete_Click"
+                            Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
+        </MenuFlyout>
+
         <!-- 搜索结果行：只留下载（启动/打开/删除只对"已下载"才有意义） -->
         <DataTemplate x:Key="SearchRowTemplate">
             <Grid ColumnSpacing="8" Padding="0,8">
@@ -44,11 +53,11 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Click="Update_Click" Tag="{Binding}"
-                            AutomationProperties.Name="更新" ToolTipService.ToolTip="从官方重新下载最新版并覆盖（同时更新索引与绑定）"
+                    <Button Click="More_Click" Tag="{Binding}"
+                            AutomationProperties.Name="更多" ToolTipService.ToolTip="更多"
                             Width="28" Height="28" MinWidth="0" Padding="0"
                             Background="Transparent" BorderThickness="0">
-                        <FontIcon Glyph="&#xE74A;" FontSize="14" />
+                        <FontIcon Glyph="&#xE712;" FontSize="14" />
                     </Button>
                     <Button Click="Launch_Click" Tag="{Binding}"
                             AutomationProperties.Name="启动" ToolTipService.ToolTip="启动"
@@ -61,12 +70,6 @@
                             Width="28" Height="28" MinWidth="0" Padding="0"
                             Background="Transparent" BorderThickness="0">
                         <FontIcon Glyph="&#xE8B7;" FontSize="14" />
-                    </Button>
-                    <Button Click="Delete_Click" Tag="{Binding}"
-                            AutomationProperties.Name="删除" ToolTipService.ToolTip="删除"
-                            Width="28" Height="28" MinWidth="0" Padding="0"
-                            Background="Transparent" BorderThickness="0">
-                        <FontIcon Glyph="&#xE74D;" FontSize="14" />
                     </Button>
                 </StackPanel>
             </Grid>

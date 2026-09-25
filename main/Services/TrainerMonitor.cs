@@ -65,20 +65,20 @@ public static class TrainerMonitor
                     var game = FindGameProcess(binding.GameExePath);
                     if (game != null)
                     {
-                        if (!started.ContainsKey(binding.TrainerFilePath)) StartTrainer(binding, started);
+                        if (!started.ContainsKey(binding.TrainerName)) StartTrainer(binding, started);
                     }
-                    else if (started.Remove(binding.TrainerFilePath, out var trainer))
+                    else if (started.Remove(binding.TrainerName, out var trainer))
                     {
                         Kill(trainer);
                     }
                 }
 
                 // 绑定被删/禁用 → 把已经起来的收掉
-                foreach (var path in started.Keys.ToList())
+                foreach (var name in started.Keys.ToList())
                 {
-                    if (enabled.Any(b => string.Equals(b.TrainerFilePath, path, StringComparison.OrdinalIgnoreCase))) continue;
-                    Kill(started[path]);
-                    started.Remove(path);
+                    if (enabled.Any(b => string.Equals(b.TrainerName, name, StringComparison.OrdinalIgnoreCase))) continue;
+                    Kill(started[name]);
+                    started.Remove(name);
                 }
 
                 Thread.Sleep(IntervalMs);
@@ -120,9 +120,11 @@ public static class TrainerMonitor
 
     private static void StartTrainer(TrainerBinding binding, Dictionary<string, Process> started)
     {
-        if (!File.Exists(binding.TrainerFilePath))
+        // 绑定只记名称 → 实际路径按名称查索引（改过名/更新过文件都不影响）
+        var path = TrainerDownloadService.FindTrainerPath(binding.TrainerName);
+        if (path == null)
         {
-            LogService.AddAppLog($"trainer 监控：修改器文件不存在 {binding.TrainerFilePath}");
+            LogService.AddAppLog($"trainer 监控：索引里找不到修改器「{binding.TrainerName}」，跳过");
             return;
         }
 
@@ -130,17 +132,17 @@ public static class TrainerMonitor
         {
             var proc = Process.Start(new ProcessStartInfo
             {
-                FileName = binding.TrainerFilePath,
-                WorkingDirectory = Path.GetDirectoryName(binding.TrainerFilePath) ?? TrainerDownloadService.DefaultDir,
+                FileName = path,
+                WorkingDirectory = Path.GetDirectoryName(path) ?? TrainerDownloadService.DefaultDir,
                 UseShellExecute = true,
             });
 
-            if (proc != null) started[binding.TrainerFilePath] = proc;
-            LogService.AddAppLog($"trainer 已随游戏启动 {Path.GetFileName(binding.TrainerFilePath)}（游戏 {binding.GameName}）");
+            if (proc != null) started[binding.TrainerName] = proc;
+            LogService.AddAppLog($"trainer 已随游戏启动 {Path.GetFileName(path)}（游戏 {binding.GameName}）");
         }
         catch (Exception ex)
         {
-            LogService.AddAppLog($"trainer 启动失败 {Path.GetFileName(binding.TrainerFilePath)}: {ex.Message}");
+            LogService.AddAppLog($"trainer 启动失败 {Path.GetFileName(path)}: {ex.Message}");
         }
     }
 

@@ -55,6 +55,29 @@ public sealed partial class TrainerPage : Page
         if ((sender as FrameworkElement)?.Tag is TrainerInfo info) VM.DownloadCommand.Execute(info);
     }
 
+    /// <summary>「更多」菜单针对的条目（MenuFlyout 是页面级的，菜单项拿不到行数据）</summary>
+    private TrainerInfo? _menuItem;
+
+    private void More_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not FrameworkElement button || button.Tag is not TrainerInfo item) return;
+
+        _menuItem = item;
+        ((MenuFlyout)Resources["MoreMenu"]).ShowAt(button, new Windows.Foundation.Point(0, button.ActualHeight));
+    }
+
+    /// <summary>复制 exe 的完整文件名（= 索引里的名称，也是绑定用的名字）</summary>
+    private void CopyName_Click(object sender, RoutedEventArgs e)
+    {
+        if (_menuItem == null) return;
+
+        var name = Path.GetFileName(_menuItem.LocalPath);
+        var data = new Windows.ApplicationModel.DataTransfer.DataPackage();
+        data.SetText(name);
+        Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(data);
+        ToastService.ShowSuccess("已复制", name);
+    }
+
     private void Update_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.Tag is TrainerInfo info) VM.UpdateCommand.Execute(info);
@@ -119,13 +142,6 @@ public sealed partial class TrainerPage : Page
             return;
         }
 
-        var gameBox = new ComboBox
-        {
-            ItemsSource = VM.Games,
-            DisplayMemberPath = "GameName",
-            HorizontalAlignment = HorizontalAlignment.Stretch,
-            MinWidth = 320,
-        };
         var trainerBox = new ComboBox
         {
             ItemsSource = VM.LocalTrainers,
@@ -134,24 +150,10 @@ public sealed partial class TrainerPage : Page
             MinWidth = 320,
             SelectedIndex = 0,
         };
-        var exeText = new TextBlock { FontSize = 12, TextWrapping = TextWrapping.Wrap };
-        var pickButton = new Button { Content = "手选游戏主程序…" };
-        var enabledBox = new CheckBox { Content = "启用（游戏运行时自动启动修改器）", IsChecked = true };
-
+        var exeText = new TextBlock { Text = "（还没选）", FontSize = 12, TextWrapping = TextWrapping.Wrap };
+        var pickButton = new Button { Content = "选择游戏主程序（exe）…" };
         var gameExe = "";
 
-        void SyncGameExe()
-        {
-            var game = gameBox.SelectedItem as LibraryItem;
-            gameExe = game == null ? "" : VM.ResolveGameExe(game.AppId) ?? "";
-            exeText.Text = game == null
-                ? "没选游戏（也可以直接手选主程序）"
-                : gameExe.Length > 0
-                    ? $"主程序：{gameExe}"
-                    : "客户端里没找到这个游戏的主程序（可能没安装）——请手选";
-        }
-
-        gameBox.SelectionChanged += (_, _) => SyncGameExe();
         pickButton.Click += async (_, _) =>
         {
             var picker = new Windows.Storage.Pickers.FileOpenPicker();
@@ -163,19 +165,15 @@ public sealed partial class TrainerPage : Page
             if (file == null) return;
 
             gameExe = file.Path;
-            exeText.Text = $"主程序：{gameExe}";
+            exeText.Text = gameExe;
         };
 
-        SyncGameExe();
-
         var panel = new StackPanel { Spacing = 10 };
-        panel.Children.Add(new TextBlock { Text = "游戏" });
-        panel.Children.Add(gameBox);
-        panel.Children.Add(pickButton);
-        panel.Children.Add(exeText);
         panel.Children.Add(new TextBlock { Text = "修改器" });
         panel.Children.Add(trainerBox);
-        panel.Children.Add(enabledBox);
+        panel.Children.Add(new TextBlock { Text = "游戏主程序（游戏一启动就自动运行这个修改器）" });
+        panel.Children.Add(pickButton);
+        panel.Children.Add(exeText);
 
         var dialog = new ContentDialog
         {
@@ -189,27 +187,21 @@ public sealed partial class TrainerPage : Page
         Helpers.PopupTheme.Apply(dialog);
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
 
-        if (trainerBox.SelectedItem is not TrainerInfo trainer || !File.Exists(trainer.LocalPath))
+        if (trainerBox.SelectedItem is not TrainerInfo trainer)
         {
-            ToastService.ShowError("绑定失败", "没有选到可用的修改器文件");
+            ToastService.ShowError("绑定失败", "没有选到修改器");
             return;
         }
 
         if (gameExe.Length == 0 || !File.Exists(gameExe))
         {
-            ToastService.ShowError("绑定失败", "没有可用的游戏主程序——先选游戏或手选一个 exe");
+            ToastService.ShowError("绑定失败", "还没选游戏主程序（exe）");
             return;
         }
 
-        var picked = gameBox.SelectedItem as LibraryItem;
-        VM.AddOrUpdateBinding(
-            picked?.AppId ?? "",
-            picked?.GameName ?? Path.GetFileNameWithoutExtension(gameExe),
-            gameExe,
-            trainer.LocalPath,
-            enabledBox.IsChecked == true);
+        VM.AddOrUpdateBinding(trainer.GameName, gameExe, enabled: true);
 
         // 绑了却不启监控＝不生效，容易踩；顺手替用户打开（关掉随时可以）
-        if (enabledBox.IsChecked == true && !VM.MonitorEnabled) VM.MonitorEnabled = true;
+        if (!VM.MonitorEnabled) VM.MonitorEnabled = true;
     }
 }

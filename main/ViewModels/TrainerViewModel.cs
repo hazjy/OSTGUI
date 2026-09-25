@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using OSTGUI.Models;
@@ -16,8 +17,6 @@ public partial class TrainerViewModel : ObservableObject
     private readonly TrainerCatalogService _catalog;
     private readonly TrainerDownloadService _downloads;
     private readonly TrainerBindingService _bindingService;
-    private readonly LibraryScanner _scanner;
-    private readonly OnlineFixService _onlineFix;
     private readonly ConfigService _config;
 
     private bool _initialized;
@@ -28,9 +27,6 @@ public partial class TrainerViewModel : ObservableObject
 
     public ObservableCollection<TrainerInfo> Items { get; } = new();
     public ObservableCollection<TrainerBinding> Bindings { get; } = new();
-
-    /// <summary>绑定对话框用的游戏下拉（入库游戏，AppId + 名字）</summary>
-    public ObservableCollection<LibraryItem> Games { get; } = new();
 
     /// <summary>已下载的修改器（绑定对话框的候选）</summary>
     public ObservableCollection<TrainerInfo> LocalTrainers { get; } = new();
@@ -72,13 +68,11 @@ public partial class TrainerViewModel : ObservableObject
 
     public TrainerViewModel(
         TrainerCatalogService catalog, TrainerDownloadService downloads, TrainerBindingService bindingService,
-        LibraryScanner scanner, OnlineFixService onlineFix, ConfigService config)
+        ConfigService config)
     {
         _catalog = catalog;
         _downloads = downloads;
         _bindingService = bindingService;
-        _scanner = scanner;
-        _onlineFix = onlineFix;
         _config = config;
 
         _loadingConfig = true;
@@ -107,22 +101,6 @@ public partial class TrainerViewModel : ObservableObject
         {
             _initialized = true;
             await LoadViewAsync();
-            _ = LoadGamesAsync();
-        }
-    }
-
-    private async Task LoadGamesAsync()
-    {
-        try
-        {
-            var items = await _scanner.ScanLibraryAsync();
-            Games.Clear();
-            foreach (var item in items.Where(i => i.AppId != "N/A" && i.AppId.All(char.IsDigit)))
-                Games.Add(item);
-        }
-        catch (Exception ex)
-        {
-            LogService.AddAppLog($"trainer 载入游戏列表失败: {ex.Message}");
         }
     }
 
@@ -267,58 +245,64 @@ public partial class TrainerViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 更新已下载的修改器：回详情页取**最新那条附件**下载覆盖，并把索引与进程绑定一并改写。
-    /// 详情页里最新附件排在第一行（实测 Crimson Desert 有 13 行，第一行是最新版本）→ GetDownloadAsync 拿到的就是最新版。
+    /// 更新已下载的修改器：取**最新附件**下载覆盖，并同步更新索引（绑定记的是名称，无需改写）。
+    /// 找文章优先用条目里存的详情页；没有（早先下载的记录）就用**官方 RSS** 按名字搜出来——
+    /// 但文件直链官方只在文章页里给（RSS 没有 enclosure、正文也不含附件表），只能从那一页取一次。
     /// </summary>
     [RelayCommand]
     private async Task UpdateAsync(TrainerInfo? trainer)
     {
         if (trainer == null || IsBusy) return;
 
-        if (string.IsNullOrEmpty(trainer.PageUrl))
-        {
-            ToastService.ShowWarning("无法更新", "这条记录没存来源页（早先下载的），删掉重新下载一次即可支持一键更新");
-            return;
-        }
-
         var oldPath = trainer.LocalPath;
         IsBusy = true;
-        StatusText = $"正在检查更新 {trainer.GameName}…";
         try
         {
-            var latest = await _catalog.GetDownloadAsync(trainer.PageUrl);
+            StatusText = $"正在检查更新 {trainer.GameName}…";
+            var page = trainer.PageUrl;
+            if (string.IsNullOrEmpty(page))
+            {
+                StatusText = $"正在用官方 RSS 找 {trainer.GameName} 的文章…";
+                page = await FindPageUrlAsync(trainer.GameName);
+                if (string.IsNullOrEmpty(page))
+                {
+                    StatusText = "更新失败：RSS 里没找到这个修改器";
+                    ToastService.ShowWarning("找不到来源", $"官方 RSS 里没搜到「{trainer.GameName}」");
+                    return;
+                }
+            }
+
+            var latest = await _catalog.GetDownloadAsync(page);
             if (latest == null)
             {
-                StatusText = SearchStatusText();
-                ToastService.ShowError("更新失败", "详情页里没找到附件链接（站点结构可能已变）");
+                StatusText = "更新失败：文章页里没找到附件";
+                ToastService.ShowError("更新失败", "文章页里没找到附件链接（站点结构可能已变）");
                 return;
             }
 
             if (string.Equals(Path.GetFileNameWithoutExtension(oldPath),
                     Path.GetFileNameWithoutExtension(latest.Value.FileName), StringComparison.OrdinalIgnoreCase))
             {
-                StatusText = SearchStatusText();
+                StatusText = $"已是最新：{trainer.GameName}";
                 ToastService.ShowInfo("已是最新", trainer.GameName);
                 return;
             }
 
-            StatusText = $"正在下载 {trainer.GameName} 的新版本…";
             var progress = new Progress<double>(p => StatusText = $"正在更新 {trainer.GameName} {p:0}%");
-            var (path, error) = await _downloads.DownloadAsync(
-                latest.Value.Url, latest.Value.FileName, trainer.PageUrl, progress);
+            var (path, error) = await _downloads.DownloadAsync(latest.Value.Url, latest.Value.FileName, page, progress);
 
             if (path == null)
             {
-                // 失败时旧文件原样不动（新文件是先落盘、成功后才动旧引用）
+                // 失败时旧文件原样不动（新文件先落盘、成功后才动旧引用）
                 StatusText = "更新失败：网络或站点异常（详见日志）";
                 ToastService.ShowError("更新失败", error.Length > 0 ? error : "详见日志");
                 return;
             }
 
             _downloads.CommitUpdate(oldPath, path, Path.GetFileNameWithoutExtension(latest.Value.FileName),
-                trainer.PageUrl, latest.Value.Url);
+                page, latest.Value.Url);
             RefreshLocalTrainers();
-            ReloadBindings();              // 绑定路径可能被改写过，列表跟着刷新
+            ReloadBindings();              // 名称→路径 的解析结果可能变了，列表跟着刷新
             StatusText = $"已更新：{trainer.GameName} → {Path.GetFileName(path)}";
             ToastService.ShowSuccess("更新完成", Path.GetFileName(path));
         }
@@ -327,6 +311,22 @@ public partial class TrainerViewModel : ObservableObject
             IsBusy = false;
         }
     }
+
+    /// <summary>用官方 RSS 按名字找文章页（本地名形如 Crimson.Desert.Enhanced.v1.0-v2.0x.Plus.12.Trainer-FLiNG）</summary>
+    private async Task<string?> FindPageUrlAsync(string trainerName)
+    {
+        var query = Regex.Replace(trainerName, @"\.v\d.*$", "");           // 砍掉版本尾巴
+        query = Regex.Replace(query, @"[-_.]+", " ").Replace("FLiNG", "").Trim();
+        if (query.Length == 0) return null;
+
+        var hits = await _catalog.SearchAsync(query);
+        var target = Norm(query);
+        return (hits.FirstOrDefault(h => Norm(h.GameName) == target) ?? hits.FirstOrDefault())?.PageUrl;
+    }
+
+    /// <summary>比对用归一化：只留字母数字（大小写不敏感）</summary>
+    private static string Norm(string text) =>
+        new(text.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
 
     [RelayCommand]
     private void Reveal(TrainerInfo? trainer)
@@ -362,23 +362,24 @@ public partial class TrainerViewModel : ObservableObject
         ApplyMonitorState();
     }
 
-    /// <summary>绑定对话框点确定后调用：同一修改器只留一条绑定</summary>
-    public void AddOrUpdateBinding(string appId, string gameName, string gameExe, string trainerExe, bool enabled)
+    /// <summary>绑定对话框点确定后调用：同一个修改器只留一条绑定（按**名称**去重）</summary>
+    public void AddOrUpdateBinding(string trainerName, string gameExe, bool enabled)
     {
+        if (string.IsNullOrWhiteSpace(trainerName) || string.IsNullOrWhiteSpace(gameExe)) return;
+
         var same = Bindings.FirstOrDefault(b =>
-            string.Equals(b.TrainerFilePath, trainerExe, StringComparison.OrdinalIgnoreCase));
+            string.Equals(b.TrainerName, trainerName, StringComparison.OrdinalIgnoreCase));
         if (same != null) Bindings.Remove(same);
 
         Bindings.Add(new TrainerBinding
         {
-            AppId = appId,
-            GameName = gameName,
+            TrainerName = trainerName,
+            GameName = Path.GetFileNameWithoutExtension(gameExe),
             GameExePath = gameExe,
-            TrainerFilePath = trainerExe,
             IsEnabled = enabled,
         });
         SaveBindings();
-        ToastService.ShowSuccess("已绑定", $"{gameName} → {Path.GetFileName(trainerExe)}");
+        ToastService.ShowSuccess("已绑定", $"{Path.GetFileNameWithoutExtension(gameExe)} → {trainerName}");
     }
 
     [RelayCommand]
@@ -396,9 +397,6 @@ public partial class TrainerViewModel : ObservableObject
         binding.IsEnabled = enabled;
         SaveBindings();
     }
-
-    /// <summary>按 AppID 找游戏主程序（绑定对话框自动带出 exe 用）</summary>
-    public string? ResolveGameExe(string appId) => _onlineFix.ResolveGameExe(appId);
 
     // ── 监控子进程 ──────────────────────────────────────────────────────────
 
