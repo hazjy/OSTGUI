@@ -71,6 +71,24 @@ public sealed partial class TrainerPage : Page
     /// 添加绑定：选游戏（自动带出主程序，找不到可手选）→ 选已下载的修改器 → 是否启用。
     /// 对话框用代码搭（与入库管理页同风格），读到的结果交给 VM 统一落盘。
     /// </summary>
+    /// <summary>选下载目录：取消就什么都不改；选定后只改内存（退出时统一落盘），立刻生效</summary>
+    private async void ChooseDir_Click(object sender, RoutedEventArgs e)
+    {
+        var picker = new Windows.Storage.Pickers.FolderPicker
+        {
+            SuggestedStartLocation = Windows.Storage.Pickers.PickerLocationId.Downloads,
+        };
+        picker.FileTypeFilter.Add("*");   // FolderPicker 至少要一个过滤项，否则 WinUI 会抛异常
+
+        var hwnd = WinRT.Interop.WindowNative.GetWindowHandle(App.MainWindow);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, hwnd);
+
+        var folder = await picker.PickSingleFolderAsync();
+        if (folder == null) return;
+
+        VM.SetDownloadDir(folder.Path);
+    }
+
     private async void AddBinding_Click(object sender, RoutedEventArgs e)
     {
         if (XamlRoot == null) return;

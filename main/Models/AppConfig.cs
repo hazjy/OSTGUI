@@ -68,6 +68,8 @@ public class AppConfig
     public bool AchievementShowOwned { get; set; } = true;
     // 修改器监控：退出 GUI 后仍按绑定自动起停修改器（默认关；开了才会起监控子进程）
     public bool TrainerMonitorEnabled { get; set; }
+    // 修改器下载目录（空 = 用默认 %LOCALAPPDATA%\OSTGUI\trainers）
+    public string TrainerDownloadDir { get; set; } = string.Empty;
 
     // === 应用程序设置 ===
     public int LogMaxLines { get; set; } = 1000;

@@ -41,6 +41,23 @@ public partial class TrainerViewModel : ObservableObject
     /// <summary>监控开关：开了 GUI 退出后仍按绑定工作（默认关）</summary>
     [ObservableProperty] private bool _monitorEnabled;
 
+    /// <summary>当前下载目录（显示用；改目录见 SetDownloadDir）</summary>
+    [ObservableProperty] private string _downloadDirText = "";
+
+    /// <summary>改下载目录：只改内存（退出时统一落盘），立刻生效并刷新已下载列表</summary>
+    public void SetDownloadDir(string? dir)
+    {
+        var value = string.IsNullOrWhiteSpace(dir) ? "" : dir.Trim();
+        _config.Update(c => c.TrainerDownloadDir = value);
+        UpdateDownloadDirText();
+        RefreshLocalTrainers();
+        if (ViewIndex == 1) _ = LoadViewAsync();
+        ToastService.ShowSuccess("下载目录已切换", DownloadDirText);
+    }
+
+    private void UpdateDownloadDirText() =>
+        DownloadDirText = "下载目录：" + _downloads.Dir;
+
     public TrainerViewModel(
         TrainerCatalogService catalog, TrainerDownloadService downloads, TrainerBindingService bindingService,
         LibraryScanner scanner, OnlineFixService onlineFix, ConfigService config)
@@ -70,6 +87,7 @@ public partial class TrainerViewModel : ObservableObject
         RefreshLocalTrainers();
         ReloadBindings();
         ApplyMonitorState();
+        UpdateDownloadDirText();
 
         if (!_initialized)
         {
@@ -165,10 +183,11 @@ public partial class TrainerViewModel : ObservableObject
             }
 
             var progress = new Progress<double>(p => trainer.DownloadProgress = p);
-            var path = await _downloads.DownloadAsync(download.Value.Url, download.Value.FileName, progress);
+            var (path, error) = await _downloads.DownloadAsync(
+                download.Value.Url, download.Value.FileName, trainer.PageUrl, progress);
             if (path == null)
             {
-                ToastService.ShowError("下载失败", "网络异常或文件被占用，详见日志");
+                ToastService.ShowError("下载失败", error.Length > 0 ? error : "详见日志");
                 return;
             }
 
@@ -199,7 +218,7 @@ public partial class TrainerViewModel : ObservableObject
             Process.Start(new ProcessStartInfo
             {
                 FileName = exe,
-                WorkingDirectory = Path.GetDirectoryName(exe) ?? TrainerDownloadService.TrainerDir,
+                WorkingDirectory = Path.GetDirectoryName(exe) ?? _downloads.Dir,
                 UseShellExecute = true,
             });
 
@@ -287,7 +306,7 @@ public partial class TrainerViewModel : ObservableObject
 
     // ── 监控子进程 ──────────────────────────────────────────────────────────
 
-    private static string PidPath => Path.Combine(TrainerDownloadService.TrainerDir, "monitor.pid");
+    private static string PidPath => Path.Combine(TrainerDownloadService.DefaultDir, "monitor.pid");
 
     /// <summary>按开关与"是否有启用绑定"起停监控子进程；关掉时主动结束它，不留后台进程</summary>
     public void ApplyMonitorState()

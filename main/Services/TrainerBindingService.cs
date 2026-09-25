@@ -11,7 +11,7 @@ public class TrainerBindingService
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
-    public static string BindingsPath { get; } = Path.Combine(TrainerDownloadService.TrainerDir, "bindings.json");
+    public static string BindingsPath { get; } = Path.Combine(TrainerDownloadService.DefaultDir, "bindings.json");
 
     public List<TrainerBinding> Load()
     {
@@ -34,7 +34,7 @@ public class TrainerBindingService
     {
         try
         {
-            Directory.CreateDirectory(TrainerDownloadService.TrainerDir);
+            Directory.CreateDirectory(TrainerDownloadService.DefaultDir);
             var temp = BindingsPath + ".tmp";
             File.WriteAllText(temp, JsonSerializer.Serialize(bindings, JsonOptions));
             File.Move(temp, BindingsPath, overwrite: true);   // 原子替换，监控读到的永远是一份完整文件

@@ -17,7 +17,7 @@ public static class TrainerMonitor
     private const int IntervalMs = 2000;
 
     /// <summary>自己写 pid 文件，GUI 侧要停监控时按它来（比按命令行筛进程省事）</summary>
-    private static string PidPath => Path.Combine(TrainerDownloadService.TrainerDir, "monitor.pid");
+    private static string PidPath => Path.Combine(TrainerDownloadService.DefaultDir, "monitor.pid");
 
     public static int Run()
     {
@@ -28,7 +28,7 @@ public static class TrainerMonitor
             return 0;
         }
 
-        Directory.CreateDirectory(TrainerDownloadService.TrainerDir);
+        Directory.CreateDirectory(TrainerDownloadService.DefaultDir);
         try { File.WriteAllText(PidPath, Environment.ProcessId.ToString()); } catch { }
         LogService.AddAppLog($"trainer 监控启动 pid={Environment.ProcessId}");
 
@@ -131,7 +131,7 @@ public static class TrainerMonitor
             var proc = Process.Start(new ProcessStartInfo
             {
                 FileName = binding.TrainerFilePath,
-                WorkingDirectory = Path.GetDirectoryName(binding.TrainerFilePath) ?? TrainerDownloadService.TrainerDir,
+                WorkingDirectory = Path.GetDirectoryName(binding.TrainerFilePath) ?? TrainerDownloadService.DefaultDir,
                 UseShellExecute = true,
             });
 

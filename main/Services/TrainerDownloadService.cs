@@ -6,17 +6,39 @@ namespace OSTGUI.Services;
 
 /// <summary>
 /// 修改器文件的本地管理：下载（进度/取消/原子落盘）、zip 解压、列目录、删除、打开所在目录。
-/// 存放目录：<c>%LOCALAPPDATA%\OSTGUI\trainers</c>（与 bindings.json 同目录）。
+/// 默认目录 <c>%LOCALAPPDATA%\OSTGUI\trainers</c>，可在页面上改（<c>AppConfig.TrainerDownloadDir</c>）。
 ///
-/// FLiNG 的附件是 zip 且**标题里没有扩展名**（如 <c>Elden.Ring.v1.02-v1.16.1.Plus.35.Trainer-FLiNG</c>），
-/// 所以按内容嗅探（开头 "PK"）判断是否要解压，而不是看扩展名。
+/// 下载必须照抄浏览器的请求（2026-09-25 实测）：
+/// - 站点在 Cloudflare 后面且防盗链：**必须带浏览器 UA + 详情页 Referer**（只带 UA 会 403）；
+/// - 直链会 302 两次：<c>/downloads/x</c> → <c>/download-trainer.php?path=…</c>
+///   → <c>wp-content/uploads/trainer-files/…zip/名字.exe</c>，所以自己跟跳转
+///   （HttpClient 的自动跳转不会替我们带上自定义 Referer）。
+/// 落盘的附件**其实是 exe**（不是 zip；站点只是把单文件放在"zip/名.exe"这种路径下），
+/// 所以仍按内容嗅探（开头 "PK" 才是 zip）决定要不要解压。
 /// </summary>
 public class TrainerDownloadService
 {
-    public static string TrainerDir { get; } = Path.Combine(
+    /// <summary>默认目录（也是 bindings.json / monitor.pid 的固定位置——监控进程要一个稳定路径）</summary>
+    public static string DefaultDir { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OSTGUI", "trainers");
 
     private const int TimeoutSeconds = 600;
+    private const string UserAgent =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36";
+
+    private readonly ConfigService _config;
+
+    public TrainerDownloadService(ConfigService config) => _config = config;
+
+    /// <summary>当前下载目录：配置里有就用它，否则默认目录</summary>
+    public string Dir
+    {
+        get
+        {
+            var custom = _config.Config.TrainerDownloadDir;
+            return string.IsNullOrWhiteSpace(custom) ? DefaultDir : custom;
+        }
+    }
 
     /// <summary>已下载的修改器 = 目录下的 exe（含解压出来的子目录，最多看两层）</summary>
     public List<TrainerInfo> ListLocal()
@@ -24,9 +46,9 @@ public class TrainerDownloadService
         var result = new List<TrainerInfo>();
         try
         {
-            if (!Directory.Exists(TrainerDir)) return result;
+            if (!Directory.Exists(Dir)) return result;
 
-            foreach (var file in EnumerateExes(TrainerDir))
+            foreach (var file in EnumerateExes(Dir))
             {
                 result.Add(new TrainerInfo
                 {
@@ -44,25 +66,29 @@ public class TrainerDownloadService
     }
 
     /// <summary>
-    /// 下载到 <see cref="TrainerDir"/>，若是 zip 就地解压；返回可执行的 exe 路径（失败/取消返回 null）。
-    /// 先写 <c>.part</c>、成功再落最终名：取消或断网都不会留下半截文件。
+    /// 下载到 <see cref="Dir"/>，若是 zip 就地解压；返回可执行的 exe 路径（失败/取消返回 null）。
+    /// <paramref name="referer"/> 传详情页地址（防盗链要用）。先写 <c>.part</c>、成功再落最终名。
     /// </summary>
-    public async Task<string?> DownloadAsync(string url, string fileName, IProgress<double>? progress, CancellationToken ct = default)
+    public async Task<(string? Path, string Error)> DownloadAsync(
+        string url, string fileName, string referer, IProgress<double>? progress, CancellationToken ct = default)
     {
-        Directory.CreateDirectory(TrainerDir);
+        Directory.CreateDirectory(Dir);
         var bare = Path.GetFileNameWithoutExtension(fileName);      // 附件标题没有扩展名，先按无扩展名处理
-        var temp = Path.Combine(TrainerDir, bare + ".part");
+        var temp = Path.Combine(Dir, bare + ".part");
 
         try
         {
-            using (var client = new HttpClient { Timeout = TimeSpan.FromSeconds(TimeoutSeconds) })
-            using (var resp = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct))
-            {
-                resp.EnsureSuccessStatusCode();
-                var total = resp.Content.Headers.ContentLength ?? 0;
+            using var handler = new HttpClientHandler { AllowAutoRedirect = false };
+            using var client = new HttpClient(handler) { Timeout = TimeSpan.FromSeconds(TimeoutSeconds) };
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
 
-                await using var src = await resp.Content.ReadAsStreamAsync(ct);
-                await using var dst = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None);
+            using var resp = await FollowRedirectsAsync(client, url, referer, ct);
+            resp.EnsureSuccessStatusCode();
+
+            var total = resp.Content.Headers.ContentLength ?? 0;
+            await using (var src = await resp.Content.ReadAsStreamAsync(ct))
+            await using (var dst = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
                 var buffer = new byte[81920];
                 long read = 0;
                 int n;
@@ -75,24 +101,21 @@ public class TrainerDownloadService
             }
 
             progress?.Report(100);
-            var final = Path.Combine(TrainerDir, bare + (IsZip(temp) ? ".zip" : ".exe"));
+            var final = Path.Combine(Dir, bare + (IsZip(temp) ? ".zip" : ".exe"));
             File.Move(temp, final, overwrite: true);
             LogService.AddAppLog($"trainer 下载完成 {Path.GetFileName(final)}（{new FileInfo(final).Length / 1024} KB，SHA256 {Sha256(final)[..16]}…）");
 
-            if (!IsZip(final)) return final;
-
-            var exe = Extract(final);
-            return exe;
+            return IsZip(final) ? (Extract(final), "") : (final, "");
         }
         catch (OperationCanceledException)
         {
             LogService.AddAppLog($"trainer 下载已取消 {bare}");
-            return null;
+            return (null, "已取消");
         }
         catch (Exception ex)
         {
             LogService.AddAppLog($"trainer 下载失败 {bare}: {ex.Message}");
-            return null;
+            return (null, ex.Message);
         }
         finally
         {
@@ -100,10 +123,35 @@ public class TrainerDownloadService
         }
     }
 
-    /// <summary>解压到与压缩包同名的目录，返回里面第一个 exe（没有 exe 就返回 null）</summary>
-    private static string? Extract(string zipPath)
+    /// <summary>自己跟 302（最多 5 跳），每一跳都带详情页 Referer——站点只认这种"像浏览器"的请求</summary>
+    private static async Task<HttpResponseMessage> FollowRedirectsAsync(
+        HttpClient client, string url, string referer, CancellationToken ct)
     {
-        var dir = Path.Combine(TrainerDir, Path.GetFileNameWithoutExtension(zipPath));
+        var current = url;
+        for (var hop = 0; hop < 5; hop++)
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, current);
+            if (!string.IsNullOrEmpty(referer)) request.Headers.Referrer = new Uri(referer);
+
+            var resp = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, ct);
+            if ((int)resp.StatusCode is >= 300 and < 400 && resp.Headers.Location != null)
+            {
+                var next = resp.Headers.Location.IsAbsoluteUri
+                    ? resp.Headers.Location
+                    : new Uri(new Uri(current), resp.Headers.Location);
+                resp.Dispose();
+                current = next.ToString();
+                continue;
+            }
+            return resp;
+        }
+        throw new IOException("下载地址跳转次数过多");
+    }
+
+    /// <summary>解压到与压缩包同名的目录，返回里面第一个 exe（没有 exe 就返回 null）</summary>
+    private string? Extract(string zipPath)
+    {
+        var dir = Path.Combine(Dir, Path.GetFileNameWithoutExtension(zipPath));
         var dirFull = Path.GetFullPath(dir + Path.DirectorySeparatorChar);
         try
         {
@@ -132,7 +180,7 @@ public class TrainerDownloadService
         }
     }
 
-    /// <summary>目录下的 exe（最多两层，跳过 .part/.tmp）</summary>
+    /// <summary>目录下的 exe（最多两层，跳过临时文件）</summary>
     private static IEnumerable<string> EnumerateExes(string root)
     {
         var result = new List<string>();
