@@ -223,24 +223,23 @@ public partial class AchievementViewModel : ObservableObject
         {
             var map = new Dictionary<string, LibraryItem>(StringComparer.Ordinal);
 
-            // ① 客户端认识的所有游戏（appinfo.vdf，实测 492 条）——类型白名单同 Fluent-Steam-Lua：
-            //    只有 Game/Demo/Mod 算游戏，SDK、工具、Redistributable 之类不进来
-            try
-            {
-                foreach (var (id, info) in AppInfoVdf.GetAll(steamPath))
-                {
-                    if (lua.Contains(id) || !GameTypes.Contains(info.Type)) continue;
-                    map[id] = new LibraryItem
-                    {
-                        AppId = id,
-                        GameName = info.Name.Length > 0 ? info.Name : $"AppID {id}",
-                        SourceTag = "正版",
-                    };
-                }
-            }
-            catch (Exception ex) { LogService.AddAppLog($"正版候选①失败: {ex.Message}"); }
+            var all = AppInfoVdf.GetAll(steamPath);   // appid → (类型, 名字)
 
-            // ② 已安装的游戏（appmanifest_<appid>.acf，顺带取游戏名）
+            // ① 客户端认识的游戏——类型白名单同 Fluent-Steam-Lua：
+            //    只有 Game/Demo/Mod 算游戏，SDK、工具、Redistributable 之类不进来
+            foreach (var (id, info) in all)
+            {
+                if (lua.Contains(id) || !GameTypes.Contains(info.Type)) continue;
+                map[id] = new LibraryItem
+                {
+                    AppId = id,
+                    GameName = info.Name.Length > 0 ? info.Name : $"AppID {id}",
+                    SourceTag = "正版",
+                };
+            }
+
+            // ② 已安装、但 appinfo 不认识的（极少见）：名字取 appmanifest。
+            //    appinfo 认识的一律走 ①，否则工具/运行库会从这条路漏进来（228980 就是这么进来的）
             try
             {
                 foreach (var root in SteamLibraryRoots(steamPath))
@@ -250,7 +249,7 @@ public partial class AchievementViewModel : ObservableObject
                     var idMatch = Regex.Match(text, "\"appid\"\\s*\"(\\d+)\"");
                     if (!idMatch.Success) continue;
                     var id = idMatch.Groups[1].Value;
-                    if (lua.Contains(id)) continue;
+                    if (lua.Contains(id) || all.ContainsKey(id)) continue;
                     var nameMatch = Regex.Match(text, "\"name\"\\s*\"([^\"]*)\"");
                     map[id] = new LibraryItem
                     {
