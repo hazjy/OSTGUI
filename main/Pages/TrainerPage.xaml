@@ -18,7 +18,6 @@
                     <TextBlock Text="{Binding GameName}" TextTrimming="CharacterEllipsis" />
                     <TextBlock Text="{Binding DisplayDate}" FontSize="12"
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <ProgressBar Maximum="100" Value="{Binding DownloadProgress}" Height="2" />
                 </StackPanel>
 
                 <Button Grid.Column="1" Click="Download_Click" Tag="{Binding}"

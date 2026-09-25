@@ -22,6 +22,9 @@ public partial class TrainerViewModel : ObservableObject
 
     private bool _initialized;
     private bool _loadingConfig;
+    /// <summary>搜索页是否已抓过：切回来不重复抓（抓一次就够，除非改了查询词或手动点搜索）</summary>
+    private bool _searchLoaded;
+    private string _loadedQuery = "";
 
     public ObservableCollection<TrainerInfo> Items { get; } = new();
     public ObservableCollection<TrainerBinding> Bindings { get; } = new();
@@ -85,6 +88,7 @@ public partial class TrainerViewModel : ObservableObject
 
     partial void OnViewIndexChanged(int value) => _ = LoadViewAsync();
     partial void OnLocalFilterChanged(string value) => ApplyLocalFilter();
+    partial void OnQueryChanged(string value) => _searchLoaded = false;   // 查询词变了，旧结果作废
     partial void OnMonitorEnabledChanged(bool value)
     {
         if (!_loadingConfig) _config.Update(c => c.TrainerMonitorEnabled = value);   // 只改内存，退出时统一落盘
@@ -122,13 +126,20 @@ public partial class TrainerViewModel : ObservableObject
         }
     }
 
-    public async Task LoadViewAsync()
+    public async Task LoadViewAsync(bool force = false)
     {
         if (IsBusy) return;
 
         if (ViewIndex == 1)
         {
             RefreshLocalTrainers();   // 走索引，只动 LocalItems（不碰搜索的 Items）
+            return;
+        }
+
+        // 已经搜过同样的词就直接用现成结果（切页面不该重新联网抓一次）
+        if (_searchLoaded && !force)
+        {
+            StatusText = SearchStatusText();
             return;
         }
 
@@ -156,11 +167,9 @@ public partial class TrainerViewModel : ObservableObject
             Items.Clear();
             foreach (var t in MarkDownloaded(list)) Items.Add(t);
 
-            StatusText = string.IsNullOrWhiteSpace(Query)
-                ? "输入游戏名后点搜索"
-                : $"搜索「{Query}」{Items.Count} 条";
-            if (Items.Count == 0 && !string.IsNullOrWhiteSpace(Query))
-                StatusText += "（没抓到内容，可能是站点改版或网络异常，详见日志）";
+            _searchLoaded = true;
+            _loadedQuery = Query.Trim();
+            StatusText = SearchStatusText();
         }
         finally
         {
@@ -168,11 +177,20 @@ public partial class TrainerViewModel : ObservableObject
         }
     }
 
+    /// <summary>搜索视图的状态栏文案（含"没找到"——页面真结果 0 条时的正常情况，不是故障）</summary>
+    private string SearchStatusText()
+    {
+        if (_loadedQuery.Length == 0) return "输入游戏名后点搜索";
+        if (Items.Count == 0) return $"没找到「{_loadedQuery}」对应的修改器（站点上确实有却搜不到时，可能是站点改版，详见日志）";
+        return $"搜索「{_loadedQuery}」{Items.Count} 条";
+    }
+
     [RelayCommand]
     private async Task SearchAsync()
     {
-        if (ViewIndex == 0) await LoadViewAsync();   // 已经在搜索页 → 直接重搜
-        else ViewIndex = 0;                          // 从「已下载」切回来：切页本身就会加载
+        _searchLoaded = false;                        // 点搜索 = 明确要求重搜
+        if (ViewIndex == 0) await LoadViewAsync(force: true);
+        else ViewIndex = 0;                           // 从「已下载」切回搜索视图
     }
 
     [RelayCommand]
@@ -192,7 +210,12 @@ public partial class TrainerViewModel : ObservableObject
                 return;
             }
 
-            var progress = new Progress<double>(p => trainer.DownloadProgress = p);
+            // 进度改显示在状态栏（行里不再放进度条：搜索结果行要和已下载行长得一样）
+            var progress = new Progress<double>(p =>
+            {
+                trainer.DownloadProgress = p;
+                StatusText = $"正在下载 {trainer.GameName} {p:0}%";
+            });
             var (path, error) = await _downloads.DownloadAsync(
                 download.Value.Url, download.Value.FileName, trainer.PageUrl, progress);
             if (path == null)
@@ -203,6 +226,7 @@ public partial class TrainerViewModel : ObservableObject
 
             trainer.LocalPath = path;
             RefreshLocalTrainers();
+            if (ViewIndex == 0) StatusText = SearchStatusText();   // 把"正在下载 x%"换回搜索结果说明
             ToastService.ShowSuccess("下载完成", Path.GetFileName(path));
         }
         finally

@@ -18,13 +18,55 @@ public class TrainerCatalogService
 
     public TrainerCatalogService(HttpClient http) => _http = http;
 
-    /// <summary>搜索（?s= 结果页里的 /trainer/ 链接；实测 38 命中 / 16 去重）</summary>
+    /// <summary>结果区的文章块（侧栏/推荐用的是别的 class，不在这里）</summary>
+    private const string ArticlePattern = "<article[^>]*class=\"[^\"]*\\bpost-(?:standard|list)\\b[^\"]*\"[^>]*>(.*?)</article>";
+
+    /// <summary>文章块里的标题链接（h2.post-title &gt; a）</summary>
+    private const string TitleLinkPattern = "<h2[^>]*class=\"[^\"]*post-title[^\"]*\"[^>]*>\\s*<a[^>]*href=\"([^\"]+)\"[^>]*>(.*?)</a>";
+
+    /// <summary>
+    /// 搜索：**只解析结果区的文章块**（<c>article.post-standard</c> / <c>post-list</c>）。
+    ///
+    /// 2026-09-25 修正：原来抓整页所有 <c>/trainer/</c> 链接，会把侧栏的"热门/最新/相关"小工具一起捞进来——
+    /// 实测 <c>?s=elden</c> 真结果只有 2 条却抓到 16 条，<c>?s=peak</c> 真结果 0 条却抓到 12 条（全是推荐）。
+    /// </summary>
     public async Task<List<TrainerInfo>> SearchAsync(string query, int count = 20, CancellationToken ct = default)
     {
         if (string.IsNullOrWhiteSpace(query)) return new List<TrainerInfo>();
 
         var html = await GetAsync($"{BaseUrl}/?s={Uri.EscapeDataString(query.Trim())}", ct);
-        return ParseLinks(html, "<a[^>]+href=\"(" + BaseUrl + "/trainer/[^\"]+)\"[^>]*>(.*?)</a>", count);
+        var result = new List<TrainerInfo>();
+
+        foreach (Match block in Regex.Matches(html, ArticlePattern, RegexOptions.Singleline))
+        {
+            var body = block.Groups[1].Value;
+            var link = Regex.Match(body, TitleLinkPattern, RegexOptions.Singleline);
+
+            string url, name;
+            if (link.Success)
+            {
+                url = WebUtility.HtmlDecode(link.Groups[1].Value);
+                name = Clean(Regex.Replace(link.Groups[2].Value, "<[^>]+>", "").Trim());
+            }
+            else
+            {
+                // 兜底：块内第一个 /trainer/ 链接（仍限定在这一块里，不会带进侧栏）
+                var any = Regex.Match(body, "href=\"(" + BaseUrl + "/trainer/[^\"]+)\"");
+                if (!any.Success) continue;
+                url = WebUtility.HtmlDecode(any.Groups[1].Value);
+                name = "";
+            }
+
+            if (url.Length == 0 || result.Any(r => r.PageUrl == url)) continue;
+            if (name.Length == 0) name = Uri.UnescapeDataString(url.TrimEnd('/').Split('/').Last());
+
+            result.Add(new TrainerInfo { GameName = StripTrainerSuffix(name), PageUrl = url });
+            if (result.Count >= count) break;
+        }
+
+        if (result.Count == 0)
+            LogService.AddAppLog($"trainer 搜索「{query}」无结果（页面长度 {html.Length}）");
+        return result;
     }
 
     /// <summary>详情页里附件行的直链（含 class="attachment-link" 的那个 a 标签的 href 与 title）</summary>
@@ -73,27 +115,6 @@ public class TrainerCatalogService
             }
         }
         throw last ?? new IOException($"抓取失败: {url}");
-    }
-
-    private static List<TrainerInfo> ParseLinks(string html, string pattern, int count)
-    {
-        var result = new List<TrainerInfo>();
-        if (string.IsNullOrEmpty(html)) return result;
-
-        foreach (Match m in Regex.Matches(html, pattern, RegexOptions.Singleline))
-        {
-            var name = Clean(Regex.Replace(m.Groups[2].Value, "<[^>]+>", "").Trim());
-            var url = WebUtility.HtmlDecode(m.Groups[1].Value);
-            if (name.Length == 0 || url.Length == 0) continue;
-            if (result.Any(r => r.PageUrl == url)) continue;   // 结果页里同一链接会出现多次
-
-            result.Add(new TrainerInfo { GameName = StripTrainerSuffix(name), PageUrl = url });
-            if (result.Count >= count) break;
-        }
-
-        if (result.Count == 0)
-            LogService.AddAppLog($"trainer 抓取无结果（页面长度 {html.Length}，可能是站点改版或网络异常）");
-        return result;
     }
 
     private static string Clean(string html) =>
