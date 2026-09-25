@@ -200,7 +200,7 @@ public partial class TrainerViewModel : ObservableObject
 
             trainer.LocalPath = path;
             RefreshLocalTrainers();
-            _ = RevertSearchStatusLaterAsync();
+            _ = RevertStatusLaterAsync();
             ToastService.ShowSuccess("下载完成", Path.GetFileName(path));
         }
         finally
@@ -284,6 +284,7 @@ public partial class TrainerViewModel : ObservableObject
             if (TrainerNames.IsSame(Path.GetFileName(oldPath), latest.Value.FileName))
             {
                 StatusText = $"已是最新：{trainer.GameName}";
+                _ = RevertStatusLaterAsync();
                 ToastService.ShowInfo("已是最新", trainer.GameName);
                 return;
             }
@@ -303,6 +304,7 @@ public partial class TrainerViewModel : ObservableObject
             RefreshLocalTrainers();
             ReloadBindings();              // 名称→路径 的解析结果可能变了，列表跟着刷新
             StatusText = $"已更新：{trainer.GameName} → {Path.GetFileName(path)}";
+            _ = RevertStatusLaterAsync();
             ToastService.ShowSuccess("更新完成", Path.GetFileName(path));
         }
         finally
@@ -324,13 +326,13 @@ public partial class TrainerViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 下载/更新完成后隔 2 秒把状态行换回「搜索 xxx N 条」。
-    /// 留这 2 秒是为了让人看到进度走到 100%（否则刚下完就被换掉，像是没下完）。
+    /// 操作完成后隔 2 秒把状态行换回当前视图的底数状态（搜索=「搜索 xxx N 条」，已下载=「已下载 N 个修改器」）。
+    /// 留这 2 秒是让人看到进度走完，否则刚下完就被换掉，像是没下完。
     /// </summary>
-    private async Task RevertSearchStatusLaterAsync()
+    private async Task RevertStatusLaterAsync()
     {
         await Task.Delay(2000);
-        if (ViewIndex == 0 && !IsBusy) StatusText = SearchStatusText();
+        if (!IsBusy) StatusText = ViewIndex == 1 ? LocalStatusText() : SearchStatusText();
     }
 
     /// <summary>
@@ -512,10 +514,16 @@ public partial class TrainerViewModel : ObservableObject
         LocalItems.Clear();
         foreach (var t in list) LocalItems.Add(t);
 
-        if (ViewIndex == 1)
-            StatusText = q.Length > 0
-                ? $"已下载 {LocalTrainers.Count} 个（过滤「{q}」后 {list.Count} 个）"
-                : $"已下载 {list.Count} 个修改器";
+        if (ViewIndex == 1) StatusText = LocalStatusText();
+    }
+
+    /// <summary>「已下载」该显示的那句底数状态</summary>
+    private string LocalStatusText()
+    {
+        var q = LocalFilter?.Trim() ?? "";
+        return q.Length > 0
+            ? $"已下载 {LocalTrainers.Count} 个（过滤「{q}」后 {LocalItems.Count} 个）"
+            : $"已下载 {LocalItems.Count} 个修改器";
     }
 
     /// <summary>把条目与本地已下载文件对上（同名的就算已下载）</summary>
