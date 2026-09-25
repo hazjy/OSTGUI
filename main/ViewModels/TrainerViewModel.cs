@@ -33,6 +33,8 @@ public partial class TrainerViewModel : ObservableObject
     public ObservableCollection<TrainerInfo> LocalTrainers { get; } = new();
 
     [ObservableProperty] private string _query = "";
+    /// <summary>「已下载」视图的本地过滤词（只筛本地，不发请求；与网页搜索的 Query 各管一摊）</summary>
+    [ObservableProperty] private string _localFilter = "";
     [ObservableProperty] private int _viewIndex;          // 0 搜索 / 1 已下载
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _statusText = "";
@@ -75,6 +77,7 @@ public partial class TrainerViewModel : ObservableObject
     }
 
     partial void OnViewIndexChanged(int value) => _ = LoadViewAsync();
+    partial void OnLocalFilterChanged(string value) => ApplyLocalFilter();
     partial void OnMonitorEnabledChanged(bool value)
     {
         if (!_loadingConfig) _config.Update(c => c.TrainerMonitorEnabled = value);   // 只改内存，退出时统一落盘
@@ -118,10 +121,8 @@ public partial class TrainerViewModel : ObservableObject
 
         if (ViewIndex == 1)
         {
-            RefreshLocalTrainers();
-            Items.Clear();
-            foreach (var t in LocalTrainers) Items.Add(t);
-            StatusText = $"已下载 {Items.Count} 个修改器";
+            RefreshLocalTrainers();   // 走索引，不扫目录（见 TrainerDownloadService.ListLocal）
+            ApplyLocalFilter();
             return;
         }
 
@@ -374,6 +375,24 @@ public partial class TrainerViewModel : ObservableObject
     {
         LocalTrainers.Clear();
         foreach (var t in _downloads.ListLocal()) LocalTrainers.Add(t);
+        if (ViewIndex == 1) ApplyLocalFilter();
+    }
+
+    /// <summary>本地过滤：只筛「已下载」，不动搜索页的 Items（两个视图共用一个 Items 集合）</summary>
+    private void ApplyLocalFilter()
+    {
+        if (ViewIndex != 1) return;
+
+        var q = LocalFilter?.Trim() ?? "";
+        var list = string.IsNullOrEmpty(q)
+            ? LocalTrainers.ToList()
+            : LocalTrainers.Where(t => t.GameName.Contains(q, StringComparison.OrdinalIgnoreCase)).ToList();
+
+        Items.Clear();
+        foreach (var t in list) Items.Add(t);
+        StatusText = q.Length > 0
+            ? $"已下载 {LocalTrainers.Count} 个（过滤「{q}」后 {list.Count} 个）"
+            : $"已下载 {list.Count} 个修改器";
     }
 
     /// <summary>把条目与本地已下载文件对上（同名的就算已下载）</summary>

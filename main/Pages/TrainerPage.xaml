@@ -5,6 +5,69 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:CommunityToolkit.WinUI.Controls">
 
+    <Page.Resources>
+        <!-- 搜索结果行：只留下载（启动/打开/删除只对"已下载"才有意义） -->
+        <DataTemplate x:Key="SearchRowTemplate">
+            <Grid ColumnSpacing="8" Padding="0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Spacing="2">
+                    <TextBlock Text="{Binding GameName}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding DisplayDate}" FontSize="12"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <ProgressBar Maximum="100" Value="{Binding DownloadProgress}" Height="2" />
+                </StackPanel>
+
+                <Button Grid.Column="1" Click="Download_Click" Tag="{Binding}"
+                        AutomationProperties.Name="下载" ToolTipService.ToolTip="下载"
+                        Width="28" Height="28" MinWidth="0" Padding="0" VerticalAlignment="Center"
+                        Background="Transparent" BorderThickness="0">
+                    <FontIcon Glyph="&#xE896;" FontSize="14" />
+                </Button>
+            </Grid>
+        </DataTemplate>
+
+        <!-- 已下载行：启动 / 打开所在目录 / 删除 -->
+        <DataTemplate x:Key="LocalRowTemplate">
+            <Grid ColumnSpacing="8" Padding="0,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Spacing="2">
+                    <TextBlock Text="{Binding GameName}" TextTrimming="CharacterEllipsis" />
+                    <TextBlock Text="{Binding DisplayDate}" FontSize="12"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Click="Launch_Click" Tag="{Binding}"
+                            AutomationProperties.Name="启动" ToolTipService.ToolTip="启动"
+                            Width="28" Height="28" MinWidth="0" Padding="0"
+                            Background="Transparent" BorderThickness="0">
+                        <FontIcon Glyph="&#xE768;" FontSize="14" />
+                    </Button>
+                    <Button Click="Reveal_Click" Tag="{Binding}"
+                            AutomationProperties.Name="打开所在目录" ToolTipService.ToolTip="打开所在目录"
+                            Width="28" Height="28" MinWidth="0" Padding="0"
+                            Background="Transparent" BorderThickness="0">
+                        <FontIcon Glyph="&#xE8B7;" FontSize="14" />
+                    </Button>
+                    <Button Click="Delete_Click" Tag="{Binding}"
+                            AutomationProperties.Name="删除" ToolTipService.ToolTip="删除"
+                            Width="28" Height="28" MinWidth="0" Padding="0"
+                            Background="Transparent" BorderThickness="0">
+                        <FontIcon Glyph="&#xE74D;" FontSize="14" />
+                    </Button>
+                </StackPanel>
+            </Grid>
+        </DataTemplate>
+    </Page.Resources>
+
     <Grid Margin="40,32,40,40" RowSpacing="16">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -23,7 +86,7 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <!-- 左：来源切换 + 搜索 + 条目 -->
+            <!-- 左：搜索网页 / 过滤已下载 + 条目 -->
             <Border Grid.Column="0" Padding="12" CornerRadius="8"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
@@ -37,11 +100,12 @@
 
                     <controls:Segmented Grid.Row="0" x:Name="SourceSegmented" HorizontalAlignment="Stretch"
                                         SelectionChanged="SourceSegmented_SelectionChanged">
-                        <controls:SegmentedItem Content="搜索" IsSelected="True" Height="40" MinHeight="40" />
-                        <controls:SegmentedItem Content="已下载" Height="40" MinHeight="40" />
+                        <controls:SegmentedItem Content="搜索" IsSelected="True" Height="32" MinHeight="32" />
+                        <controls:SegmentedItem Content="已下载" Height="32" MinHeight="32" />
                     </controls:Segmented>
 
-                    <Grid Grid.Row="1" ColumnSpacing="8">
+                    <!-- 视图 0：搜网页（"搜索"） -->
+                    <Grid x:Name="WebSearchRow" Grid.Row="1" ColumnSpacing="8">
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
@@ -56,60 +120,13 @@
                         </Button>
                     </Grid>
 
-                    <ListView Grid.Row="2" SelectionMode="None" ItemsSource="{Binding Items}">
-                        <ListView.ItemTemplate>
-                            <DataTemplate>
-                                <Border Padding="0,8" BorderThickness="0,0,0,1"
-                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
-                                    <Grid ColumnSpacing="4">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
+                    <!-- 视图 1：过滤本地（只筛已下载，不发网络请求） -->
+                    <TextBox x:Name="LocalFilterRow" Grid.Row="1" Visibility="Collapsed"
+                             PlaceholderText="过滤已下载" TextChanged="LocalFilterBox_TextChanged" />
 
-                                        <StackPanel Grid.Column="0" Spacing="2">
-                                            <TextBlock Text="{Binding GameName}" TextTrimming="CharacterEllipsis" />
-                                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                                <TextBlock Text="{Binding DisplayDate}" FontSize="12"
-                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                                <TextBlock Text="{Binding SizeText}" FontSize="12"
-                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                            </StackPanel>
-                                            <ProgressBar Maximum="100" Value="{Binding DownloadProgress}" Height="2" />
-                                        </StackPanel>
-
-                                        <!-- 纯图标按钮：都给 AutomationProperties.Name（UIA 才读得到） -->
-                                        <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                                            <Button Click="Download_Click" Tag="{Binding}"
-                                                    AutomationProperties.Name="下载" ToolTipService.ToolTip="下载"
-                                                    Width="28" Height="28" MinWidth="0" Padding="0"
-                                                    Background="Transparent" BorderThickness="0">
-                                                <FontIcon Glyph="&#xE896;" FontSize="14" />
-                                            </Button>
-                                            <Button Click="Launch_Click" Tag="{Binding}"
-                                                    AutomationProperties.Name="启动" ToolTipService.ToolTip="启动"
-                                                    Width="28" Height="28" MinWidth="0" Padding="0"
-                                                    Background="Transparent" BorderThickness="0">
-                                                <FontIcon Glyph="&#xE768;" FontSize="14" />
-                                            </Button>
-                                            <Button Click="Reveal_Click" Tag="{Binding}"
-                                                    AutomationProperties.Name="打开所在目录" ToolTipService.ToolTip="打开所在目录"
-                                                    Width="28" Height="28" MinWidth="0" Padding="0"
-                                                    Background="Transparent" BorderThickness="0">
-                                                <FontIcon Glyph="&#xE8B7;" FontSize="14" />
-                                            </Button>
-                                            <Button Click="Delete_Click" Tag="{Binding}"
-                                                    AutomationProperties.Name="删除" ToolTipService.ToolTip="删除"
-                                                    Width="28" Height="28" MinWidth="0" Padding="0"
-                                                    Background="Transparent" BorderThickness="0">
-                                                <FontIcon Glyph="&#xE74D;" FontSize="14" />
-                                            </Button>
-                                        </StackPanel>
-                                    </Grid>
-                                </Border>
-                            </DataTemplate>
-                        </ListView.ItemTemplate>
-                    </ListView>
+                    <ListView x:Name="ItemsList" Grid.Row="2" SelectionMode="None"
+                              ItemsSource="{Binding Items}"
+                              ItemTemplate="{StaticResource SearchRowTemplate}" />
 
                     <Grid Grid.Row="3" ColumnSpacing="8">
                         <Grid.ColumnDefinitions>
@@ -173,34 +190,31 @@
                     <ListView Grid.Row="1" SelectionMode="None" ItemsSource="{Binding Bindings}">
                         <ListView.ItemTemplate>
                             <DataTemplate>
-                                <Border Padding="0,8" BorderThickness="0,0,0,1"
-                                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
-                                    <Grid ColumnSpacing="12">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="Auto" />
-                                            <ColumnDefinition Width="*" />
-                                            <ColumnDefinition Width="Auto" />
-                                        </Grid.ColumnDefinitions>
+                                <Grid ColumnSpacing="12" Padding="0,8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
 
-                                        <CheckBox Grid.Column="0" MinWidth="0" MinHeight="0" VerticalAlignment="Center"
-                                                  IsChecked="{Binding IsEnabled, Mode=OneWay}"
-                                                  Click="BindingEnabled_Click" Tag="{Binding}"
-                                                  AutomationProperties.Name="启用该绑定" />
+                                    <CheckBox Grid.Column="0" MinWidth="0" MinHeight="0" VerticalAlignment="Center"
+                                              IsChecked="{Binding IsEnabled, Mode=OneWay}"
+                                              Click="BindingEnabled_Click" Tag="{Binding}"
+                                              AutomationProperties.Name="启用该绑定" />
 
-                                        <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
-                                            <TextBlock Text="{Binding GameName}" TextTrimming="CharacterEllipsis" />
-                                            <TextBlock Text="{Binding Subtitle}" FontSize="12" TextTrimming="CharacterEllipsis"
-                                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                        </StackPanel>
+                                    <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                        <TextBlock Text="{Binding GameName}" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Text="{Binding Subtitle}" FontSize="12" TextTrimming="CharacterEllipsis"
+                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
 
-                                        <Button Grid.Column="2" Click="RemoveBinding_Click" Tag="{Binding}"
-                                                AutomationProperties.Name="删除绑定" ToolTipService.ToolTip="删除绑定"
-                                                Width="28" Height="28" MinWidth="0" Padding="0" VerticalAlignment="Center"
-                                                Background="Transparent" BorderThickness="0">
-                                            <FontIcon Glyph="&#xE74D;" FontSize="14" />
-                                        </Button>
-                                    </Grid>
-                                </Border>
+                                    <Button Grid.Column="2" Click="RemoveBinding_Click" Tag="{Binding}"
+                                            AutomationProperties.Name="删除绑定" ToolTipService.ToolTip="删除绑定"
+                                            Width="28" Height="28" MinWidth="0" Padding="0" VerticalAlignment="Center"
+                                            Background="Transparent" BorderThickness="0">
+                                        <FontIcon Glyph="&#xE74D;" FontSize="14" />
+                                    </Button>
+                                </Grid>
                             </DataTemplate>
                         </ListView.ItemTemplate>
                     </ListView>

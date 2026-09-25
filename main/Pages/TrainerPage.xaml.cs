@@ -27,7 +27,21 @@ public sealed partial class TrainerPage : Page
     {
         // 注意：Segmented 第一项的 IsSelected="True" 会在 InitializeComponent() **期间**就触发本事件，
         // 那时 VM 还没赋值（构造里 InitializeComponent 在前）——不判空会在导航时抛 NRE、页面打不开
-        if (VM != null && SourceSegmented.SelectedIndex >= 0) VM.ViewIndex = SourceSegmented.SelectedIndex;
+        if (VM == null || SourceSegmented.SelectedIndex < 0) return;
+
+        VM.ViewIndex = SourceSegmented.SelectedIndex;
+
+        // 两个视图的输入框与行模板都不一样：
+        // 搜索 = 网页查询 + 只留下载按钮；已下载 = 本地过滤 + 启动/打开目录/删除
+        var local = SourceSegmented.SelectedIndex == 1;
+        WebSearchRow.Visibility = local ? Visibility.Collapsed : Visibility.Visible;
+        LocalFilterRow.Visibility = local ? Visibility.Visible : Visibility.Collapsed;
+        ItemsList.ItemTemplate = (DataTemplate)Resources[local ? "LocalRowTemplate" : "SearchRowTemplate"];
+    }
+
+    private void LocalFilterBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (VM != null && sender is TextBox box) VM.LocalFilter = box.Text ?? "";
     }
 
     private void QueryBox_KeyDown(object sender, KeyRoutedEventArgs e)

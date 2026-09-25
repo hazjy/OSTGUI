@@ -40,29 +40,93 @@ public class TrainerDownloadService
         }
     }
 
-    /// <summary>已下载的修改器 = 目录下的 exe（含解压出来的子目录，最多看两层）</summary>
+    /// <summary>已下载修改器的**索引**（固定放默认目录，不随下载目录变）：只认这里记的条目</summary>
+    private static string IndexPath => Path.Combine(DefaultDir, "trainers.json");
+
+    private sealed class IndexEntry
+    {
+        public string Name { get; set; } = "";
+        public string Path { get; set; } = "";
+        public string SourceUrl { get; set; } = "";
+        public DateTime AddedAt { get; set; }
+    }
+
+    /// <summary>
+    /// 已下载的修改器 = **索引里的条目**（文件还在的）。
+    /// 刻意不扫目录：修改器自带一堆其他 exe（游戏原版 exe、工具链），递归扫会把它们都当成修改器。
+    /// 索引里指向的文件被手动删掉时，顺手把该条目摘掉。
+    /// </summary>
     public List<TrainerInfo> ListLocal()
     {
         var result = new List<TrainerInfo>();
         try
         {
-            if (!Directory.Exists(Dir)) return result;
+            var entries = ReadIndex();
+            var alive = entries.Where(e => File.Exists(e.Path)).ToList();
+            if (alive.Count != entries.Count) WriteIndex(alive);
 
-            foreach (var file in EnumerateExes(Dir))
+            foreach (var entry in alive)
             {
                 result.Add(new TrainerInfo
                 {
-                    GameName = Path.GetFileNameWithoutExtension(file),
-                    LocalPath = file,
-                    UpdateDate = File.GetLastWriteTime(file).ToString("yyyy.MM.dd"),
+                    GameName = entry.Name,
+                    LocalPath = entry.Path,
+                    UpdateDate = File.GetLastWriteTime(entry.Path).ToString("yyyy.MM.dd"),
                 });
             }
         }
         catch (Exception ex)
         {
-            LogService.AddAppLog($"trainer 列目录失败: {ex.Message}");
+            LogService.AddAppLog($"trainer 读取索引失败: {ex.Message}");
         }
         return result.OrderBy(r => r.GameName, StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    private static List<IndexEntry> ReadIndex()
+    {
+        try
+        {
+            if (!File.Exists(IndexPath)) return new List<IndexEntry>();
+            return System.Text.Json.JsonSerializer.Deserialize<List<IndexEntry>>(File.ReadAllText(IndexPath))
+                   ?? new List<IndexEntry>();
+        }
+        catch (Exception ex)
+        {
+            LogService.AddAppLog($"trainer 索引解析失败（当空处理）: {ex.Message}");
+            return new List<IndexEntry>();
+        }
+    }
+
+    private static void WriteIndex(List<IndexEntry> entries)
+    {
+        try
+        {
+            Directory.CreateDirectory(DefaultDir);
+            var temp = IndexPath + ".tmp";
+            File.WriteAllText(temp, System.Text.Json.JsonSerializer.Serialize(entries,
+                new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+            File.Move(temp, IndexPath, overwrite: true);
+        }
+        catch (Exception ex)
+        {
+            LogService.AddAppLog($"trainer 索引写入失败: {ex.Message}");
+        }
+    }
+
+    /// <summary>记录一个修改器（按路径去重）</summary>
+    private static void AddToIndex(string name, string path, string sourceUrl)
+    {
+        var entries = ReadIndex();
+        entries.RemoveAll(e => string.Equals(e.Path, path, StringComparison.OrdinalIgnoreCase));
+        entries.Add(new IndexEntry { Name = name, Path = path, SourceUrl = sourceUrl, AddedAt = DateTime.Now });
+        WriteIndex(entries);
+    }
+
+    private static void RemoveFromIndex(string path)
+    {
+        var entries = ReadIndex();
+        if (entries.RemoveAll(e => string.Equals(e.Path, path, StringComparison.OrdinalIgnoreCase)) > 0)
+            WriteIndex(entries);
     }
 
     /// <summary>
@@ -105,7 +169,9 @@ public class TrainerDownloadService
             File.Move(temp, final, overwrite: true);
             LogService.AddAppLog($"trainer 下载完成 {Path.GetFileName(final)}（{new FileInfo(final).Length / 1024} KB，SHA256 {Sha256(final)[..16]}…）");
 
-            return IsZip(final) ? (Extract(final), "") : (final, "");
+            var result = IsZip(final) ? Extract(final) : final;
+            if (result != null) AddToIndex(bare, result, url);   // 让"已下载"只认我们下过的东西
+            return (result, "");
         }
         catch (OperationCanceledException)
         {
@@ -210,6 +276,7 @@ public class TrainerDownloadService
         try
         {
             if (File.Exists(path)) File.Delete(path);
+            RemoveFromIndex(path);
             LogService.AddAppLog($"trainer 已删除 {Path.GetFileName(path)}");
         }
         catch (Exception ex)
