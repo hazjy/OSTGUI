@@ -44,6 +44,12 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Click="Update_Click" Tag="{Binding}"
+                            AutomationProperties.Name="更新" ToolTipService.ToolTip="从官方重新下载最新版并覆盖（同时更新索引与绑定）"
+                            Width="28" Height="28" MinWidth="0" Padding="0"
+                            Background="Transparent" BorderThickness="0">
+                        <FontIcon Glyph="&#xE74A;" FontSize="14" />
+                    </Button>
                     <Button Click="Launch_Click" Tag="{Binding}"
                             AutomationProperties.Name="启动" ToolTipService.ToolTip="启动"
                             Width="28" Height="28" MinWidth="0" Padding="0"

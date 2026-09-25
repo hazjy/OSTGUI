@@ -51,6 +51,8 @@ public class TrainerDownloadService
     {
         public string Name { get; set; } = "";
         public string Path { get; set; } = "";
+        /// <summary>详情页地址——「更新」要靠它重新取最新附件（旧记录可能为空，见 <see cref="CommitUpdate"/> 的提示）</summary>
+        public string PageUrl { get; set; } = "";
         public string SourceUrl { get; set; } = "";
         public DateTime AddedAt { get; set; }
     }
@@ -75,6 +77,7 @@ public class TrainerDownloadService
                 {
                     GameName = entry.Name,
                     LocalPath = entry.Path,
+                    PageUrl = entry.PageUrl,     // 「更新」要用它回详情页取最新版
                     UpdateDate = File.GetLastWriteTime(entry.Path).ToString("yyyy.MM.dd"),
                 });
             }
@@ -118,12 +121,67 @@ public class TrainerDownloadService
     }
 
     /// <summary>记录一个修改器（按路径去重）</summary>
-    private static void AddToIndex(string name, string path, string sourceUrl)
+    private static void AddToIndex(string name, string path, string pageUrl, string sourceUrl)
     {
         var entries = ReadIndex();
         entries.RemoveAll(e => string.Equals(e.Path, path, StringComparison.OrdinalIgnoreCase));
-        entries.Add(new IndexEntry { Name = name, Path = path, SourceUrl = sourceUrl, AddedAt = DateTime.Now });
+        entries.Add(new IndexEntry
+        {
+            Name = name,
+            Path = path,
+            PageUrl = pageUrl,
+            SourceUrl = sourceUrl,
+            AddedAt = DateTime.Now,
+        });
         WriteIndex(entries);
+    }
+
+    /// <summary>
+    /// 「更新」的收尾：新文件已就位后，删旧文件（含旧的解压目录）、把索引换到新路径、
+    /// 并把绑定里指向旧路径的条目改指新路径。
+    /// 顺序刻意是"新文件先就位 → 再动旧引用"：中途失败也不会把还能用的旧文件弄没。
+    /// </summary>
+    public void CommitUpdate(string oldPath, string newPath, string newName, string pageUrl, string sourceUrl)
+    {
+        var entries = ReadIndex();
+        var old = entries.FirstOrDefault(e => string.Equals(e.Path, oldPath, StringComparison.OrdinalIgnoreCase));
+
+        if (!string.Equals(oldPath, newPath, StringComparison.OrdinalIgnoreCase))
+        {
+            TryDelete(oldPath);
+
+            // 旧文件是 zip 解压出来的 → 连同那个解压目录一起清掉（里面全是旧版文件）
+            var oldDir = Path.GetDirectoryName(oldPath);
+            if (oldDir != null && !string.Equals(oldDir, DefaultDir, StringComparison.OrdinalIgnoreCase))
+                TryDeleteDirectory(oldDir);
+        }
+
+        entries.RemoveAll(e => string.Equals(e.Path, oldPath, StringComparison.OrdinalIgnoreCase));
+        entries.RemoveAll(e => string.Equals(e.Path, newPath, StringComparison.OrdinalIgnoreCase));
+        entries.Add(new IndexEntry
+        {
+            Name = newName,
+            Path = newPath,
+            PageUrl = string.IsNullOrEmpty(pageUrl) ? old?.PageUrl ?? "" : pageUrl,
+            SourceUrl = sourceUrl,
+            AddedAt = DateTime.Now,
+        });
+        WriteIndex(entries);
+
+        var rewired = new TrainerBindingService().ReplaceTrainerPath(oldPath, newPath);
+        LogService.AddAppLog($"trainer 更新完成：{Path.GetFileName(oldPath)} → {Path.GetFileName(newPath)}（绑定改写 {rewired} 条）");
+    }
+
+    private static void TryDelete(string path)
+    {
+        try { if (File.Exists(path)) File.Delete(path); }
+        catch (Exception ex) { LogService.AddAppLog($"trainer 删除旧文件失败 {Path.GetFileName(path)}: {ex.Message}"); }
+    }
+
+    private static void TryDeleteDirectory(string dir)
+    {
+        try { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); }
+        catch (Exception ex) { LogService.AddAppLog($"trainer 删除旧目录失败 {Path.GetFileName(dir)}: {ex.Message}"); }
     }
 
     private static void RemoveFromIndex(string path)
@@ -174,7 +232,7 @@ public class TrainerDownloadService
             LogService.AddAppLog($"trainer 下载完成 {Path.GetFileName(final)}（{new FileInfo(final).Length / 1024} KB，SHA256 {Sha256(final)[..16]}…）");
 
             var result = IsZip(final) ? Extract(final) : final;
-            if (result != null) AddToIndex(bare, result, url);   // 让"已下载"只认我们下过的东西
+            if (result != null) AddToIndex(bare, result, referer, url);   // referer 就是详情页：「更新」要靠它
             return (result, "");
         }
         catch (OperationCanceledException)

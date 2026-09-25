@@ -55,6 +55,11 @@ public sealed partial class TrainerPage : Page
         if ((sender as FrameworkElement)?.Tag is TrainerInfo info) VM.DownloadCommand.Execute(info);
     }
 
+    private void Update_Click(object sender, RoutedEventArgs e)
+    {
+        if ((sender as FrameworkElement)?.Tag is TrainerInfo info) VM.UpdateCommand.Execute(info);
+    }
+
     private void Launch_Click(object sender, RoutedEventArgs e)
     {
         if ((sender as FrameworkElement)?.Tag is TrainerInfo info) VM.LaunchCommand.Execute(info);

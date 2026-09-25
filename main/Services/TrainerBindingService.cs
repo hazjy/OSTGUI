@@ -45,4 +45,23 @@ public class TrainerBindingService
             LogService.AddAppLog($"trainer 绑定保存失败: {ex.Message}");
         }
     }
+
+    /// <summary>
+    /// 修改器文件被更新（换了路径/文件名）后，把绑定里指向旧路径的条目改指新路径。
+    /// 不做这一步，「更新」之后绑定就指向一个已被删掉的文件（监控会静默失效）。
+    /// 返回改写的条数。
+    /// </summary>
+    public int ReplaceTrainerPath(string oldPath, string newPath)
+    {
+        if (string.Equals(oldPath, newPath, StringComparison.OrdinalIgnoreCase)) return 0;
+
+        var bindings = Load();
+        var changed = bindings.Where(b =>
+            string.Equals(b.TrainerFilePath, oldPath, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (changed.Count == 0) return 0;
+
+        foreach (var binding in changed) binding.TrainerFilePath = newPath;
+        Save(bindings);
+        return changed.Count;
+    }
 }

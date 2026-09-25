@@ -266,6 +266,68 @@ public partial class TrainerViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// 更新已下载的修改器：回详情页取**最新那条附件**下载覆盖，并把索引与进程绑定一并改写。
+    /// 详情页里最新附件排在第一行（实测 Crimson Desert 有 13 行，第一行是最新版本）→ GetDownloadAsync 拿到的就是最新版。
+    /// </summary>
+    [RelayCommand]
+    private async Task UpdateAsync(TrainerInfo? trainer)
+    {
+        if (trainer == null || IsBusy) return;
+
+        if (string.IsNullOrEmpty(trainer.PageUrl))
+        {
+            ToastService.ShowWarning("无法更新", "这条记录没存来源页（早先下载的），删掉重新下载一次即可支持一键更新");
+            return;
+        }
+
+        var oldPath = trainer.LocalPath;
+        IsBusy = true;
+        StatusText = $"正在检查更新 {trainer.GameName}…";
+        try
+        {
+            var latest = await _catalog.GetDownloadAsync(trainer.PageUrl);
+            if (latest == null)
+            {
+                StatusText = SearchStatusText();
+                ToastService.ShowError("更新失败", "详情页里没找到附件链接（站点结构可能已变）");
+                return;
+            }
+
+            if (string.Equals(Path.GetFileNameWithoutExtension(oldPath),
+                    Path.GetFileNameWithoutExtension(latest.Value.FileName), StringComparison.OrdinalIgnoreCase))
+            {
+                StatusText = SearchStatusText();
+                ToastService.ShowInfo("已是最新", trainer.GameName);
+                return;
+            }
+
+            StatusText = $"正在下载 {trainer.GameName} 的新版本…";
+            var progress = new Progress<double>(p => StatusText = $"正在更新 {trainer.GameName} {p:0}%");
+            var (path, error) = await _downloads.DownloadAsync(
+                latest.Value.Url, latest.Value.FileName, trainer.PageUrl, progress);
+
+            if (path == null)
+            {
+                // 失败时旧文件原样不动（新文件是先落盘、成功后才动旧引用）
+                StatusText = "更新失败：网络或站点异常（详见日志）";
+                ToastService.ShowError("更新失败", error.Length > 0 ? error : "详见日志");
+                return;
+            }
+
+            _downloads.CommitUpdate(oldPath, path, Path.GetFileNameWithoutExtension(latest.Value.FileName),
+                trainer.PageUrl, latest.Value.Url);
+            RefreshLocalTrainers();
+            ReloadBindings();              // 绑定路径可能被改写过，列表跟着刷新
+            StatusText = $"已更新：{trainer.GameName} → {Path.GetFileName(path)}";
+            ToastService.ShowSuccess("更新完成", Path.GetFileName(path));
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
     [RelayCommand]
     private void Reveal(TrainerInfo? trainer)
     {
