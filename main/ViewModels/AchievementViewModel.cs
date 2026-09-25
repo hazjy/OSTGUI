@@ -61,6 +61,12 @@ public partial class AchievementViewModel : ObservableObject
     private bool _suppress;
     private bool _ownedLoaded;
 
+    /// <summary>算"游戏"的 appinfo 类型（Fluent-Steam-Lua 同款白名单），其余是 SDK/工具/Redistributable 之类</summary>
+    private static readonly HashSet<string> GameTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "Game", "Demo", "Mod"
+    };
+
     /// <summary>lua 入库涉及的所有 appid（文件名 + 各 addappid），用来把正版候选排除掉</summary>
     private readonly HashSet<string> _luaIds = new(StringComparer.Ordinal);
 
@@ -169,9 +175,9 @@ public partial class AchievementViewModel : ObservableObject
         var filled = false;
         foreach (var item in nameless)
         {
-            if (local.TryGetValue(item.AppId, out var localName) && localName.Length > 0)
+            if (local.TryGetValue(item.AppId, out var info) && info.Name.Length > 0)
             {
-                item.GameName = localName;
+                item.GameName = info.Name;
                 filled = true;
             }
         }
@@ -217,17 +223,17 @@ public partial class AchievementViewModel : ObservableObject
         {
             var map = new Dictionary<string, LibraryItem>(StringComparer.Ordinal);
 
-            // ① 客户端认识的所有 app（appinfo.vdf，实测 492 条）——不按"有没有成就定义"筛，
-            //    否则没装、也没启动过的拥有游戏不会出现
+            // ① 客户端认识的所有游戏（appinfo.vdf，实测 492 条）——类型白名单同 Fluent-Steam-Lua：
+            //    只有 Game/Demo/Mod 算游戏，SDK、工具、Redistributable 之类不进来
             try
             {
-                foreach (var (id, name) in AppInfoVdf.GetAll(steamPath))
+                foreach (var (id, info) in AppInfoVdf.GetAll(steamPath))
                 {
-                    if (lua.Contains(id)) continue;
+                    if (lua.Contains(id) || !GameTypes.Contains(info.Type)) continue;
                     map[id] = new LibraryItem
                     {
                         AppId = id,
-                        GameName = name.Length > 0 ? name : $"AppID {id}",
+                        GameName = info.Name.Length > 0 ? info.Name : $"AppID {id}",
                         SourceTag = "正版",
                     };
                 }
