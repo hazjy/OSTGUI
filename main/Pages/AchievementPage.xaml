@@ -37,6 +37,7 @@
                             <ColumnDefinition Width="*" />
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
                         <TextBox Grid.Column="0" PlaceholderText="按名称或 AppID 过滤"
                                  Text="{Binding Filter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
@@ -46,6 +47,13 @@
                         <CheckBox Grid.Column="2" MinWidth="0" Content="正版" VerticalAlignment="Center"
                                   IsChecked="{Binding ShowOwned, Mode=TwoWay}"
                                   ToolTipService.ToolTip="显示客户端认为你拥有的游戏" />
+                        <Button Grid.Column="3" Command="{Binding RefreshCommand}"
+                                AutomationProperties.Name="刷新"
+                                ToolTipService.ToolTip="重新扫描游戏列表"
+                                Width="32" Height="32" MinWidth="0" Padding="0"
+                                Background="Transparent" BorderThickness="0">
+                            <FontIcon Glyph="&#xE72C;" FontSize="16" />
+                        </Button>
                     </Grid>
 
                     <ListView Grid.Row="1" SelectionMode="Single"

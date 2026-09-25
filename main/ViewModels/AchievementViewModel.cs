@@ -53,6 +53,7 @@ public partial class AchievementViewModel : ObservableObject
     private readonly AchievementStore _store;
     private readonly SteamStatsService _stats;
     private readonly GameSearchService _search;
+    private readonly ConfigService _config;
 
     private List<LibraryItem> _allGames = new();
     private List<LibraryItem> _ownedGames = new();
@@ -93,7 +94,7 @@ public partial class AchievementViewModel : ObservableObject
 
     public AchievementViewModel(
         SteamService steam, LibraryScanner scanner, GameNameCacheService names,
-        AchievementStore store, SteamStatsService stats, GameSearchService search)
+        AchievementStore store, SteamStatsService stats, GameSearchService search, ConfigService config)
     {
         _steam = steam;
         _scanner = scanner;
@@ -101,6 +102,11 @@ public partial class AchievementViewModel : ObservableObject
         _store = store;
         _stats = stats;
         _search = search;
+        _config = config;
+
+        // 勾选状态沿用上次的选择（直接写字段：构造期不触发过滤与保存）
+        _showLua = config.Config.AchievementShowLua;
+        _showOwned = config.Config.AchievementShowOwned;
     }
 
     public bool HasNotice => !string.IsNullOrEmpty(Notice);
@@ -117,8 +123,49 @@ public partial class AchievementViewModel : ObservableObject
         value.CollectionChanged += (_, _) => ApplyRowFilter();
         ApplyRowFilter();
     }
-    partial void OnShowLuaChanged(bool value) => ApplyFilter();
-    partial void OnShowOwnedChanged(bool value) => ApplyFilter();
+    partial void OnShowLuaChanged(bool value)
+    {
+        ApplyFilter();
+        _ = SaveTogglesAsync();
+    }
+
+    partial void OnShowOwnedChanged(bool value)
+    {
+        ApplyFilter();
+        _ = SaveTogglesAsync();
+    }
+
+    /// <summary>重扫左侧列表（入库 + 正版）并重读当前游戏</summary>
+    [RelayCommand]
+    private async Task RefreshAsync()
+    {
+        if (IsBusy) return;
+        IsBusy = true;
+        try
+        {
+            _ownedLoaded = false;
+            _luaIds.Clear();
+            await InitializeAsync();
+        }
+        finally
+        {
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>记住两个来源勾选，下次进页面沿用</summary>
+    private async Task SaveTogglesAsync()
+    {
+        try
+        {
+            await _config.UpdateAndSaveAsync(c =>
+            {
+                c.AchievementShowLua = ShowLua;
+                c.AchievementShowOwned = ShowOwned;
+            });
+        }
+        catch (Exception ex) { LogService.AddAppLog($"成就页记住勾选失败: {ex.Message}"); }
+    }
     partial void OnSelectedGameChanged(LibraryItem? value) => _ = LoadGameAsync(value);
 
     public async Task InitializeAsync()

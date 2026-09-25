@@ -63,6 +63,9 @@ public class AppConfig
     public string LibraryViewMode { get; set; } = "list";
     // 搜索入库视图形态：同上（两页各自独立记忆；想联动就都读这一个键）
     public string SearchViewMode { get; set; } = "list";
+    // 成就页左侧列表的两个来源勾选（lua 入库 / 正版拥有），记住上次的选择
+    public bool AchievementShowLua { get; set; } = true;
+    public bool AchievementShowOwned { get; set; } = true;
 
     // === 应用程序设置 ===
     public int LogMaxLines { get; set; } = 1000;
