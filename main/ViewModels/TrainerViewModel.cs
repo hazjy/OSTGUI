@@ -1,6 +1,5 @@
 using System.Collections.ObjectModel;
 using System.Diagnostics;
-using System.Text.RegularExpressions;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using OSTGUI.Models;
@@ -88,7 +87,7 @@ public partial class TrainerViewModel : ObservableObject
     partial void OnMonitorEnabledChanged(bool value)
     {
         if (!_loadingConfig) _config.Update(c => c.TrainerMonitorEnabled = value);   // 只改内存，退出时统一落盘
-        ApplyMonitorState();
+        _ = ApplyMonitorStateAsync();
     }
 
     /// <summary>每次进页面：刷新已下载、绑定与监控状态（列表按当前视图按需拉）</summary>
@@ -96,7 +95,7 @@ public partial class TrainerViewModel : ObservableObject
     {
         RefreshLocalTrainers();
         ReloadBindings();
-        ApplyMonitorState();
+        await ApplyMonitorStateAsync();
         UpdateDownloadDirText();
 
         if (!_initialized)
@@ -108,13 +107,15 @@ public partial class TrainerViewModel : ObservableObject
 
     public async Task LoadViewAsync(bool force = false)
     {
-        if (IsBusy) return;
-
+        // 「已下载」是纯本地刷新，**必须在 IsBusy 之前处理**：否则下载/搜索进行中切过去，
+        // 列表会保留上一次的搜索结果（切到已下载却看到搜索结果）
         if (ViewIndex == 1)
         {
             RefreshLocalTrainers();   // 走索引，只动 LocalItems（不碰搜索的 Items）
             return;
         }
+
+        if (IsBusy) return;
 
         // 已经搜过同样的词就直接用现成结果（切页面不该重新联网抓一次）
         if (_searchLoaded && !force)
@@ -180,7 +181,6 @@ public partial class TrainerViewModel : ObservableObject
 
         IsBusy = true;
         trainer.IsDownloading = true;
-        trainer.DownloadProgress = 0;
         try
         {
             var download = await _catalog.GetDownloadAsync(trainer.PageUrl);
@@ -190,13 +190,8 @@ public partial class TrainerViewModel : ObservableObject
                 return;
             }
 
-            // 进度改显示在状态栏（行里不放进度条：搜索结果行要和已下载行长得一样）
-            var progress = new Progress<double>(p =>
-            {
-                trainer.DownloadProgress = p;
-                WorkProgress = p;
-                StatusText = $"正在下载 {trainer.GameName} {p:0}%";
-            });
+            // 进度改显示在状态栏与小进度条上（行里不放进度条：搜索结果行要和已下载行长得一样）
+            var progress = MakeProgress("正在下载", trainer.GameName);
             var (path, error) = await _downloads.DownloadAsync(
                 download.Value.Url, download.Value.FileName, trainer.PageUrl, progress);
             if (path == null)
@@ -289,18 +284,14 @@ public partial class TrainerViewModel : ObservableObject
                 return;
             }
 
-            if (IsSameVersion(Path.GetFileName(oldPath), latest.Value.FileName))
+            if (TrainerNames.IsSame(Path.GetFileName(oldPath), latest.Value.FileName))
             {
                 StatusText = $"已是最新：{trainer.GameName}";
                 ToastService.ShowInfo("已是最新", trainer.GameName);
                 return;
             }
 
-            var progress = new Progress<double>(p =>
-            {
-                WorkProgress = p;
-                StatusText = $"正在更新 {trainer.GameName} {p:0}%";
-            });
+            var progress = MakeProgress("正在更新", trainer.GameName);
             var (path, error) = await _downloads.DownloadAsync(latest.Value.Url, latest.Value.FileName, page, progress);
 
             if (path == null)
@@ -324,34 +315,25 @@ public partial class TrainerViewModel : ObservableObject
         }
     }
 
-    /// <summary>用官方 RSS 按名字找文章页（本地名形如 Crimson.Desert.Enhanced.v1.0-v2.0x.Plus.12.Trainer-FLiNG）</summary>
+    /// <summary>用官方 RSS 按名字找文章页（本地名形如 Crimson.Desert.Enhanced.v1.0-v2.0x.Plus.12.exe）</summary>
     private async Task<string?> FindPageUrlAsync(string trainerName)
     {
-        var query = Regex.Replace(trainerName, @"\.v\d.*$", "");           // 砍掉版本尾巴
-        query = Regex.Replace(query, @"[-_.]+", " ").Replace("FLiNG", "").Trim();
+        var query = TrainerNames.SearchQuery(trainerName);
         if (query.Length == 0) return null;
 
+        var target = TrainerNames.Normalize(query);
         var hits = await _catalog.SearchAsync(query);
-        var target = Norm(query);
-        return (hits.FirstOrDefault(h => Norm(h.GameName) == target) ?? hits.FirstOrDefault())?.PageUrl;
+        return (hits.FirstOrDefault(h => TrainerNames.Normalize(h.GameName) == target)
+                ?? hits.FirstOrDefault())?.PageUrl;
     }
 
-    /// <summary>比对用归一化：只留字母数字（大小写不敏感）</summary>
-    private static string Norm(string text) =>
-        new(text.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
-
-    /// <summary>
-    /// 本地文件名与文章里最新附件的标题是不是同一个版本。
-    /// 两者写法不同（文件 <c>… Trainer.exe</c> / 附件标题 <c>….Trainer-FLiNG</c>），
-    /// 归一化后互为前缀就算同版本。
-    /// </summary>
-    private static bool IsSameVersion(string fileName, string attachmentTitle)
-    {
-        var a = Norm(Path.GetFileNameWithoutExtension(fileName));
-        var b = Norm(Path.GetFileNameWithoutExtension(attachmentTitle));
-        return a.Length > 0 && b.Length > 0
-            && (a == b || a.StartsWith(b, StringComparison.Ordinal) || b.StartsWith(a, StringComparison.Ordinal));
-    }
+    /// <summary>进度回调（下载与更新共用）：同时推状态行文字与细进度条</summary>
+    private IProgress<double> MakeProgress(string verb, string gameName) =>
+        new Progress<double>(p =>
+        {
+            WorkProgress = p;
+            StatusText = $"{verb} {gameName} {p:0}%";
+        });
 
     [RelayCommand]
     private void Reveal(TrainerInfo? trainer)
@@ -384,7 +366,7 @@ public partial class TrainerViewModel : ObservableObject
     {
         _bindingService.Save(Bindings.ToList());
         UpdateMonitorStatus();
-        ApplyMonitorState();
+        _ = ApplyMonitorStateAsync();
     }
 
     /// <summary>绑定对话框点确定后调用：同一个修改器只留一条绑定（按**名称**去重）</summary>
@@ -434,7 +416,7 @@ public partial class TrainerViewModel : ObservableObject
     /// 按**开关本身**起停监控子进程：开着就一定有监控在跑（哪怕还没有绑定，它待命），
     /// 关掉就把它结束掉、不留后台进程。
     /// </summary>
-    public void ApplyMonitorState()
+    public async Task ApplyMonitorStateAsync()
     {
         var running = FindMonitorPid();
 
@@ -456,10 +438,11 @@ public partial class TrainerViewModel : ObservableObject
                 LogService.AddAppLog($"trainer 监控启动失败: {ex.Message}");
             }
 
-            // 子进程写 pid 文件要一点时间，等一下再报状态（否则会误报"未运行"）
+            // 子进程写 pid 文件要一点时间，等一下再报状态（否则会误报"未运行"）。
+            // 用 await 轮询：这里是 UI 线程，Thread.Sleep 会把界面冻住
             for (var i = 0; i < 10 && running == null; i++)
             {
-                Thread.Sleep(200);
+                await Task.Delay(200);
                 running = FindMonitorPid();
             }
         }

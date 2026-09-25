@@ -151,9 +151,13 @@ public class TrainerDownloadService
         {
             TryDelete(oldPath);
 
-            // 旧文件是 zip 解压出来的 → 连同那个解压目录一起清掉（里面全是旧版文件）
+            // 旧文件是 zip 解压出来的 → 连同那个解压目录一起清掉（里面全是旧版文件）。
+            // 但**绝不能删新文件所在的目录**：新版若解压进同一目录，删了就等于刚下好就没了
             var oldDir = Path.GetDirectoryName(oldPath);
-            if (oldDir != null && !string.Equals(oldDir, DefaultDir, StringComparison.OrdinalIgnoreCase))
+            var newDir = Path.GetDirectoryName(newPath);
+            if (oldDir != null
+                && !string.Equals(oldDir, DefaultDir, StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(oldDir, newDir, StringComparison.OrdinalIgnoreCase))
                 TryDeleteDirectory(oldDir);
         }
 
@@ -183,17 +187,11 @@ public class TrainerDownloadService
         if (string.IsNullOrWhiteSpace(name)) return null;
         try
         {
-            // 两侧都去掉扩展名再归一化：文件名带 .exe、索引里的名字不带，直接比重就会永远不相等
-            var want = Normalize(Path.GetFileNameWithoutExtension(name));
-            if (want.Length == 0) return null;
-
             foreach (var entry in ReadIndex())
             {
                 if (!File.Exists(entry.Path)) continue;
-
-                var byFile = Normalize(Path.GetFileNameWithoutExtension(entry.Path));
-                var byStored = Normalize(Path.GetFileNameWithoutExtension(entry.Name));
-                if (Matches(want, byFile) || Matches(want, byStored)) return entry.Path;
+                if (TrainerNames.IsSame(name, entry.Path) || TrainerNames.IsSame(name, entry.Name))
+                    return entry.Path;
             }
         }
         catch (Exception ex)
@@ -201,15 +199,7 @@ public class TrainerDownloadService
             LogService.AddAppLog($"trainer 按名称查索引失败: {ex.Message}");
         }
         return null;
-
-        static bool Matches(string want, string have) =>
-            have.Length > 0 && (have == want || have.StartsWith(want, StringComparison.Ordinal)
-                                             || want.StartsWith(have, StringComparison.Ordinal));
     }
-
-    /// <summary>归一化：只留字母数字并转小写（用于名称比对，容忍点/空格/下划线的差别）</summary>
-    private static string Normalize(string text) =>
-        new(text.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
 
     private static void TryDelete(string path)
     {

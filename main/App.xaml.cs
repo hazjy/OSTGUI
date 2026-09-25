@@ -65,6 +65,15 @@ public partial class App : Application
             return;
         }
 
+        // 修改器自检：名称比对这类"容易悄悄错"的纯逻辑（跑完即退，不建窗口；结果进日志与退出码）
+        if (cmdArgs.Length >= 2 && cmdArgs[1].Equals("--trainer-selftest", StringComparison.OrdinalIgnoreCase))
+        {
+            var failure = TrainerNames.SelfCheck();
+            LogService.AddAppLog(failure.Length == 0 ? "trainer 自检通过" : $"trainer 自检失败：{failure}");
+            Environment.Exit(failure.Length == 0 ? 0 : 1);
+            return;
+        }
+
         // 先完整读取配置文件，再创建窗口，
         // 避免窗口先以默认状态显示、随后又被配置恢复导致闪烁
         var services = new ServiceCollection();

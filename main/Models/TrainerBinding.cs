@@ -42,12 +42,4 @@ public class TrainerBinding
     [JsonIgnore]
     public string Subtitle =>
         $"{GameExeName} → {TrainerFileName}" + (FilesExist ? "" : "（文件缺失）");
-
-    public TrainerBinding Clone() => new()
-    {
-        TrainerName = TrainerName,
-        GameName = GameName,
-        GameExePath = GameExePath,
-        IsEnabled = IsEnabled,
-    };
 }
