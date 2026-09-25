@@ -53,12 +53,6 @@
                 </StackPanel>
 
                 <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Click="More_Click" Tag="{Binding}"
-                            AutomationProperties.Name="更多" ToolTipService.ToolTip="更多"
-                            Width="28" Height="28" MinWidth="0" Padding="0"
-                            Background="Transparent" BorderThickness="0">
-                        <FontIcon Glyph="&#xE712;" FontSize="14" />
-                    </Button>
                     <Button Click="Launch_Click" Tag="{Binding}"
                             AutomationProperties.Name="启动" ToolTipService.ToolTip="启动"
                             Width="28" Height="28" MinWidth="0" Padding="0"
@@ -70,6 +64,12 @@
                             Width="28" Height="28" MinWidth="0" Padding="0"
                             Background="Transparent" BorderThickness="0">
                         <FontIcon Glyph="&#xE8B7;" FontSize="14" />
+                    </Button>
+                    <Button Click="More_Click" Tag="{Binding}"
+                            AutomationProperties.Name="更多" ToolTipService.ToolTip="更多"
+                            Width="28" Height="28" MinWidth="0" Padding="0"
+                            Background="Transparent" BorderThickness="0">
+                        <FontIcon Glyph="&#xE712;" FontSize="14" />
                     </Button>
                 </StackPanel>
             </Grid>
@@ -148,6 +148,9 @@
                         </Grid.ColumnDefinitions>
                         <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="8">
                             <ProgressRing IsActive="{Binding IsBusy}" Width="16" Height="16" VerticalAlignment="Center" />
+                            <!-- 细进度条：下载/更新时给出"确实在动"的反馈（0 时是空的，不需要转换器） -->
+                            <ProgressBar Width="110" Height="2" Maximum="100" Value="{Binding WorkProgress}"
+                                         VerticalAlignment="Center" />
                             <TextBlock Text="{Binding StatusText}" FontSize="12" VerticalAlignment="Center"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>

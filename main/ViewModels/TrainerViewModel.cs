@@ -43,6 +43,8 @@ public partial class TrainerViewModel : ObservableObject
     [ObservableProperty] private string _localFilter = "";
     [ObservableProperty] private int _viewIndex;          // 0 搜索 / 1 已下载
     [ObservableProperty] private bool _isBusy;
+    /// <summary>左侧状态行那根细进度条（0-100；只有下载/更新这种有明确进度的操作会动）</summary>
+    [ObservableProperty] private double _workProgress;
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private string _monitorStatus = "";
 
@@ -188,10 +190,11 @@ public partial class TrainerViewModel : ObservableObject
                 return;
             }
 
-            // 进度改显示在状态栏（行里不再放进度条：搜索结果行要和已下载行长得一样）
+            // 进度改显示在状态栏（行里不放进度条：搜索结果行要和已下载行长得一样）
             var progress = new Progress<double>(p =>
             {
                 trainer.DownloadProgress = p;
+                WorkProgress = p;
                 StatusText = $"正在下载 {trainer.GameName} {p:0}%";
             });
             var (path, error) = await _downloads.DownloadAsync(
@@ -211,6 +214,7 @@ public partial class TrainerViewModel : ObservableObject
         {
             trainer.IsDownloading = false;
             IsBusy = false;
+            WorkProgress = 0;
         }
     }
 
@@ -252,7 +256,12 @@ public partial class TrainerViewModel : ObservableObject
     [RelayCommand]
     private async Task UpdateAsync(TrainerInfo? trainer)
     {
-        if (trainer == null || IsBusy) return;
+        if (trainer == null) return;
+        if (IsBusy)
+        {
+            StatusText = "正在忙（下载/搜索中），稍后再点「更新」";
+            return;
+        }
 
         var oldPath = trainer.LocalPath;
         IsBusy = true;
@@ -287,7 +296,11 @@ public partial class TrainerViewModel : ObservableObject
                 return;
             }
 
-            var progress = new Progress<double>(p => StatusText = $"正在更新 {trainer.GameName} {p:0}%");
+            var progress = new Progress<double>(p =>
+            {
+                WorkProgress = p;
+                StatusText = $"正在更新 {trainer.GameName} {p:0}%";
+            });
             var (path, error) = await _downloads.DownloadAsync(latest.Value.Url, latest.Value.FileName, page, progress);
 
             if (path == null)
@@ -307,6 +320,7 @@ public partial class TrainerViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+            WorkProgress = 0;
         }
     }
 

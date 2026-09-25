@@ -78,9 +78,15 @@ public sealed partial class TrainerPage : Page
         ToastService.ShowSuccess("已复制", name);
     }
 
+    /// <summary>菜单项没有 Tag，条目来自页面级的 _menuItem（由 More_Click 设置）</summary>
     private void Update_Click(object sender, RoutedEventArgs e)
     {
-        if ((sender as FrameworkElement)?.Tag is TrainerInfo info) VM.UpdateCommand.Execute(info);
+        if (_menuItem == null)
+        {
+            LogService.AddAppLog("trainer 菜单「更新」但 _menuItem 为空（菜单未从行上打开？）");
+            return;
+        }
+        VM.UpdateCommand.Execute(_menuItem);
     }
 
     private void Launch_Click(object sender, RoutedEventArgs e)
@@ -95,7 +101,12 @@ public sealed partial class TrainerPage : Page
 
     private void Delete_Click(object sender, RoutedEventArgs e)
     {
-        if ((sender as FrameworkElement)?.Tag is TrainerInfo info) VM.DeleteCommand.Execute(info);
+        if (_menuItem == null)
+        {
+            LogService.AddAppLog("trainer 菜单「删除」但 _menuItem 为空（菜单未从行上打开？）");
+            return;
+        }
+        VM.DeleteCommand.Execute(_menuItem);
     }
 
     private void RemoveBinding_Click(object sender, RoutedEventArgs e)
