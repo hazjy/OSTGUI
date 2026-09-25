@@ -188,9 +188,18 @@
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
 
-                        <ToggleSwitch Grid.Column="1" MinWidth="0" VerticalAlignment="Center"
-                                      IsOn="{Binding MonitorEnabled, Mode=TwoWay}"
-                                      ToolTipService.ToolTip="开启时：建立后台服务，使修改器随游戏启停；GUI不运行时也有效" />
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                            <Button Click="MonitorStart_Click" IsEnabled="{Binding CanStartMonitor}"
+                                    AutomationProperties.Name="运行" ToolTipService.ToolTip="运行"
+                                    Background="Transparent" BorderThickness="0">
+                                <FontIcon Glyph="&#xE768;" FontSize="14" />
+                            </Button>
+                            <Button Click="MonitorStop_Click" IsEnabled="{Binding CanStopMonitor}"
+                                    AutomationProperties.Name="停止" ToolTipService.ToolTip="停止"
+                                    Background="Transparent" BorderThickness="0">
+                                <FontIcon Glyph="&#xE71A;" FontSize="14" />
+                            </Button>
+                        </StackPanel>
 
                         <Button Grid.Column="2" VerticalAlignment="Center" Content="添加绑定" Click="AddBinding_Click" />
                     </Grid>

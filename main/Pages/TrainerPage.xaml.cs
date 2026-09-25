@@ -228,8 +228,9 @@ public sealed partial class TrainerPage : Page
         if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
 
         VM.AddOrUpdateBinding(trainerBox.Text!.Trim(), gameExe, enabled: true);
-
-        // 绑了却不启监控＝不生效，容易踩；顺手替用户打开（关掉随时可以）
-        if (!VM.MonitorEnabled) VM.MonitorEnabled = true;
     }
+
+    private void MonitorStart_Click(object sender, RoutedEventArgs e) => VM.StartMonitor();
+
+    private void MonitorStop_Click(object sender, RoutedEventArgs e) => VM.StopMonitor();
 }

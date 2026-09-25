@@ -45,11 +45,26 @@ public partial class TrainerViewModel : ObservableObject
     [ObservableProperty] private string _statusText = "";
     [ObservableProperty] private string _monitorStatus = "";
 
-    /// <summary>监控开关：开了 GUI 退出后仍按绑定工作（默认关）</summary>
-    [ObservableProperty] private bool _monitorEnabled;
+    /// <summary>监控按钮的可用状态：跑着时只能点「停止」，停着时只能点「运行」</summary>
+    [ObservableProperty] private bool _canStartMonitor = true;
+    [ObservableProperty] private bool _canStopMonitor;
 
     /// <summary>当前下载目录（显示用；改目录见 SetDownloadDir）</summary>
     [ObservableProperty] private string _downloadDirText = "";
+
+    /// <summary>运行监控：建立后台服务，使修改器随游戏启停（GUI 退出了也继续）</summary>
+    public void StartMonitor()
+    {
+        _config.Update(c => c.TrainerMonitorEnabled = true);   // 只改内存，退出时统一落盘
+        _ = ApplyMonitorStateAsync();
+    }
+
+    /// <summary>停止监控：把后台进程结束掉，不留驻留</summary>
+    public void StopMonitor()
+    {
+        _config.Update(c => c.TrainerMonitorEnabled = false);
+        _ = ApplyMonitorStateAsync();
+    }
 
     /// <summary>改下载目录：只改内存（退出时统一落盘），立刻生效并刷新已下载列表</summary>
     public void SetDownloadDir(string? dir)
@@ -73,20 +88,11 @@ public partial class TrainerViewModel : ObservableObject
         _downloads = downloads;
         _bindingService = bindingService;
         _config = config;
-
-        _loadingConfig = true;
-        _monitorEnabled = config.Config.TrainerMonitorEnabled;
-        _loadingConfig = false;
     }
 
     partial void OnViewIndexChanged(int value) => _ = LoadViewAsync();
     partial void OnLocalFilterChanged(string value) => ApplyLocalFilter();
     partial void OnQueryChanged(string value) => _searchLoaded = false;   // 查询词变了，旧结果作废
-    partial void OnMonitorEnabledChanged(bool value)
-    {
-        if (!_loadingConfig) _config.Update(c => c.TrainerMonitorEnabled = value);   // 只改内存，退出时统一落盘
-        _ = ApplyMonitorStateAsync();
-    }
 
     /// <summary>每次进页面：刷新已下载、绑定与监控状态（列表按当前视图按需拉）</summary>
     public async Task InitializeAsync()
@@ -420,14 +426,15 @@ public partial class TrainerViewModel : ObservableObject
     private static string PidPath => Path.Combine(TrainerDownloadService.DefaultDir, "monitor.pid");
 
     /// <summary>
-    /// 按**开关本身**起停监控子进程：开着就一定有监控在跑（哪怕还没有绑定，它待命），
-    /// 关掉就把它结束掉、不留后台进程。
+    /// 按「运行 / 停止」两个按钮的意图起停监控子进程：想运行就一定有监控在跑（哪怕还没有绑定，它待命），
+    /// 想停止就把它结束掉、不留后台进程。意图记在配置里（退出时统一落盘），下次开 GUI 按它继续。
     /// </summary>
     public async Task ApplyMonitorStateAsync()
     {
+        var wanted = _config.Config.TrainerMonitorEnabled;
         var running = FindMonitorPid();
 
-        if (MonitorEnabled && running == null)
+        if (wanted && running == null)
         {
             try
             {
@@ -453,7 +460,7 @@ public partial class TrainerViewModel : ObservableObject
                 running = FindMonitorPid();
             }
         }
-        else if (!MonitorEnabled && running != null)
+        else if (!wanted && running != null)
         {
             try
             {
@@ -489,9 +496,13 @@ public partial class TrainerViewModel : ObservableObject
         var enabled = Bindings.Count(b => b.IsEnabled);
 
         var monitor = pid == null
-            ? (MonitorEnabled ? "监控未运行" : "监控已关闭")
+            ? (_config.Config.TrainerMonitorEnabled ? "监控未运行" : "监控已关闭")
             : "监控已运行";
         MonitorStatus = $"共{Bindings.Count}条，启用{enabled}条 · {monitor}" + (pid == null ? "" : $"（pid {pid}）");
+
+        // 跑着时只能点「停止」，停着时只能点「运行」
+        CanStopMonitor = pid != null;
+        CanStartMonitor = pid == null;
     }
 
     private void RefreshLocalTrainers()
