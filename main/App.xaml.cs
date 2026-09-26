@@ -68,11 +68,12 @@ public partial class App : Application
         // 修改器监控子进程（--trainer-monitor）**不在这里**：它走 main/Program.cs 的入口点，
         // 在 WinUI 初始化之前就返回了（否则一个纯后台进程要背 100 MB 的 UI 栈）
 
-        // 修改器自检：名称比对这类"容易悄悄错"的纯逻辑（跑完即退，不建窗口；结果进日志与退出码）
+        // 自检：名称比对、成就列表缓存这些"容易悄悄错"的纯逻辑（跑完即退，不建窗口；结果进日志与退出码）
         if (cmdArgs.Length >= 2 && cmdArgs[1].Equals("--trainer-selftest", StringComparison.OrdinalIgnoreCase))
         {
             var failure = TrainerNames.SelfCheck();
-            LogService.Diag(failure.Length == 0 ? "trainer 自检通过" : $"trainer 自检失败：{failure}");
+            if (failure.Length == 0) failure = AchievementListCache.SelfCheck();
+            LogService.Diag(failure.Length == 0 ? "自检通过" : $"自检失败：{failure}");
             Environment.Exit(failure.Length == 0 ? 0 : 1);
             return;
         }

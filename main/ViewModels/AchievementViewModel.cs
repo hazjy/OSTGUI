@@ -145,6 +145,8 @@ public partial class AchievementViewModel : ObservableObject
         {
             _ownedLoaded = false;
             _luaIds.Clear();
+            _forceRescan = true;                    // 强制重扫：跳过缓存并重写它
+            AchievementListCache.Delete();
             await InitializeAsync();
         }
         finally
@@ -167,6 +169,16 @@ public partial class AchievementViewModel : ObservableObject
     public async Task InitializeAsync()
     {
         SteamRunning = _steam.IsSteamRunning();
+
+        // 缓存命中就直接铺列表（重开秒开，也不起 stats-owned 子进程）；「刷新」按钮会置 _forceRescan 跳过它
+        if (!_forceRescan && TryApplyCache())
+        {
+            ApplyFilter();
+            await LoadGameAsync(SelectedGame);
+            return;
+        }
+        _forceRescan = false;
+
         var items = await _scanner.ScanLibraryAsync();
 
         _allGames = new List<LibraryItem>();
@@ -199,6 +211,61 @@ public partial class AchievementViewModel : ObservableObject
         // 每次进页面都重读当前游戏（原来的「重试」按钮就是这个）：启动过一次游戏后再回来就能拿到 schema
         await LoadGameAsync(SelectedGame);
     }
+
+    /// <summary>「刷新」按下的这一轮不读缓存（强制重扫并重写缓存）</summary>
+    private bool _forceRescan;
+
+    /// <summary>缓存命中就把列表直接铺出来；返回 false = 需要真扫</summary>
+    private bool TryApplyCache()
+    {
+        var snapshot = AchievementListCache.Load();
+        if (snapshot == null)
+        {
+            LogService.Diag("成就列表缓存：没有（首次运行或已损坏）");
+            return false;
+        }
+
+        var luaDir = _steam.GetEffectiveLuaDir() ?? "";
+        if (!AchievementListCache.IsFresh(snapshot, luaDir, _steam.GetSteamPath() ?? ""))
+        {
+            LogService.Diag("成就列表缓存：已失效（lua 目录或 appinfo.vdf 有变化）");
+            return false;
+        }
+
+        _allGames = snapshot.LuaGames.Select(ToLibItem).ToList();
+        _ownedGames = snapshot.OwnedGames.Select(ToLibItem).ToList();
+        _luaIds.Clear();
+        foreach (var g in snapshot.LuaGames) _luaIds.Add(g.AppId);
+
+        // 拥有关系来自缓存（快照里没有正版列表时不算——那种情况多半是当时 Steam 没开，得重查）
+        _ownedLoaded = snapshot.OwnedGames.Count > 0;
+        LogService.Diag($"成就列表缓存：命中（lua {_allGames.Count} / 正版 {_ownedGames.Count}）");
+        return true;
+    }
+
+    /// <summary>扫描完把结果写回缓存（含两个指纹，供下次判失效）</summary>
+    private void SaveListCache()
+    {
+        var (luaTicks, luaCount) = AchievementListCache.LuaStamp(_steam.GetEffectiveLuaDir() ?? "");
+        var (appSize, appTicks) = AchievementListCache.AppInfoStamp(_steam.GetSteamPath() ?? "");
+
+        AchievementListCache.Save(new AchievementListCache.Snapshot
+        {
+            SavedAt = DateTime.Now,
+            LuaDirTicks = luaTicks,
+            LuaFileCount = luaCount,
+            AppInfoSize = appSize,
+            AppInfoTicks = appTicks,
+            LuaGames = _allGames.Select(ToCacheItem).ToList(),
+            OwnedGames = _ownedGames.Select(ToCacheItem).ToList(),
+        });
+    }
+
+    private static LibraryItem ToLibItem(AchievementListCache.Item item) =>
+        new() { AppId = item.AppId, GameName = item.GameName, SourceTag = item.SourceTag };
+
+    private static AchievementListCache.Item ToCacheItem(LibraryItem item) =>
+        new() { AppId = item.AppId, GameName = item.GameName, SourceTag = item.SourceTag };
 
     /// <summary>
     /// 补名：先本地 appinfo.vdf（离线权威、明文；在线那条路走 store.steampowered.com，这台机器上常不通），
@@ -319,6 +386,7 @@ public partial class AchievementViewModel : ObservableObject
                 g.GameName = name;
         }
         LogService.Event($"正版游戏：候选={candidates.Count} 拥有={_ownedGames.Count}");
+        SaveListCache();   // 只有走到这里才写缓存（含正版列表；Steam 没开时不写，免得缓存一份空的正版列表）
         ApplyFilter();
         _ = FillNamesAsync();
     }
