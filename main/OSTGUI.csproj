@@ -13,9 +13,9 @@
     <!-- 关掉 WinUI 自动生成的 Main：我们自己写入口点（main/Program.cs），
          目的是让监控子进程（trainer-monitor 参数）在 WinUI 初始化之前就返回（省掉整个 UI 栈的内存） -->
     <DefineConstants>$(DefineConstants);DISABLE_XAML_GENERATED_MAIN</DefineConstants>
-    <Version>1.6.2</Version>
-    <AssemblyVersion>1.6.2.0</AssemblyVersion>
-    <FileVersion>1.6.2.0</FileVersion>
+    <Version>1.7.0</Version>
+    <AssemblyVersion>1.7.0.0</AssemblyVersion>
+    <FileVersion>1.7.0.0</FileVersion>
   </PropertyGroup>
 
   <ItemGroup>
