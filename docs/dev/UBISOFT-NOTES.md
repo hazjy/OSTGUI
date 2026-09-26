@@ -103,6 +103,13 @@
 
 ## 6.5 UNO 实机测试结论（2026-09-05，Steam AppID 470220）
 
+- **loader 三档文件名**：`upc_r2_loader64.dll`（Unity 育碧新作）/ `uplay_r2_loader64.dll` / `uplaypc_r2_loader64.dll`
+- **Unity 子目录布局** `*_Data\Plugins\x86_64\`（除根目录外还要扫这层）；`uplay_r2.ini` **必须与 loader 同目录**（emu.cpp `lib_path + "\\uplay_r2.ini"` 求证）
+- **结论**：无第三条开箱即用路线，免育碧**保持挂起**；UNO 缺 `ubiservices`/`uprofile`/`Storm` 三件且无模拟
+- **ServerEmus 是覆盖多组件 UC 栈的唯一完整链路**（DLL + 命名管道 + 本地 Server），未实测、Server 需自建，暂不集成
+- 别走这条路：联机"其他"下拉的 BAT 脚本注入 → 只是路线 B 的减法（等于功能倒退），用户否决
+（来源：agents-log 09-05 / 09-06 / 09-19）
+
 - **UNO = "多组件 UC 栈 + Steamworks 双栈"**：插件区含 `upc_r2_loader64.dll`（loader）+ `ubiservices.dll` + `uprofile.dll` + `dbdata.dll` + `Storm.dll` + `steam_api64.dll`/`uno_steam.dll`（Unity + Steamworks.NET）。**验证了 Goldberg R2 单 loader 模拟的边界**：只替换 `upc_r2_loader64.dll` 后，游戏仍弹"需要育碧客户端"（ubiservices/uprofile 向真实 UC 客户端要服务）；**流畅入库（同 Goldberg 核心）对 UNO 同样失败**——非实现缺陷，架构不兼容；
 - **loader 命名三档（服务 KnownLoaders）**：`upc_r2_loader64.dll`（Unity 育碧新作，如 UNO）/ `uplay_r2_loader64.dll` / `uplaypc_r2_loader64.dll`；布局：根目录 或 `*_Data\Plugins\x86_64\`（Unity）；`uplay_r2.ini` **必须与 loader 同目录**（emu.cpp `lib_path + "\\uplay_r2.ini"`）；
 - **结论**：免育碧可选**两条路线**——① Goldberg 单 loader（轻、已实现，兼容传统单 loader R2 游戏）；② ServerEmus 链路（DLL+命名管道+本地 Server，理论覆盖 UNO 类，**未实测 + Server 需自建 + 重架构**）。UNO 本身作为"不兼容样本"记录，需此类游戏支持则走路线②（spike 门槛高，暂不集成）。
