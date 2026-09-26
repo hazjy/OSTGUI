@@ -13,7 +13,13 @@ public partial class App : Application
 {
     public static ServiceProvider Services { get; private set; } = null!;
     public new static App Current => (App)Application.Current;
-    public static Window? MainWindow => ((App)Current)._window;
+    /// <summary>
+    /// 主窗口。**必须能安全返回 null**：监控子进程（<c>--trainer-monitor</c>）走自写入口点，
+    /// 没有 App 实例，`Application.Current` 是 null——原来写成 ((App)Current)._window，
+    /// 日志服务一句 `App.MainWindow?.DispatcherQueue` 就会 NRE，把监控进程当场炸掉
+    /// （2026-09-26 实测：监控一运行就死，退出码 0xC0000005 / App.get_MainWindow NRE）。
+    /// </summary>
+    public static Window? MainWindow => (Application.Current as App)?._window;
 
     private Window? _window;
 

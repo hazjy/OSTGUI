@@ -18,7 +18,18 @@ public static class Program
     public static int Main(string[] args)
     {
         if (args.Length >= 1 && args[0].Equals("--trainer-monitor", StringComparison.OrdinalIgnoreCase))
-            return Services.TrainerMonitor.Run();
+        {
+            // 子进程没有 App 的异常钩子 → 自己兜住：崩了要能在日志里看见（没兜住就是"一运行就死、日志全无"）
+            try
+            {
+                return Services.TrainerMonitor.Run();
+            }
+            catch (Exception ex)
+            {
+                Services.LogService.Fatal("监控子进程未处理异常", ex);
+                return 1;
+            }
+        }
 
         WinRT.ComWrappersSupport.InitializeComWrappers();
         Microsoft.UI.Xaml.Application.Start(_ =>
