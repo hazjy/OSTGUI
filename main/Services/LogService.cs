@@ -4,25 +4,35 @@ using System.Text;
 namespace OSTGUI.Services;
 
 /// <summary>
-/// 日志服务 - 内存显示 + 落盘保存，超过保留行数时自动裁剪
+/// 日志服务。**两条通道，用途分开**（2026-09-26 拆分）：
+///
+/// - <see cref="Diag"/>：崩溃/诊断 —— 写文件 + 进运行时日志（视图里带 <c>[诊断]</c> 前缀）。
+///   启动退出、异常、外部失败、关键状态变化走这里；**别往这里塞流水账**。
+/// - <see cref="Event"/>：流水账 —— 只进运行时日志（内存，设置页可看/复制/清空），不落盘。
+///
+/// 文件（<c>%LOCALAPPDATA%\OSTGUI\logs\ostgui.log</c>）：毫秒时间戳 + pid，追加写且用
+/// <c>FileShare.ReadWrite</c>——监控子进程与 stats 子进程也会写同一个文件，互相不能踩；
+/// 超过 <see cref="MaxFileBytes"/> 轮转为 <c>ostgui.1.log</c> / <c>ostgui.2.log</c>，
+/// 不再"读全文件再重写"（那既抖又和别的进程抢文件）。
+///
+/// 视图：<see cref="Logs"/> 绑着设置页，任意线程可写（非 UI 线程封送），上限 <see cref="MaxLines"/> 行。
+/// 行数上限**只管内存视图**，不影响文件。
 /// </summary>
-public class LogService
+public static class LogService
 {
     private static readonly ObservableCollection<string> _logs = new();
     private static readonly object _lock = new();
-    private static int _addCount;
+    private const long MaxFileBytes = 2 * 1024 * 1024;
+    private const int FileBackups = 2;
 
     public static ObservableCollection<string> Logs => _logs;
 
     /// <summary>日志文件路径（设置页可一键打开）</summary>
     public static string LogFilePath { get; private set; } = "";
 
-    /// <summary>日志保留行数（内存与文件一致）</summary>
+    /// <summary>运行时日志保留行数（只作用于内存视图）</summary>
     public static int MaxLines { get; private set; } = 1000;
 
-    /// <summary>
-    /// 初始化：指定日志文件路径
-    /// </summary>
     public static void Initialize(string filePath)
     {
         lock (_lock)
@@ -37,96 +47,124 @@ public class LogService
         }
     }
 
-    /// <summary>
-    /// 设置保留行数并立即裁剪
-    /// </summary>
+    /// <summary>设置运行时日志保留行数并立即裁剪视图</summary>
     public static void SetMaxLines(int maxLines)
     {
         if (maxLines < 10) maxLines = 10;
-        lock (_lock)
-        {
-            MaxLines = maxLines;
-            while (_logs.Count > MaxLines)
-                _logs.RemoveAt(0);
-            TrimFileToMaxLines();
-        }
-    }
-
-    /// <summary>
-    /// 运行时日志（仅内存，设置页日志栏显示，可清空）
-    /// 任意线程可调用：Logs 集合绑定着界面，非 UI 线程写入必须封送回 UI 线程，
-    /// 否则集合变更事件会在工作线程上触发绑定更新，异常会反向炸进日志调用方
-    /// </summary>
-    public static void AddLog(string message)
-    {
-        var timestamp = DateTime.Now.ToString("HH:mm:ss");
-
-        void Add()
+        void Apply()
         {
             lock (_lock)
             {
-                _logs.Add($"[{timestamp}] {message}");
-                while (_logs.Count > MaxLines)
-                    _logs.RemoveAt(0);
+                MaxLines = maxLines;
+                while (_logs.Count > MaxLines) _logs.RemoveAt(0);
             }
         }
 
-        var dq = App.MainWindow?.DispatcherQueue;
-        if (dq == null || dq.HasThreadAccess)
-            Add();
-        else
-            dq.TryEnqueue(Add);
+        RunOnUiThread(Apply);
     }
+
+    /// <summary>流水账：**只进运行时日志**，不落盘</summary>
+    public static void Event(string message) => Write(message, toFile: false);
+
+    /// <summary>诊断：**写文件 + 进运行时日志**（启动退出、异常、外部失败、关键状态变化）</summary>
+    public static void Diag(string message) => Write(message, toFile: true);
 
     /// <summary>
-    /// 应用级日志（写入日志文件，保留 MaxLines 行，不受运行时清空影响）
+    /// 崩溃专用：文件里留**完整堆栈**（多行、带 FATAL 标记），视图里只留一行摘要。
+    /// 日志本身出问题也不能再抛（否则崩在崩溃处理里）。
     /// </summary>
-    public static void AddAppLog(string message)
+    public static void Fatal(string context, Exception? ex)
     {
-        var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}";
-
-        lock (_lock)
+        var now = DateTime.Now;
+        try
         {
-            if (string.IsNullOrEmpty(LogFilePath)) return;
-            try
-            {
-                File.AppendAllText(LogFilePath, line + Environment.NewLine, Encoding.UTF8);
-                // 每 50 条检查一次文件行数，超出保留行数时裁剪尾部
-                if (++_addCount % 50 == 0)
-                    TrimFileToMaxLines();
-            }
-            catch { }
+            AppendFile($"[{now:yyyy-MM-dd HH:mm:ss.fff}] [p{Environment.ProcessId}] [D] FATAL {context}" +
+                       $"{Environment.NewLine}{ex?.ToString() ?? "(无异常对象)"}");
+            AddToView($"[{now:HH:mm:ss}] [诊断] FATAL {context}：{ex?.GetType().Name}: {ex?.Message}");
         }
+        catch { }
     }
+
+    // ── 兼容旧调用点：AddAppLog 原本"只写文件"、AddLog 原本"只进视图"。
+    //    拆分后语义收敛到 Diag / Event，调用点按模块分批迁移，迁完这几个别名可删 ──
+    public static void AddLog(string message) => Event(message);
+    public static void AddAppLog(string message) => Diag(message);
 
     public static void Clear()
     {
-        void DoClear()
+        // 集合绑着界面，CollectionChanged(Reset) 必须在 UI 线程触发（否则订阅方在工作线程刷绑定）
+        RunOnUiThread(() =>
         {
-            lock (_lock)
-            {
-                _logs.Clear();
-            }
-        }
-
-        // 与 AddLog 同理：集合绑定着界面，Clear 的 CollectionChanged(Reset)
-        // 必须在 UI 线程触发，否则订阅了事件的页面在非 UI 线程刷新绑定
-        var dq = App.MainWindow?.DispatcherQueue;
-        if (dq == null || dq.HasThreadAccess)
-            DoClear();
-        else
-            dq.TryEnqueue(DoClear);
+            lock (_lock) _logs.Clear();
+        });
     }
 
-    private static void TrimFileToMaxLines()
+    private static void Write(string message, bool toFile)
     {
-        if (string.IsNullOrEmpty(LogFilePath) || !File.Exists(LogFilePath)) return;
-        try
+        var now = DateTime.Now;
+        if (toFile)
+            AppendFile($"[{now:yyyy-MM-dd HH:mm:ss.fff}] [p{Environment.ProcessId}] [D] {message}");
+
+        AddToView($"[{now:HH:mm:ss}] {(toFile ? "[诊断] " : "")}{message}");
+    }
+
+    private static void AddToView(string line) => RunOnUiThread(() =>
+    {
+        lock (_lock)
         {
-            var lines = File.ReadAllLines(LogFilePath);
-            if (lines.Length <= MaxLines) return;
-            File.WriteAllLines(LogFilePath, lines.Skip(lines.Length - MaxLines), Encoding.UTF8);
+            _logs.Add(line);
+            while (_logs.Count > MaxLines) _logs.RemoveAt(0);
         }
-        catch { }
+    });
+
+    /// <summary>任意线程可调用：非 UI 线程要封送回 UI 线程再动集合</summary>
+    private static void RunOnUiThread(Action action)
+    {
+        var dq = App.MainWindow?.DispatcherQueue;
+        if (dq == null || dq.HasThreadAccess) action();
+        else dq.TryEnqueue(() => action());
+    }
+
+    /// <summary>追加一行到日志文件（多进程共享：FileShare.ReadWrite + 失败重试一次）</summary>
+    private static void AppendFile(string line)
+    {
+        if (string.IsNullOrEmpty(LogFilePath)) return;
+
+        lock (_lock)
+        {
+            for (var attempt = 0; attempt < 2; attempt++)
+            {
+                try
+                {
+                    RollIfTooBig();
+                    using var stream = new FileStream(LogFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+                    using var writer = new StreamWriter(stream, Encoding.UTF8);
+                    writer.WriteLine(line);
+                    return;
+                }
+                catch
+                {
+                    if (attempt == 0) Thread.Sleep(20);   // 另一个进程正占着，等一下再来
+                }
+            }
+        }
+    }
+
+    /// <summary>文件超过上限就轮转：ostgui.log → .1 → .2（保留最近两份，旧的丢弃）</summary>
+    private static void RollIfTooBig()
+    {
+        var info = new FileInfo(LogFilePath);
+        if (!info.Exists || info.Length < MaxFileBytes) return;
+
+        var dir = Path.GetDirectoryName(LogFilePath) ?? ".";
+        string Backup(int i) => Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(LogFilePath)}.{i}.log");
+
+        for (var i = FileBackups; i >= 1; i--)
+        {
+            var from = i == 1 ? LogFilePath : Backup(i - 1);
+            if (!File.Exists(from)) continue;
+            if (File.Exists(Backup(i))) File.Delete(Backup(i));
+            File.Move(from, Backup(i));
+        }
     }
 }
