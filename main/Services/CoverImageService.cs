@@ -402,5 +402,5 @@ public class CoverImageService
 
     /// <summary>写日志文件（设置页可打开），不进内存日志栏——封面是后台噪音</summary>
     private static void Log(string message)
-        => LogService.AddAppLog($"[Cover] {message}");
+        => LogService.Event($"[Cover] {message}");
 }

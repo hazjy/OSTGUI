@@ -52,7 +52,7 @@ public class AchievementStore
         catch (Exception ex)
         {
             // 坏文件不删，改名留证
-            LogService.AddAppLog($"成就留底解析失败 appid={appId}: {ex.Message}");
+            LogService.Diag($"成就留底解析失败 appid={appId}: {ex.Message}");
             try { File.Move(PathFor(appId), PathFor(appId) + ".bad", true); } catch { }
             return null;
         }
@@ -73,7 +73,7 @@ public class AchievementStore
         }
         catch (Exception ex)
         {
-            LogService.AddAppLog($"成就留底保存失败 appid={file.AppId}: {ex.Message}");
+            LogService.Diag($"成就留底保存失败 appid={file.AppId}: {ex.Message}");
             return false;
         }
     }

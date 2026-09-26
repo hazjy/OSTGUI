@@ -106,7 +106,7 @@ public sealed partial class TrainerPage : Page
     {
         if (_menuItem == null)
         {
-            LogService.AddAppLog("trainer 菜单「更新」但 _menuItem 为空（菜单未从行上打开？）");
+            LogService.Diag("trainer 菜单「更新」但 _menuItem 为空（菜单未从行上打开？）");
             return;
         }
         VM.UpdateCommand.Execute(_menuItem);
@@ -126,7 +126,7 @@ public sealed partial class TrainerPage : Page
     {
         if (_menuItem == null)
         {
-            LogService.AddAppLog("trainer 菜单「删除」但 _menuItem 为空（菜单未从行上打开？）");
+            LogService.Diag("trainer 菜单「删除」但 _menuItem 为空（菜单未从行上打开？）");
             return;
         }
         VM.DeleteCommand.Execute(_menuItem);

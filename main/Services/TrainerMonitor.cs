@@ -24,13 +24,13 @@ public static class TrainerMonitor
         using var mutex = new Mutex(true, MutexName, out var isNew);
         if (!isNew)
         {
-            LogService.AddAppLog("trainer 监控：已有实例在运行，本次退出");
+            LogService.Diag("trainer 监控：已有实例在运行，本次退出");
             return 0;
         }
 
         Directory.CreateDirectory(TrainerDownloadService.DefaultDir);
         try { File.WriteAllText(PidPath, Environment.ProcessId.ToString()); } catch { }
-        LogService.AddAppLog($"trainer 监控启动 pid={Environment.ProcessId}");
+        LogService.Diag($"trainer 监控启动 pid={Environment.ProcessId}");
 
         var service = new TrainerBindingService();
         var bindings = new List<TrainerBinding>();
@@ -59,13 +59,13 @@ public static class TrainerMonitor
                 var enabled = bindings.Where(b => b.IsEnabled).ToList();
                 if (enabled.Count == 0 && !idleLogged)
                 {
-                    LogService.AddAppLog("trainer 监控：当前没有启用的绑定，待命（开关关掉才会退出）");
+                    LogService.Diag("trainer 监控：当前没有启用的绑定，待命（开关关掉才会退出）");
                     idleLogged = true;
                 }
                 else if (enabled.Count > 0 && idleLogged)
                 {
                     idleLogged = false;
-                    LogService.AddAppLog($"trainer 监控：有 {enabled.Count} 条启用绑定，开始工作");
+                    LogService.Diag($"trainer 监控：有 {enabled.Count} 条启用绑定，开始工作");
                 }
 
                 foreach (var binding in enabled)
@@ -94,7 +94,7 @@ public static class TrainerMonitor
         }
         catch (Exception ex)
         {
-            LogService.AddAppLog($"trainer 监控异常退出: {ex.Message}");
+            LogService.Diag($"trainer 监控异常退出: {ex.Message}");
             return 1;
         }
         finally
@@ -132,7 +132,7 @@ public static class TrainerMonitor
         var path = TrainerDownloadService.FindTrainerPath(binding.TrainerName);
         if (path == null)
         {
-            LogService.AddAppLog($"trainer 监控：索引里找不到修改器「{binding.TrainerName}」，跳过");
+            LogService.Diag($"trainer 监控：索引里找不到修改器「{binding.TrainerName}」，跳过");
             return;
         }
 
@@ -146,11 +146,11 @@ public static class TrainerMonitor
             });
 
             if (proc != null) started[binding.TrainerName] = proc;
-            LogService.AddAppLog($"trainer 已随游戏启动 {Path.GetFileName(path)}（游戏 {binding.GameName}）");
+            LogService.Diag($"trainer 已随游戏启动 {Path.GetFileName(path)}（游戏 {binding.GameName}）");
         }
         catch (Exception ex)
         {
-            LogService.AddAppLog($"trainer 启动失败 {Path.GetFileName(path)}: {ex.Message}");
+            LogService.Diag($"trainer 启动失败 {Path.GetFileName(path)}: {ex.Message}");
         }
     }
 

@@ -56,7 +56,7 @@ public class SteamStatsService
             catch (OperationCanceledException)
             {
                 try { proc.Kill(true); } catch { }
-                LogService.AddAppLog("stats-owned 子进程超时");
+                LogService.Diag("stats-owned 子进程超时");
                 return empty;
             }
 
@@ -66,7 +66,7 @@ public class SteamStatsService
         }
         catch (Exception ex)
         {
-            LogService.AddAppLog($"stats-owned 异常: {ex.Message}");
+            LogService.Diag($"stats-owned 异常: {ex.Message}");
             return empty;
         }
         finally
@@ -116,7 +116,7 @@ public class SteamStatsService
             catch (OperationCanceledException)
             {
                 try { proc.Kill(true); } catch { }
-                LogService.AddAppLog($"成就子进程超时 {mode} appid={appId}");
+                LogService.Diag($"成就子进程超时 {mode} appid={appId}");
                 return new StatsChildResult { Ok = false, Message = $"子进程超时（{TimeoutMs / 1000}s）" };
             }
 
@@ -135,7 +135,7 @@ public class SteamStatsService
         }
         catch (Exception ex)
         {
-            LogService.AddAppLog($"成就子进程异常 {mode} appid={appId}: {ex.Message}");
+            LogService.Diag($"成就子进程异常 {mode} appid={appId}: {ex.Message}");
             return new StatsChildResult { Ok = false, Message = $"子进程异常: {ex.Message}" };
         }
         finally

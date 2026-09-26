@@ -172,7 +172,7 @@ public class OnlineFixService
         }
         catch (Exception ex)
         {
-            LogService.AddAppLog($"[AppID Changer] 补还原失败: {ex.Message}");
+            LogService.Diag($"[AppID Changer] 补还原失败: {ex.Message}");
             ToastService.ShowError("AppID Changer", $"上次的 steam_appid.txt 还原失败：{ex.Message}");
         }
     }

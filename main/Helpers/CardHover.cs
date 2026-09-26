@@ -125,5 +125,5 @@ public static class CardHover
         catch { return true; }
     }
 
-    private static void Log(string message) => OSTGUI.Services.LogService.AddAppLog($"[Hover] {message}");
+    private static void Log(string message) => OSTGUI.Services.LogService.Event($"[Hover] {message}");
 }

@@ -22,7 +22,7 @@ public class SudamaKeyCache
 
     private void Log(string message)
     {
-        LogService.AddLog(message);
+        LogService.Event(message);
         System.Diagnostics.Debug.WriteLine($"[SudamaKeyCache] {message}");
     }
 

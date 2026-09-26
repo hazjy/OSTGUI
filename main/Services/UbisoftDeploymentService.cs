@@ -25,7 +25,7 @@ public class UbisoftDeploymentService
 
     private static void Log(string message)
     {
-        LogService.AddLog($"[Ubisoft] {message}");
+        LogService.Event($"[Ubisoft] {message}");
         System.Diagnostics.Debug.WriteLine($"[Ubisoft] {message}");
     }
 

@@ -27,7 +27,7 @@ public class TrainerBindingService
         catch (Exception ex)
         {
             // 配置坏了别丢用户数据：留一份 .bad 供人工看，然后当空处理
-            LogService.AddAppLog($"trainer 绑定读取失败: {ex.Message}");
+            LogService.Diag($"trainer 绑定读取失败: {ex.Message}");
             try { File.Copy(BindingsPath, BindingsPath + ".bad", overwrite: true); } catch { }
             return new List<TrainerBinding>();
         }
@@ -46,11 +46,11 @@ public class TrainerBindingService
             var temp = BindingsPath + ".tmp";
             File.WriteAllText(temp, JsonSerializer.Serialize(bindings, JsonOptions));
             File.Move(temp, BindingsPath, overwrite: true);   // 原子替换，监控读到的永远是一份完整文件
-            LogService.AddAppLog($"trainer 绑定已保存 {bindings.Count} 条（启用 {bindings.Count(b => b.IsEnabled)}）");
+            LogService.Diag($"trainer 绑定已保存 {bindings.Count} 条（启用 {bindings.Count(b => b.IsEnabled)}）");
         }
         catch (Exception ex)
         {
-            LogService.AddAppLog($"trainer 绑定保存失败: {ex.Message}");
+            LogService.Diag($"trainer 绑定保存失败: {ex.Message}");
         }
     }
 }

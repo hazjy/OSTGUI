@@ -22,7 +22,7 @@ public class LuaBuilder
 
     private void Log(string message)
     {
-        LogService.AddLog(message);
+        LogService.Event(message);
         System.Diagnostics.Debug.WriteLine($"[LuaBuilder] {message}");
     }
     public async Task<(string lua, List<string> missingKeyDepots, int dlcCount, int keyCount)> BuildLuaAsync(

@@ -33,7 +33,7 @@ public class ManifestDownloadService
 
     private void Log(string message)
     {
-        LogService.AddLog(message);
+        LogService.Event(message);
         System.Diagnostics.Debug.WriteLine($"[ManifestDownload] {message}");
     }
 

@@ -60,7 +60,7 @@ public static class AppInfoVdf
         }
         catch (Exception ex)
         {
-            LogService.AddAppLog($"appinfo.vdf 读取失败: {ex.Message}");
+            LogService.Diag($"appinfo.vdf 读取失败: {ex.Message}");
         }
         return result;
     }

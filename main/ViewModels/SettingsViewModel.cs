@@ -93,7 +93,7 @@ public partial class SettingsViewModel : ObservableObject
         _denuvoMode = mode;
         OnPropertyChanged(nameof(IsDenuvoNormalMode));
         OnPropertyChanged(nameof(IsDenuvoCompatMode));
-        LogService.AddLog(message);
+        LogService.Event(message);
         SetStatus(message, "Success");
         ToastService.ShowSuccess("D 加密模式已切换", message);
     }
@@ -201,7 +201,7 @@ public partial class SettingsViewModel : ObservableObject
         try
         {
             var (ok, message) = await _sudamaCache.RefreshAsync();
-            LogService.AddLog(message);
+            LogService.Event(message);
             SetStatus(message, ok ? "Success" : "Error");
             if (ok)
                 Services.ToastService.ShowSuccess("Sudama 缓存已更新", message);
@@ -211,7 +211,7 @@ public partial class SettingsViewModel : ObservableObject
         catch (Exception ex)
         {
             var msg = $"Sudama 缓存刷新异常: {ex.Message}";
-            LogService.AddLog(msg);
+            LogService.Event(msg);
             SetStatus(msg, "Error");
             Services.ToastService.ShowError("Sudama 缓存刷新失败", msg);
         }
@@ -230,7 +230,7 @@ public partial class SettingsViewModel : ObservableObject
         try
         {
             var (ok, message) = await _sudamaCache.ImportFilesAsync(filePaths);
-            LogService.AddLog(message);
+            LogService.Event(message);
             SetStatus(message, ok ? "Success" : "Error");
             if (ok)
                 Services.ToastService.ShowSuccess("Sudama 缓存导入完成", message);
@@ -240,7 +240,7 @@ public partial class SettingsViewModel : ObservableObject
         catch (Exception ex)
         {
             var msg = $"Sudama 缓存导入异常: {ex.Message}";
-            LogService.AddLog(msg);
+            LogService.Event(msg);
             SetStatus(msg, "Error");
             Services.ToastService.ShowError("Sudama 缓存导入失败", msg);
         }
@@ -450,7 +450,7 @@ public partial class SettingsViewModel : ObservableObject
                     c.ManifestSourceEnabled[source.Id] = source.IsEnabled;
             });
         }
-        catch (Exception ex) { LogService.AddLog($"[SaveAllToConfig] 失败: {ex.Message}"); }
+        catch (Exception ex) { LogService.Diag($"[SaveAllToConfig] 失败: {ex.Message}"); }
     }
 
     /// <summary>

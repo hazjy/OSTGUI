@@ -21,7 +21,7 @@ public class SteamGameInfoService
 
     private void Log(string message)
     {
-        LogService.AddLog(message);
+        LogService.Event(message);
         System.Diagnostics.Debug.WriteLine($"[SteamGameInfo] {message}");
     }
     /// <summary>

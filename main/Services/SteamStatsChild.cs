@@ -60,11 +60,11 @@ internal static class SteamStatsChild
                     if (!uint.TryParse(id, out var u)) continue;
                     if (client.SteamApps008.IsSubscribedApp(u)) owned.Add(id);
                 }
-                LogService.AddAppLog($"stats-owned 候选={candidates.Count} 拥有={owned.Count}");
+                LogService.Diag($"stats-owned 候选={candidates.Count} 拥有={owned.Count}");
             }
             catch (Exception ex)
             {
-                LogService.AddAppLog($"stats-owned 失败: {ex.Message}");
+                LogService.Diag($"stats-owned 失败: {ex.Message}");
                 File.WriteAllText(outOwnedFile, JsonSerializer.Serialize(new List<string>()));
                 return 1;
             }
@@ -80,7 +80,7 @@ internal static class SteamStatsChild
                     defs.Select((d, i) => $"{i,3}  {(d.Hidden ? "[隐]" : "    ")}  {d.Name}  =  {d.DisplayName}"))
                 : "未发现成就定义，错误码：" + error;
             File.WriteAllText(args[4], text);
-            LogService.AddAppLog($"schema dump appid={appId} 条数={(ok ? defs.Count : -1)} {error}");
+            LogService.Diag($"schema dump appid={appId} 条数={(ok ? defs.Count : -1)} {error}");
             return ok ? 0 : 2;
         }
 
@@ -114,9 +114,9 @@ internal static class SteamStatsChild
         }
         catch (Exception ex)
         {
-            LogService.AddAppLog($"成就子进程写结果失败: {ex.Message}");
+            LogService.Diag($"成就子进程写结果失败: {ex.Message}");
         }
-        LogService.AddAppLog($"stats {mode} appid={appId} ok={result.Ok} {result.Message} {result.Warning}");
+        LogService.Diag($"stats {mode} appid={appId} ok={result.Ok} {result.Message} {result.Warning}");
         return result.Ok ? 0 : 1;
     }
 
@@ -129,7 +129,7 @@ internal static class SteamStatsChild
             res.Message = "未发现成就定义，错误码：" + schemaError;
             return res;
         }
-        LogService.AddAppLog($"stats[{appId}] begin defs={defs.Count} changes={changes?.Count.ToString() ?? "-"}");
+        LogService.Diag($"stats[{appId}] begin defs={defs.Count} changes={changes?.Count.ToString() ?? "-"}");
 
         Steam.InstallPath = steamPath;
         using var client = new Client();
@@ -144,7 +144,7 @@ internal static class SteamStatsChild
             res.Message = $"连接 Steam 失败：{ex.Message}";
             return res;
         }
-        LogService.AddAppLog($"stats[{appId}] connected");
+        LogService.Diag($"stats[{appId}] connected");
 
         var received = false;
         var callback = client.CreateAndRegisterCallback<UserStatsReceived>();
@@ -181,7 +181,7 @@ internal static class SteamStatsChild
             {
                 res.Achievements = cached;
                 res.Ok = true;
-                LogService.AddAppLog($"stats[{appId}] read(cached) {cached.Count(r => r.Achieved)}/{cached.Count} unlocked");
+                LogService.Diag($"stats[{appId}] read(cached) {cached.Count(r => r.Achieved)}/{cached.Count} unlocked");
                 return res;
             }
         }
@@ -208,11 +208,11 @@ internal static class SteamStatsChild
             res.Failed = failed;
             if (!client.SteamUserStats.StoreStats())
                 Append(ref res, "StoreStats 失败");
-            LogService.AddAppLog($"stats[{appId}] applied={res.Changed}/{changes.Count} failed={failed}");
+            LogService.Diag($"stats[{appId}] applied={res.Changed}/{changes.Count} failed={failed}");
         }
 
         res.Achievements = ReadAll();
-        LogService.AddAppLog(
+        LogService.Diag(
             $"stats[{appId}] read {res.Achievements.Count(a => a.Achieved)}/{res.Achievements.Count} unlocked ready={res.StatsReady} ok={res.ReadOk}");
         res.Ok = true;
         return res;

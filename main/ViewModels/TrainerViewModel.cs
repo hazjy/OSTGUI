@@ -140,7 +140,7 @@ public partial class TrainerViewModel : ObservableObject
             catch (Exception ex)
             {
                 // 抓取失败（站点/网络不可用）不能让异常冒出去：这里是 fire-and-forget 调用
-                LogService.AddAppLog($"trainer 列表加载失败: {ex.Message}");
+                LogService.Diag($"trainer 列表加载失败: {ex.Message}");
                 Items.Clear();
                 StatusText = SearchStatusText();
                 return;
@@ -230,12 +230,12 @@ public partial class TrainerViewModel : ObservableObject
                 UseShellExecute = true,
             });
 
-            LogService.AddAppLog($"trainer 手动启动 {Path.GetFileName(exe)}");
+            LogService.Event($"trainer 手动启动 {Path.GetFileName(exe)}");
             ToastService.ShowSuccess("已启动", Path.GetFileName(exe));
         }
         catch (Exception ex)
         {
-            LogService.AddAppLog($"trainer 启动失败 {exe}: {ex.Message}");
+            LogService.Diag($"trainer 启动失败 {exe}: {ex.Message}");
             ToastService.ShowError("启动失败", ex.Message);
         }
     }
@@ -360,7 +360,7 @@ public partial class TrainerViewModel : ObservableObject
         if (stale.Count > 0)
         {
             SaveBindings();          // 落盘并让监控重载
-            LogService.AddAppLog($"trainer 删除 {trainer.GameName}：同时移除 {stale.Count} 条绑定");
+            LogService.Diag($"trainer 删除 {trainer.GameName}：同时移除 {stale.Count} 条绑定");
         }
 
         RefreshLocalTrainers();
@@ -445,11 +445,11 @@ public partial class TrainerViewModel : ObservableObject
                     UseShellExecute = false,
                     CreateNoWindow = true,
                 });
-                LogService.AddAppLog("trainer 监控子进程已启动");
+                LogService.Diag("trainer 监控子进程已启动");
             }
             catch (Exception ex)
             {
-                LogService.AddAppLog($"trainer 监控启动失败: {ex.Message}");
+                LogService.Diag($"trainer 监控启动失败: {ex.Message}");
             }
 
             // 子进程写 pid 文件要一点时间，等一下再报状态（否则会误报"未运行"）。
@@ -465,7 +465,7 @@ public partial class TrainerViewModel : ObservableObject
             try
             {
                 Process.GetProcessById(running.Value).Kill();
-                LogService.AddAppLog($"trainer 监控子进程已停止 pid={running.Value}");
+                LogService.Diag($"trainer 监控子进程已停止 pid={running.Value}");
             }
             catch { }
             running = null;

@@ -170,7 +170,7 @@ public partial class SearchViewModel : ObservableObject
         try
         {
             var query = SearchQuery.Trim();
-            LogService.AddLog($"开始搜索: {query}");
+            LogService.Event($"开始搜索: {query}");
 
             // 检查是否是 Steam 链接
             var appIdFromUrl = GameSearchService.ParseAppIdFromUrl(query);
@@ -180,32 +180,32 @@ public partial class SearchViewModel : ObservableObject
             // 检查是否是纯 AppID
             if (int.TryParse(query, out _))
             {
-                LogService.AddLog($"按 AppID 搜索: {query}");
+                LogService.Event($"按 AppID 搜索: {query}");
                 var result = await _searchService.SearchByAppIdAsync(query);
                 if (result.Success)
                 {
                     SearchResults.Add(result);
                     SelectedResult = result;
-                    LogService.AddLog($"找到: {result.Name} (AppID {result.AppId})");
+                    LogService.Event($"找到: {result.Name} (AppID {result.AppId})");
                     SetStatus($"识别成功: {result.Name}", "Success");
                 }
                 else
                 {
-                    LogService.AddLog($"搜索失败: {result.ErrorMessage}");
+                    LogService.Diag($"搜索失败: {result.ErrorMessage}");
                     SetStatus($"未找到匹配的游戏: {result.ErrorMessage}", "Error");
                 }
             }
             else
             {
                 // 按名称搜索
-                LogService.AddLog($"按名称搜索: {query}");
+                LogService.Event($"按名称搜索: {query}");
                 var results = await _searchService.SearchByNameAsync(query);
                 if (results.Count > 0)
                 {
                     foreach (var r in results)
                         SearchResults.Add(r);
                     SelectedResult = results[0];
-                    LogService.AddLog($"找到 {results.Count} 个匹配结果，首个: {results[0].Name} (AppID {results[0].AppId})");
+                    LogService.Event($"找到 {results.Count} 个匹配结果，首个: {results[0].Name} (AppID {results[0].AppId})");
                     SetStatus($"找到 {results.Count} 个匹配结果", "Success");
                 }
                 else
@@ -213,7 +213,7 @@ public partial class SearchViewModel : ObservableObject
                     var msg = ContainsChinese(query)
                         ? "未找到匹配的游戏（Steam 对中文名的搜索支持有限，建议改用英文名或 AppID）"
                         : "未找到匹配的游戏，请尝试使用 AppID";
-                    LogService.AddLog(msg);
+                    LogService.Event(msg);
                     SetStatus(msg, "Error");
                 }
             }
@@ -303,23 +303,23 @@ public partial class SearchViewModel : ObservableObject
         IsCancelling = false;   // 新一轮：清掉上一轮可能遗留的"取消中"状态
         ProgressValue = 0;
         LogService.Clear();
-        LogService.AddLog($"开始入库 AppID: {target.AppId}");
+        LogService.Event($"开始入库 AppID: {target.AppId}");
 
         try
         {
             var appId = target.AppId;
-            LogService.AddLog($"游戏名称: {target.Name}");
+            LogService.Event($"游戏名称: {target.Name}");
 
             var steamPath = _steamService.GetSteamPath();
             if (string.IsNullOrEmpty(steamPath))
             {
-                LogService.AddLog("错误: Steam 路径未设置");
+                LogService.Diag("错误: Steam 路径未设置");
                 SetStatus("Steam 路径未设置", "Error");
                 return;
             }
-            LogService.AddLog($"Steam 路径: {steamPath}");
+            LogService.Event($"Steam 路径: {steamPath}");
 
-            var progress = new Progress<string>(msg => LogService.AddLog(msg));
+            var progress = new Progress<string>(msg => LogService.Event(msg));
             AddGameResult res;
 
             if (DownloadManifest)
@@ -331,7 +331,7 @@ public partial class SearchViewModel : ObservableObject
 
                 if (!string.IsNullOrEmpty(mhubKey))
                 {
-                    LogService.AddLog("使用 ManifestHub 下载清单...");
+                    LogService.Event("使用 ManifestHub 下载清单...");
                     res = await _manifestService.DownloadFromManifestHubAsync(
                         appId, FixedVersion, AddAllDlc, progress, ct);
                 }
@@ -344,7 +344,7 @@ public partial class SearchViewModel : ObservableObject
                 // 被用户取消时不兜底——取消的语义是"停下来"，不是"换个源接着跑"
                 if (!res.Success && !res.Cancelled)
                 {
-                    LogService.AddLog("尝试 Sudama 兜底...");
+                    LogService.Event("尝试 Sudama 兜底...");
                     res = await _manifestService.DownloadFromSudamaAsync(
                         appId, FixedVersion, AddAllDlc, progress, ct);
                 }
@@ -352,7 +352,7 @@ public partial class SearchViewModel : ObservableObject
             else
             {
                 // 关闭清单下载：跳过清单源，直接用密钥源生成 Lua，清单由内核运行时兜底获取
-                LogService.AddLog("已关闭清单下载，跳过清单源，清单由内核运行时兜底获取...");
+                LogService.Event("已关闭清单下载，跳过清单源，清单由内核运行时兜底获取...");
                 res = await _manifestService.DownloadFromSudamaAsync(
                     appId, FixedVersion, AddAllDlc, progress, ct);
             }
@@ -360,13 +360,13 @@ public partial class SearchViewModel : ObservableObject
             // 用户取消：既不是成功也不是失败，安静收尾（不弹通知——是用户自己发起的）
             if (res.Cancelled)
             {
-                LogService.AddLog("入库已取消（临时文件已清理）");
+                LogService.Event("入库已取消（临时文件已清理）");
                 SetStatus("已取消入库", "Info");
                 return;
             }
 
             ProgressValue = 100;
-            LogService.AddLog(res.Message);
+            LogService.Event(res.Message);
 
             if (res.Success)
             {
@@ -380,7 +380,7 @@ public partial class SearchViewModel : ObservableObject
                 if (warnings.Count > 0)
                 {
                     var abnormalMsg = $"入库异常: {string.Join("；", warnings)}";
-                    LogService.AddLog(abnormalMsg);
+                    LogService.Event(abnormalMsg);
                     if (_configService.Config.ShowSystemNotifications)
                         Services.ToastService.ShowWarning("入库异常",
                             $"{target.Name} (AppID {appId}) {string.Join("；", warnings)}");
@@ -414,12 +414,12 @@ public partial class SearchViewModel : ObservableObject
             // 留着是防御：任何一处漏传 token 的取消也不会变成"入库失败"弹窗。
             // ⚠️ 必须带 ct.IsCancellationRequested 过滤：HttpClient 的**超时也是 OCE**，
             // 否则一次网络超时会被显示成"已取消入库"。
-            LogService.AddLog("入库已取消");
+            LogService.Event("入库已取消");
             SetStatus("已取消入库", "Info");
         }
         catch (Exception ex)
         {
-            LogService.AddLog($"异常: {ex.Message}");
+            LogService.Diag($"异常: {ex.Message}");
             SetStatus($"入库失败: {ex.Message}", "Error");
         }
         finally
@@ -445,7 +445,7 @@ public partial class SearchViewModel : ObservableObject
         if (_addCts is null) return;
         IsCancelling = true;      // 立刻反馈：按钮变「取消中…」并禁用，别等链路返回
         _addCts.Cancel();
-        LogService.AddLog("用户取消入库");
+        LogService.Event("用户取消入库");
     }
 
     private void SetStatus(string message, string type)

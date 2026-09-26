@@ -235,7 +235,7 @@ public partial class AchievementViewModel : ObservableObject
         if (ids.Count == 0) return;
 
         try { await _search.GetGameNamesBatchAsync(ids); }
-        catch (Exception ex) { LogService.AddAppLog($"成就页补名失败: {ex.Message}"); }
+        catch (Exception ex) { LogService.Diag($"成就页补名失败: {ex.Message}"); }
 
         var changed = false;
         foreach (var item in _allGames.Concat(_ownedGames))
@@ -304,7 +304,7 @@ public partial class AchievementViewModel : ObservableObject
                     };
                 }
             }
-            catch (Exception ex) { LogService.AddAppLog($"正版候选②失败: {ex.Message}"); }
+            catch (Exception ex) { LogService.Diag($"正版候选②失败: {ex.Message}"); }
 
             return map;
         });
@@ -318,7 +318,7 @@ public partial class AchievementViewModel : ObservableObject
             if (_names.TryGet(g.AppId, out var name) && !string.IsNullOrWhiteSpace(name))
                 g.GameName = name;
         }
-        LogService.AddAppLog($"正版游戏：候选={candidates.Count} 拥有={_ownedGames.Count}");
+        LogService.Event($"正版游戏：候选={candidates.Count} 拥有={_ownedGames.Count}");
         ApplyFilter();
         _ = FillNamesAsync();
     }

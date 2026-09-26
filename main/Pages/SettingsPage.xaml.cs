@@ -178,7 +178,7 @@ public sealed partial class SettingsPage : Page
         dataPackage.SetText(LogsTextBox.Text);
         Clipboard.SetContent(dataPackage);
 
-        LogService.AddLog($"已复制日志到剪贴板");
+        LogService.Event($"已复制日志到剪贴板");
     }
 
     private void OpenLogFile_Click(object sender, RoutedEventArgs e)

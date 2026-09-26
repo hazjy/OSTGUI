@@ -35,10 +35,8 @@ public partial class App : Application
             e.SetObserved();
         };
 
-        // 初始化日志文件（本地数据目录）
-        LogService.Initialize(Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "OSTGUI", "logs", "ostgui.log"));
+        // 初始化日志文件（本地数据目录）。监控子进程不走这里，LogService 内部会兜底用同一路径
+        LogService.Initialize(LogService.DefaultPath);
     }
 
     protected override async void OnLaunched(LaunchActivatedEventArgs args)
@@ -68,7 +66,7 @@ public partial class App : Application
         if (cmdArgs.Length >= 2 && cmdArgs[1].Equals("--trainer-selftest", StringComparison.OrdinalIgnoreCase))
         {
             var failure = TrainerNames.SelfCheck();
-            LogService.AddAppLog(failure.Length == 0 ? "trainer 自检通过" : $"trainer 自检失败：{failure}");
+            LogService.Diag(failure.Length == 0 ? "trainer 自检通过" : $"trainer 自检失败：{failure}");
             Environment.Exit(failure.Length == 0 ? 0 : 1);
             return;
         }

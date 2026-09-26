@@ -85,7 +85,7 @@ public class TrainerDownloadService
         }
         catch (Exception ex)
         {
-            LogService.AddAppLog($"trainer 读取索引失败: {ex.Message}");
+            LogService.Diag($"trainer 读取索引失败: {ex.Message}");
         }
         return result.OrderBy(r => r.GameName, StringComparer.OrdinalIgnoreCase).ToList();
     }
@@ -100,7 +100,7 @@ public class TrainerDownloadService
         }
         catch (Exception ex)
         {
-            LogService.AddAppLog($"trainer 索引解析失败（当空处理）: {ex.Message}");
+            LogService.Diag($"trainer 索引解析失败（当空处理）: {ex.Message}");
             return new List<IndexEntry>();
         }
     }
@@ -117,7 +117,7 @@ public class TrainerDownloadService
         }
         catch (Exception ex)
         {
-            LogService.AddAppLog($"trainer 索引写入失败: {ex.Message}");
+            LogService.Diag($"trainer 索引写入失败: {ex.Message}");
         }
     }
 
@@ -172,7 +172,7 @@ public class TrainerDownloadService
             AddedAt = DateTime.Now,
         });
         WriteIndex(entries);
-        LogService.AddAppLog($"trainer 更新完成：{Path.GetFileName(oldPath)} → {Path.GetFileName(newPath)}（绑定按名称查索引，无需改写）");
+        LogService.Diag($"trainer 更新完成：{Path.GetFileName(oldPath)} → {Path.GetFileName(newPath)}（绑定按名称查索引，无需改写）");
     }
 
     /// <summary>
@@ -196,7 +196,7 @@ public class TrainerDownloadService
         }
         catch (Exception ex)
         {
-            LogService.AddAppLog($"trainer 按名称查索引失败: {ex.Message}");
+            LogService.Diag($"trainer 按名称查索引失败: {ex.Message}");
         }
         return null;
     }
@@ -204,13 +204,13 @@ public class TrainerDownloadService
     private static void TryDelete(string path)
     {
         try { if (File.Exists(path)) File.Delete(path); }
-        catch (Exception ex) { LogService.AddAppLog($"trainer 删除旧文件失败 {Path.GetFileName(path)}: {ex.Message}"); }
+        catch (Exception ex) { LogService.Diag($"trainer 删除旧文件失败 {Path.GetFileName(path)}: {ex.Message}"); }
     }
 
     private static void TryDeleteDirectory(string dir)
     {
         try { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); }
-        catch (Exception ex) { LogService.AddAppLog($"trainer 删除旧目录失败 {Path.GetFileName(dir)}: {ex.Message}"); }
+        catch (Exception ex) { LogService.Diag($"trainer 删除旧目录失败 {Path.GetFileName(dir)}: {ex.Message}"); }
     }
 
     private static void RemoveFromIndex(string path)
@@ -265,7 +265,7 @@ public class TrainerDownloadService
             progress?.Report((100, read));
             var final = Path.Combine(Dir, bare + (IsZip(temp) ? ".zip" : ".exe"));
             File.Move(temp, final, overwrite: true);
-            LogService.AddAppLog($"trainer 下载完成 {Path.GetFileName(final)}（{new FileInfo(final).Length / 1024} KB，SHA256 {Sha256(final)[..16]}…）");
+            LogService.Diag($"trainer 下载完成 {Path.GetFileName(final)}（{new FileInfo(final).Length / 1024} KB，SHA256 {Sha256(final)[..16]}…）");
 
             var result = IsZip(final) ? Extract(final) : final;
             // 索引里记文件名（=「复制名称」复制的名字，也是绑定的名称）
@@ -274,12 +274,12 @@ public class TrainerDownloadService
         }
         catch (OperationCanceledException)
         {
-            LogService.AddAppLog($"trainer 下载已取消 {bare}");
+            LogService.Event($"trainer 下载已取消 {bare}");
             return (null, "已取消");
         }
         catch (Exception ex)
         {
-            LogService.AddAppLog($"trainer 下载失败 {bare}: {ex.Message}");
+            LogService.Diag($"trainer 下载失败 {bare}: {ex.Message}");
             return (null, ex.Message);
         }
         finally
@@ -335,12 +335,12 @@ public class TrainerDownloadService
             }
 
             var exe = EnumerateExes(dir).FirstOrDefault();
-            LogService.AddAppLog($"trainer 已解压到 {Path.GetFileName(dir)}（exe: {(exe == null ? "无" : Path.GetFileName(exe))}）");
+            LogService.Event($"trainer 已解压到 {Path.GetFileName(dir)}（exe: {(exe == null ? "无" : Path.GetFileName(exe))}）");
             return exe;
         }
         catch (Exception ex)
         {
-            LogService.AddAppLog($"trainer 解压失败 {Path.GetFileName(zipPath)}: {ex.Message}");
+            LogService.Diag($"trainer 解压失败 {Path.GetFileName(zipPath)}: {ex.Message}");
             return null;
         }
     }
@@ -376,11 +376,11 @@ public class TrainerDownloadService
         {
             if (File.Exists(path)) File.Delete(path);
             RemoveFromIndex(path);
-            LogService.AddAppLog($"trainer 已删除 {Path.GetFileName(path)}");
+            LogService.Diag($"trainer 已删除 {Path.GetFileName(path)}");
         }
         catch (Exception ex)
         {
-            LogService.AddAppLog($"trainer 删除失败 {Path.GetFileName(path)}: {ex.Message}");
+            LogService.Diag($"trainer 删除失败 {Path.GetFileName(path)}: {ex.Message}");
         }
     }
 
@@ -399,7 +399,7 @@ public class TrainerDownloadService
         }
         catch (Exception ex)
         {
-            LogService.AddAppLog($"trainer 打开目录失败: {ex.Message}");
+            LogService.Diag($"trainer 打开目录失败: {ex.Message}");
         }
     }
 

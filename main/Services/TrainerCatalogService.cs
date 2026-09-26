@@ -54,11 +54,11 @@ public class TrainerCatalogService
         }
         catch (Exception ex)
         {
-            LogService.AddAppLog($"trainer 搜索 RSS 解析失败「{query}」: {ex.Message}");
+            LogService.Diag($"trainer 搜索 RSS 解析失败「{query}」: {ex.Message}");
         }
 
         if (result.Count == 0)
-            LogService.AddAppLog($"trainer 搜索「{query}」无结果（feed 长度 {xml.Length}）");
+            LogService.Event($"trainer 搜索「{query}」无结果（feed 长度 {xml.Length}）");
         return result;
     }
 
@@ -96,13 +96,13 @@ public class TrainerCatalogService
                 using var resp = await _http.GetAsync(url, ct);
                 var text = await resp.Content.ReadAsStringAsync(ct);
                 if (!resp.IsSuccessStatusCode)
-                    LogService.AddAppLog($"trainer 抓取 HTTP {(int)resp.StatusCode} {url}（{text.Length} 字符）");
+                    LogService.Diag($"trainer 抓取 HTTP {(int)resp.StatusCode} {url}（{text.Length} 字符）");
                 return text;
             }
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 last = ex;
-                LogService.AddAppLog($"trainer 抓取失败（第 {attempt + 1} 次）{url}: {ex.Message}");
+                LogService.Diag($"trainer 抓取失败（第 {attempt + 1} 次）{url}: {ex.Message}");
                 if (attempt == 0) await Task.Delay(1500, ct);
             }
         }

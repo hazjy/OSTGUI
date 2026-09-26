@@ -30,6 +30,10 @@ public static class LogService
     /// <summary>日志文件路径（设置页可一键打开）</summary>
     public static string LogFilePath { get; private set; } = "";
 
+    /// <summary>默认路径：<c>%LOCALAPPDATA%\OSTGUI\logs\ostgui.log</c></summary>
+    public static string DefaultPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OSTGUI", "logs", "ostgui.log");
+
     /// <summary>运行时日志保留行数（只作用于内存视图）</summary>
     public static int MaxLines { get; private set; } = 1000;
 
@@ -85,11 +89,6 @@ public static class LogService
         catch { }
     }
 
-    // ── 兼容旧调用点：AddAppLog 原本"只写文件"、AddLog 原本"只进视图"。
-    //    拆分后语义收敛到 Diag / Event，调用点按模块分批迁移，迁完这几个别名可删 ──
-    public static void AddLog(string message) => Event(message);
-    public static void AddAppLog(string message) => Diag(message);
-
     public static void Clear()
     {
         // 集合绑着界面，CollectionChanged(Reset) 必须在 UI 线程触发（否则订阅方在工作线程刷绑定）
@@ -128,6 +127,9 @@ public static class LogService
     /// <summary>追加一行到日志文件（多进程共享：FileShare.ReadWrite + 失败重试一次）</summary>
     private static void AppendFile(string line)
     {
+        // 监控子进程走 Program.Main，不经过 App 构造函数 → 这里兜底初始化，
+        // 否则它的日志会因为路径为空被静默丢掉（验收时实测踩到）
+        if (LogFilePath.Length == 0) Initialize(DefaultPath);
         if (string.IsNullOrEmpty(LogFilePath)) return;
 
         lock (_lock)

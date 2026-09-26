@@ -174,7 +174,7 @@ public sealed class NoSteamLauncherService : IDisposable
 
         var progress = new Progress<string>(msg =>
         {
-            LogService.AddLog($"[NoSteam] {msg}");
+            LogService.Event($"[NoSteam] {msg}");
         });
 
         return await orchestrator.ExecuteAsync(options, progress, ct);
