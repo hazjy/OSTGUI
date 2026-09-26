@@ -411,12 +411,12 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
             _mainVM.SearchVM.LoadOptionsFromConfig();
 
             // 排查"启动后空白/数据全空"时先看这一行在不在（初始化有没有跑完）
-            LogService.AddAppLog($"[Init] page={page}, steam={_mainVM.SteamPathDisplay}");
+            LogService.Event($"[Init] page={page}, steam={_mainVM.SteamPathDisplay}");
         }
         catch (Exception ex)
         {
             // 以前这里静默吞掉，导致"初始化没跑"和"初始化跑了但失败"完全无法区分
-            LogService.AddAppLog($"[Init] 初始化失败: {ex}");
+            LogService.Diag($"[Init] 初始化失败: {ex}");
         }
     }
 
@@ -473,7 +473,7 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
         SolidBackdrop.Visibility = SystemBackdrop is null ? Visibility.Visible : Visibility.Collapsed;
 
         // 选了没效果时先看这行日志在不在、类名对不对
-        LogService.AddAppLog($"[Backdrop] {mode} -> {SystemBackdrop?.GetType().Name ?? "null"}");
+        LogService.Event($"[Backdrop] {mode} -> {SystemBackdrop?.GetType().Name ?? "null"}");
     }
 
     /// <summary>

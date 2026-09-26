@@ -21,15 +21,18 @@ public partial class App : Application
     {
         this.InitializeComponent();
 
-        // 全局异常日志（写入应用日志文件）
+        // 三条崩溃钩子：文件里留完整堆栈（Fatal 写 ToString()），视图里只留一行摘要
         UnhandledException += (s, e) =>
         {
-            Log($"UnhandledException: {e.Exception}");
+            LogService.Fatal("UI 线程未处理异常", e.Exception);
             e.Handled = true;
         };
         AppDomain.CurrentDomain.UnhandledException += (s, e) =>
+            LogService.Fatal("AppDomain 未处理异常", e.ExceptionObject as Exception);
+        TaskScheduler.UnobservedTaskException += (s, e) =>
         {
-            Log($"AppDomain UnhandledException: {e.ExceptionObject}");
+            LogService.Fatal("未观察的 Task 异常", e.Exception);
+            e.SetObserved();
         };
 
         // 初始化日志文件（本地数据目录）
@@ -165,6 +168,6 @@ public partial class App : Application
         }
     }
 
-    private static void Log(string msg)
-        => LogService.AddAppLog(msg);
+    // App 自己的日志都是启动/退出/参数处理这类诊断信息 → Diag（写文件）
+    private static void Log(string msg) => LogService.Diag(msg);
 }
