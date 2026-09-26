@@ -1,7 +1,7 @@
-# REF-入库与密钥（GUI 侧）
+# REF-入库与Lua（GUI 侧）
 
-> 只收 Lua 配置语义 / depot-manifest-gid-key / 清单投喂 / 搜索入库 / Sudama / 创意工坊；分工与文档地图见工作区根 `README.md`。
-> 来源：从 `doc/GUI-事实考证.md` 拆出（2026-09-26）。
+> 只收 Lua 配置语义 / 搜索与入库链路 / Sudama 密钥缓存；分工与文档地图见工作区根 `README.md`。
+> 来源：从 `doc/GUI-事实考证.md` 拆出（2026-09-26，2026-09-26 按领域重划）。
 
 ## Lua 配置语义（内核查证）
 
@@ -16,42 +16,6 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
 - `addappid` 第二参数内核实际忽略（源码只读第 1、3 参数）；密钥必须恰好 64 字符否则不生效
 - `--` 开头是注释，内核忽略；函数名不区分大小写；文件放 `config\lua\{AppId}.lua`，内核热重载
 - `setManifestid` 有则锁版本，无则自动更新；大小可省略（内核实际把 size 强制为 0）
-
-## depot / manifest / gid / key 关系（查证）
-
-- **depot**：游戏内容分区（本体/DLC/语言包各一），ID 固定不随版本变
-- **manifest**：某 depot 某版本的文件清单；"下哪些 depot"由 appinfo 决定，manifest 管"下哪些文件块"
-- **gid**：manifest ID，代表某次内容快照，每次更新换新；完整版本 = 全部 depot 的 gid 组合
-- **key**：AES-256 密钥 per-depot 且对所有用户相同 → 第三方密钥库可行的根本原因
-- 有内容清单（manifests）的 depot 内容均为 AES-256 加密，下载必须有 key；
-  也存在**无 manifests 的纯所有权壳 depot**（常见于 DLC 占位，SteamCMD 数据中连 manifests 字段都没有），
-  本就没有可解密内容，裸 `addappid(depotId)` 即为正确写法，不应计入"缺密钥"警告
-
-### manifest 获取门槛（查证）
-
-- 两步：向 CM 发 `GetManifestRequestCode`（需登录且**拥有该 depot**，参数须匹配当前 appinfo）→
-  拿 code 向 CDN 拉 `depot/{id}/manifest/{gid}/5/{code}`；code 约 5 分钟轮换、CDN 侧约 10 分钟有效、**不绑定请求者**
-- **9/9 前的真实漏洞（用户补充 2026-09-20）**：拿到码后 CDN 只校验"你是否拥有这个 depot"，
-  **不校验请求的 gid 清单是否属于这个 depot** → 一个合法 depot 的码可以拉任意清单，
-  第三方清单库因此能以极低成本攒齐全网清单（也解释了当时"非当前/老版本清单也能下"）——
-  **2026-09-09 起该绑定校验上线**：只能拉属于该 depot 的清单 → **必须拥有目标 depot 的账号才取得到码**，
-  这就是"离线号"（大批拥有账号批量取码供社区复用）的来由
-- 第三方清单库本质：有人用拥有权限的正版账号批量抓取共享；OST 内核拦截 code 请求伪造响应喂回客户端，manifest 本体仍从 Steam CDN 直连
-- **该机制的历史变迁、9/9 服务器收口侦查、第三方码源失效与替代路线，见 `doc/EVENTS/`**（不在此重复）
-
-### 直接改清单 ID 不能锁版本（查证）
-
-- 改 depotcache 文件：只是缓存，不触发更新决策
-- 改 `.acf` gid 为旧值：Steam 判定落后反而强制更到最新；社区做法是改成最新值骗过防更新，不是锁旧版
-- 锁版本唯一正道：内核 hook（见 `REF-版本锁定与Denuvo模式.md` §固定版本体系对应实现）
-
-## 清单投喂位置：两级 depotcache（查证）
-
-- `config\depotcache` = **持久层**（可长期留存）；Steam 根 `depotcache` = **易失工作层**
-- Steam 客户端只读**根** depotcache；根目录清单会在**卸载/回滚时被清理**（实测：一次失败自动卸载、一次手动卸载，两次都清根）
-- 因此投喂清单必须**同时写两处**（OSTGUI `ManifestFileService` 即双写 + 逐份容错），
-  否则会出现"config 有、根没有"的静默半成品（表现为下载报 "No connection"）
-- 清单文件名格式：`<depotId>_<gid>.manifest`
 
 ## 搜索与入库链路（GUI 侧实现事实）
 
@@ -72,7 +36,7 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
   缺解密密钥警告在两种模式下都保留（无 key 无法解密已加密内容）
 - **取消是"立即"的**：`ct` 贯穿所有会等的环节，唯一不打断的是两处原子写（`tmp + Move`，亚秒 / 毫秒级）
   → 永不留下半个 `.lua` 或半份 manifest；取消后不兜底第二个源、不弹通知
-- 卡片形态（尺寸 / 图标 / 文案 / 按钮）见 `doc/细节与偏好.md`；清单投喂两处 depotcache 见本文件「清单投喂位置」
+- 卡片形态（尺寸 / 图标 / 文案 / 按钮）见 `doc/细节与偏好.md`；清单投喂两处 depotcache 见 `REF-清单与版本.md`
 - ⚠️ **取消的两条纪律**（2026-09-22 复核后补，都是上轮踩出来的）：
   ① `catch (OperationCanceledException)` **必须带 `when (ct.IsCancellationRequested)` 过滤** ——
   `HttpClient` 的**超时抛的也是 `TaskCanceledException`（OCE）**，不过滤就会把一次网络超时当成"用户取消"透传，
@@ -101,16 +65,3 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
   与 Sudama 缓存下载（max(120,·)）的超时；早期有设置控件，08-14 起移除仅留字段
 - 待做（A2）：冷缓存下载仍是"MemoryStream → 字典 → 再序列化 17.5MB 落盘"三次物化（只在首次 / 刷新时走），
   可改流式写 `.tmp` + `Move`；要动缓存文件形状且只能靠真实冷缓存验证，暂缓
-
-## 创意工坊下载（Phase 1，GUI 侧实现事实）
-
-- 创意工坊内容走 depot 加密管线：Steam 客户端把订阅的 item 当作 **depot = consumer_app_id（游戏 AppID）** 下载
-  （depotcache 命名 `<AppID>_<manifestID>.manifest`），解密密钥按 ConfigStore `…\<AppID>\DecryptionKey` 读取
-- 内核已覆盖两环：manifest code（`GetManifestRequestCode` 劫持；第三方源只要收录了该 workshop gid 即可）
-  与密钥注入（`ConfigStoreGetBinary` hook 从 Lua 的 DepotKeySet 取 key）
-- 缺口曾是主游戏行 `addappid(appid)` 不带密钥 → 内核无 key 可喂 → 订阅下载报"内容仍处于加密"。
-  Phase 1（v1.3.x）：`LuaBuilder` 主游戏行自动带上 Sudama depotkeys 中 **AppID 自身**的密钥
-  （社区称"创意工坊密钥"，须恰好 64 位 hex）→ **新入库**即具备工坊下载解密能力；
-  已入库游戏需重新入库或手动把主行改成 `addappid(appid, 1, "<key>")`
-- 边界：**限制匿名的工坊**（部分游戏 / 新 manifest 的 code 请求被服务器拒绝）无法绕过，需真实拥有该游戏的账号；
-  **老式独立 workshop depot**（SteamDB 标注 Workshop 的 depot，如 Dying Light）需该 depot 单独密钥，Phase 1 不覆盖

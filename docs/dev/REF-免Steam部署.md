@@ -1,20 +1,7 @@
 # REF-免Steam部署（GUI 侧）
 
-> 只收 Denuvo 授权与 .ost / 免 Steam 部署与一键还原；分工与文档地图见工作区根 `README.md`。
-> 来源：从 `doc/GUI-事实考证.md` 拆出（2026-09-26）。
-
-## Denuvo / 授权（查证）
-
-- 需 **AppTicket + ETicket 双票**，不可本地伪造；ETicket 由 Steam 实时签发，**30 分钟有效**（报错 88500005）
-- 提取授权存在"本地缓存的过时授权"假象且无法程序化验证账号正伪（ETicket 请求会被内核拦截）
-  → 采用导出时弹窗提醒策略
-- `.ost` 为明文 JSON：AppTicket / ETicket / Source(Steam 用户名) / CreatedAt / ExpiresAt / UseCount / ExporterVersion
-- 导入写注册表（`HKCU\Software\Valve\Steam\Apps\<appid>` 的 `AppTicket` / `ETicket`；**GUI 不写 `SteamID`**），
-  本机任意 Steam 账号可用；部分游戏 DLC 也受 D 加密，只带主游戏票时 DLC 可能解锁失败
-- 每账号每天最多 5 台新机器激活；已激活机器不消耗
-- 与 .cw/.shiki（流畅入库私有格式）不兼容是刻意选择
-- **身份模式（`[denuvo] mode`）的两种语义、切换后果与协议层边界**：内核侧事实见工作区根 `doc/` 下的事实考证（内核侧）；
-  GUI 侧读写实现见 `REF-版本锁定与Denuvo模式.md` §D 加密模式读写
+> 只收 免 Steam 部署（GSE / SAC 对齐）与一键还原；分工与文档地图见工作区根 `README.md`。
+> 来源：从 `doc/GUI-事实考证.md` 拆出（2026-09-26，2026-09-26 按领域重划）。
 
 ## 免 Steam 部署（GSE / SAC 对齐，GUI 侧实现事实）
 
@@ -34,4 +21,8 @@
 - 还原**只动游戏目录、不解压资源**（不走 `EnsureExtracted()`）；逐项日志 + 还原后复查残留：
   被占用（游戏在跑）时逐条报失败并输出"还原未完成"，不报假成功；`%APPDATA%\GSE Saves\<appid>` 只提示路径不删；
   `steam_appid.txt` 归 AppID Changer 台账管，还原不碰；幂等（无残留时输出"未发现模拟器残留（可能已还原）"）
-- 夹具两轮实测 + 用户真机 Ib 部署 → 还原后正常，见 `REF-缺陷与归档.md`。
+
+## 归档：免 Steam 部署夹具实测
+
+- 实测：夹具两轮（完整产物正常还原；`.bak` 被独占锁定时只该项失败、其余照做、报"还原未完成"）
+  + **用户真机 Ib 部署 → 还原后正常**。

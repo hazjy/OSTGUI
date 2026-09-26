@@ -17,12 +17,12 @@
 
 每块只写"是什么、谁调谁"；机制细节与实测一律看末尾出处。
 
-- **搜索 → 入库链路**：搜索（Steam 官方 API 主源）→ 取 depot / manifest gid / DLC（`SteamGameInfoService`）→ 清单下载并**双写** `config\depotcache` 与 Steam 根 `depotcache`（`ManifestDownloadService` + `ManifestFileService`）→ 密钥 / 令牌（`SudamaKeyCache`）→ 生成 Lua（`LuaBuilder` → `LuaConfigService`）；**入库可取消**（`ct` 贯穿全链，两处原子写不可打断）。出处：`docs/dev/REF-入库与密钥.md`
-- **固定版本体系**：GUI 只写 Lua（注释形式 `--setManifestid(...)` = 固定版本配置），实际锁版本由内核 hook 完成；库页切锁定模式（`LuaConfigService.ToggleVersionModeAsync`，要求 depot 全覆盖）与「补齐版本配置」（`RepairVersionConfigAsync`）。出处：`docs/dev/REF-版本锁定与Denuvo模式.md` + 内核 DEV-NOTES
+- **搜索 → 入库链路**：搜索（Steam 官方 API 主源）→ 取 depot / manifest gid / DLC（`SteamGameInfoService`）→ 清单下载并**双写** `config\depotcache` 与 Steam 根 `depotcache`（`ManifestDownloadService` + `ManifestFileService`）→ 密钥 / 令牌（`SudamaKeyCache`）→ 生成 Lua（`LuaBuilder` → `LuaConfigService`）；**入库可取消**（`ct` 贯穿全链，两处原子写不可打断）。出处：`docs/dev/REF-入库与Lua.md`
+- **固定版本体系**：GUI 只写 Lua（注释形式 `--setManifestid(...)` = 固定版本配置），实际锁版本由内核 hook 完成；库页切锁定模式（`LuaConfigService.ToggleVersionModeAsync`，要求 depot 全覆盖）与「补齐版本配置」（`RepairVersionConfigAsync`）。出处：`docs/dev/REF-清单与版本.md` + 内核 DEV-NOTES
 - **免 Steam 部署（NoSteamLauncher）**：Steamless 脱壳 + GSE(Goldberg) 部署 + 可选 Bypass，另有「一键还原」；三层 = 宿主类库 / GBE 部署服务 / 编排器。出处：`docs/dev/REF-免Steam部署.md`
 - **联机（三条路线）**：`OnlineFixService` 统一入口，**一次只走一条** —— ① 内核原生（`steam.exe -applaunch <游戏> -onlinefix=<会话 AppID>`，靠读 PEB 扫命令行检测 / 停止）② 宿主 480（拉起 `OnlineHost.exe`，游戏 exe 按 AppID 自动解析）③ AppID Changer（`--appid-txt` 写 `steam_appid.txt` + 台账还原）。②③ 共用 `IsHostRunning` 判并发；内核侧只有一份会话状态。出处：`docs/dev/REF-联机.md`
-- **封面图**：`CoverImageService` 只返回文件路径（不碰 WinUI 类型），位图由 VM 在 UI 线程构造；入库封面落盘 `%LOCALAPPDATA%\OSTGUI\covers\`（缺失标记 `.miss2`），**搜索页缩略图刻意只走内存不落盘**；列表 / 网格共用同一份位图，切档只切宿主可见性。出处：`docs/dev/REF-界面与资产.md`；尺寸与放置规则见 `doc/细节与偏好.md`
-- **显示效果（无 / 云母 / 亚克力）**：设置页下拉 → `config.json` 的 `BackdropMode` → `MainWindow.ApplyBackdrop()` 改 `Window.SystemBackdrop`；「无」档由 `SolidBackdrop` 自己铺底。出处与落地顺序：`docs/dev/REF-界面与资产.md`、`doc/开发踩坑-UI.md`
+- **封面图**：`CoverImageService` 只返回文件路径（不碰 WinUI 类型），位图由 VM 在 UI 线程构造；入库封面落盘 `%LOCALAPPDATA%\OSTGUI\covers\`（缺失标记 `.miss2`），**搜索页缩略图刻意只走内存不落盘**；列表 / 网格共用同一份位图，切档只切宿主可见性。出处：`docs/dev/REF-资产与封面.md`；尺寸与放置规则见 `doc/细节与偏好.md`
+- **显示效果（无 / 云母 / 亚克力）**：设置页下拉 → `config.json` 的 `BackdropMode` → `MainWindow.ApplyBackdrop()` 改 `Window.SystemBackdrop`；「无」档由 `SolidBackdrop` 自己铺底。出处与落地顺序：`docs/dev/REF-界面与主题.md`、`doc/开发踩坑-UI.md`
 - **日志**：**两条通道，按用途分开**（2026-09-26 拆分）——`LogService.Diag()` 写文件 + 进运行时日志（崩溃/诊断：启动退出、异常全栈、外部失败、关键状态变化）；`LogService.Event()` 只进运行时日志（流水账，内存集合绑设置页，可复制/清空）。文件 `%LOCALAPPDATA%\OSTGUI\logs\ostgui.log`：`[yyyy-MM-dd HH:mm:ss.fff] [p<pid>] [D] msg`，追加写 + `FileShare.ReadWrite`（GUI/监控/stats 三进程共享），超 2 MB 轮转 `.1`/`.2`；`LogMaxLines` 只管内存视图。崩溃走 `LogService.Fatal()`（文件留 `ToString()` 全栈）。**子进程（监控/stats）没有视图，只能写文件，故其行一律 Diag**。联机宿主另写 `onlinehost.log`。跨线程写法见 `doc/开发踩坑-UI.md`
 - **配置与状态**：`ConfigService` → `%LOCALAPPDATA%\OSTGUI\config.json`（**改动只写内存，退出时统一落盘**）；视图档位 `LibraryViewMode` / `SearchViewMode`、联机「其他」下拉 `OnlineOtherMode`、成就页来源勾选 `AchievementShowLua/Owned`、`BackdropMode` 等偏好都落在这一份里
 - **成就编辑（成就页）**：左侧 = `LibraryScanner` 扫出的入库游戏；成就定义读本地 `<Steam>\appcache\stats\UserGameStatsSchema_<appid>.bin`（二进制 KV，`SteamStatsSchema`）。勾选**只写本地留底** `%LOCALAPPDATA%\OSTGUI\achievements\<appid>.json`；点「保存到 Steam」才 spawn `OSTGUI.exe --stats-apply`（`SteamStatsChild`，短命子进程 + 结果 JSON 文件，理由与 `SteamTicketExtractor` 相同）用 SAM 封装（`main/SteamApi/`，zlib）→ `ISteamUserStats013` 写回。**写入会进 Valve（重启 Steam 后仍在）**，但内核会对 addappid 游戏清空 819 里的成就数据 → 成就页可能显示不出来（显示层问题，不是没写进去）；证据与边界见 `docs/dev/REF-成就.md`
@@ -56,7 +56,7 @@
 - Sudama 大文件下载速度取决于服务器线路，慢时走浏览器下载 + 手动导入
 - 创意工坊：限制匿名的工坊无法绕过；老式独立 workshop depot 的密钥 Phase 1 不覆盖
 - 免 Steam 部署：自带 winmm 依赖或有反作弊的游戏对 Bypass 可能不适配（默认关闭）
-- 已知实现缺陷清单（`addtoken` 键错配、两条 lua 写入路径不一致、部署备份覆盖等）见 `docs/dev/REF-缺陷与归档.md`
+- 已知实现缺陷清单（`addtoken` 键错配、两条 lua 写入路径不一致、部署备份覆盖等）见 `docs/dev/REF-缺陷台账.md`
 
 ## 5. 文档索引（已收敛）
 

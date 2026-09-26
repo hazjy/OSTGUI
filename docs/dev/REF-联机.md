@@ -1,7 +1,7 @@
 # REF-联机（GUI 侧）
 
-> 只收 480 联机邀请失效 / 会话身份 / 宿主 480 路线 / 内核原生路线 / AppID Changer；分工与文档地图见工作区根 `README.md`。
-> 来源：从 `doc/GUI-事实考证.md` 拆出（2026-09-26）。
+> 只收 480 联机邀请失效 / 会话身份 / 宿主 480 路线 / 内核原生路线 / AppID Changer / PEB；分工与文档地图见工作区根 `README.md`。
+> 来源：从 `doc/GUI-事实考证.md` 拆出（2026-09-26，2026-09-26 按领域重划）。
 
 ## 480 联机邀请失效：调研、直启实验与既定方向
 
@@ -28,7 +28,6 @@
 - v3 定位真凶 = 内核提交 #40（叠加层身份还原）：`BuildSpawnEnvBlock` 把 `SteamOverlayGameId` 还原成真实 AppId
   → 叠加层与 480 大厅不匹配 → `ActivateGameOverlayInviteDialog` 降级成普通好友列表 → 邀请退化为 7005。
 - v3 修法 = 撤销叠加层还原（保留 OptedInMask 手柄还原）+ Persona 改写移到 selfEntry 早退之前；代价仅截图标签 / 社区链接显示 Spacewar。
-- 完整日志与提交号见 `REF-缺陷与归档.md`。
 
 ## 宿主 480 路线（v4，2026-09-17 实测打通；取代上面几轮的内核思路）
 
@@ -86,7 +85,7 @@
 - **还原机制（没变）**：台账 `%LOCALAPPDATA%\OSTGUI\appid-changer.txt`（游戏目录 / 原本有无该文件 / 原内容，
   LF 分行、原内容原样不 Trim）；宿主先写台账再动文件 → 中途被杀也能还原；
   宿主被杀留台账，GUI 启动时补还原（有台账且没有 `OnlineHost` 在跑才动手）。
-- 六项本机自测（含 PEB 直读子进程环境块）见 `REF-缺陷与归档.md`。
+- 六项本机自测（含 PEB 直读子进程环境块）见本文件 §归档：AppID Changer 本机自测（六项）。
 - **未测（留给好友实测）**：真机 480 联机进房；"启动器 → 另起的 exe" 场景下的还原时机（代码已标 `ponytail:`）；
   残留文件若长期不还原对"之后从 Steam 正常启动"的实际影响（按最坏情况强制还原 + 启动巡检）。
 
@@ -96,8 +95,38 @@
   （内核侧事实见工作区根的内核侧事实考证）
 - 检测与停止：GUI 扫描**命令行含 `-onlinefix` 的进程**（排除 `steam.exe`）——命令行是通过读 **PEB** 拿的
   （x64 布局：PEB +0x20 → `RTL_USER_PROCESS_PARAMETERS`，+0x70 → CommandLine 的 `UNICODE_STRING`）；
-  读进程环境另见 `REF-日志与诊断.md`（PEB +0x80 = Environment）。停止即 Kill 这些进程
+  读进程环境另见本文件 §读进程环境（PEB 布局）。停止即 Kill 这些进程
 - 前提：Steam 已启动并登录（在线模式）
 - 内核侧**会话状态只有一份**（`-onlinefix` 语义），故同一时间只能有一个 480 会话；
   **v1.1.3 起随游戏进程退出即清空**。残留会污染入站 persona 改写 ——
   症状：好友（如 PEAK）被显示成真实游戏名而不是 480，日志里能抓到 `Patched friend persona entries (480 -> 3527290)`
+
+## 读进程环境（PEB 布局，实测事实）
+
+- 读进程环境：PEB+0x20 → `RTL_USER_PROCESS_PARAMETERS`，+0x70 = CommandLine、**+0x80 = Environment**；
+  环境块按 128KB 整块读再按 `\0` 拆（`EnvironmentSize` 位置随版本变）。
+  读命令行扫 `-onlinefix` 进程的用法见本文件 §联机路线 A（内核原生）实现事实。
+
+## 归档：480 联机实证轮（v1/v2/v3，PEAK + 日志探针）
+
+- **v1（仅 LobbyInvite_t 改写）实测**：补丁生效（`SpawnProcess: 3527290 -> 480`、`OnlineFix: 480 -> name 'PEAK'` 均出现），
+  但**全程零 `LobbyInvite:` 日志、零 MMS/大厅流量、零 JoinLobby 尝试**——邀请根本没走大厅通道，只收到 2 条旧式 `InviteToGame(7005)`。
+  LobbyInvite 假设不成立。
+- **v2（增 Persona 好友改写 + 全回调探针）实测**：探针显示 21 次 cb=304 等；但 `Persona friend` 改写一次未触发——两处缺陷：
+  ① 改写块放在 `if (!selfEntry) return false` 之后，好友增量推送常不含 self 条目被提前拦掉；
+  ② 好友的 480 状态若在启动游戏前已进客户端缓存，后续无推送 → 改写永远无机会执行。
+- **v3（真凶落点）**：结合"邀请时弹出的是普通好友界面"定位到内核提交 **#40（Restore controllers and overlay identity）**：
+  `BuildSpawnEnvBlock` 把 `SteamOverlayGameId` 还原成真实 AppId → 叠加层身份与 480 空间大厅不匹配
+  → `ActivateGameOverlayInviteDialog` 降级为普通好友列表 → 邀请退化为 7005。**v3 撤销叠加层还原**
+  （保留 OptedInMask 手柄还原），叠加层回到 480，邀请对话框正确绑定 480 大厅；代价仅截图标签/社区链接显示 Spacewar。
+  同时把 Persona 改写移到 selfEntry 早退之前。
+  - 提交：内核分支 `fix/onlinefix-lobby-invite`（v1: 94a80b8，v3: 36708b9）。当时的三份备份
+    （`20260825-kernel-480fix` / `20260825-kernel-v2-friendpatch` / `20260826-kernel-v2-persona`）
+    **已随备份目录整理删除**；现存内核备份见工作区 `内核备份/`（2026-09-20 清理并更名，原 `ost-backups/`）。
+
+## 归档：AppID Changer 本机自测（六项）
+
+- **本机自测**：① 原本无该文件 → 退出后删除；② 原本是 `3527290`（7 字节、无换行）→ 逐字写回；
+  ③ 杀掉宿主 → 文件 480 + 台账残留、游戏照跑；④ 原文件被独占锁 → 宿主退出码 5、什么都不动、游戏不启动；
+  ⑤ 带残留开 GUI → 自动还原并清台账；⑥（修正后新增）子进程确实继承到
+  `SteamAppId`/`SteamGameId`/`SteamOverlayGameId=480`（PEB 直读子进程环境块）。
