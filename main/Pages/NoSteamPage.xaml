@@ -11,7 +11,6 @@
     mc:Ignorable="d">
 
     <Page.Resources>
-        <converters:BoolToVisibilityConverter x:Key="BoolToVis" />
         <converters:IntToDoubleConverter x:Key="IntToDoubleConverter" />
         <Style TargetType="TextBlock" x:Key="LabelStyle">
             <Setter Property="FontWeight" Value="SemiBold" />
