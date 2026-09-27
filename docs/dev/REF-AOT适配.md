@@ -65,8 +65,8 @@
 - 怎么办：页面订阅搬进 `Loaded` / `Unloaded` 成对（**先 `-=` 再 `+=`**；页面被 Frame 缓存会反复
   `Loaded`，不退订就重复订阅）；刷新节流 100ms（`DispatcherQueueTimer` + 脏标志，刷完即停表）。
 - 为什么必须搬：事件源是静态/单例（`LogService.Logs`、单例 VM），在构造函数里订阅 = 静态对象永久钉住页面实例。
-- 内存观测：`App` 启动、每次 `MainWindow.GoToPage`、每次入库/成就刷新各记一行 `内存：`
-  （工作集 / 托管堆 / 已提交 / 累计分配 / Gen0 / Gen2）。
+- 内存自测：任务管理器看工作集，或代码里读 `GC.GetTotalMemory(false)`、`GC.GetGCMemoryInfo().TotalCommittedBytes`、
+  `GC.GetTotalAllocatedBytes()`（AOT 产物没有 runtimeconfig.json，GC 模式只能运行时读）。
 
 ## 七、Marshal 泛型重载 + DAM 标注
 

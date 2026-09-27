@@ -352,9 +352,6 @@ public partial class SearchViewModel : ObservableObject
                 // 按名称搜索
                 LogService.Event($"按名称搜索: {query}");
                 var results = await _searchService.SearchByNameAsync(query);
-                // 常态诊断：这一条决定"到底有没有拿到结果"——有结果却不显示，就该去查渲染而不是网络；
-                // 原来的 Event 只进内存视图、不落盘，查不到
-                LogService.Diag($"搜索：三源返回 {results.Count} 条（query=「{query}」）");
                 if (results.Count > 0)
                 {
                     foreach (var r in results)

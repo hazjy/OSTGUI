@@ -79,11 +79,6 @@ public sealed partial class SearchPage : Page
 
             ResultGrid.ItemsSource = VM.SearchResults.ToList();
             ResultList.ItemsSource = VM.SearchResults.ToList();
-
-            LogService.Diag($"搜索：兜底List → Grid.Items={ResultGrid.Items.Count}"
-                          + $"（可见={ResultGrid.Visibility == Visibility.Visible}, 容器={ResultGrid.ItemsPanelRoot?.Children.Count}）, "
-                          + $"List.Items={ResultList.Items.Count}"
-                          + $"（可见={ResultList.Visibility == Visibility.Visible}）, VM.Count={VM.SearchResults.Count}");
         }
         catch (Exception ex)
         {
@@ -129,10 +124,6 @@ public sealed partial class SearchPage : Page
             if (sender is TextBox tb)
                 VM.SearchQuery = tb.Text;
             LogService.Clear();
-            // 常态诊断（1 行/次搜索）：区分"命令压根没触发"与"触发了但内部退出"。
-            // 放在 Clear() 之后，这样这行在内存视图里也留得住（Clear 只清视图，不清文件）
-            LogService.Diag($"搜索：回车触发（文本框「{VM.SearchQuery}」, VM.IsSearching={VM.IsSearching}, "
-                          + $"命令可执行={VM.SearchCommand.CanExecute(null)}, 命令运行中={VM.SearchCommand.IsRunning}）");
             _ = VM.SearchCommand.ExecuteAsync(null);
         }
     }
@@ -140,10 +131,6 @@ public sealed partial class SearchPage : Page
     private void SearchButton_Click(object sender, RoutedEventArgs e)
     {
         LogService.Clear();
-        // 常态诊断：按钮被 IsEnabled="{Binding IsSearching, BoolNegateConverter}" 挡掉时
-        // 这个处理器根本不会跑 → "只有回车有日志、点击没日志"本身就是证据
-        LogService.Diag($"搜索：按钮点击触发（关键词「{VM.SearchQuery}」, VM.IsSearching={VM.IsSearching}, "
-                      + $"命令可执行={VM.SearchCommand.CanExecute(null)}, 命令运行中={VM.SearchCommand.IsRunning}）");
         _ = VM.SearchCommand.ExecuteAsync(null);
     }
 

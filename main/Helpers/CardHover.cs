@@ -24,7 +24,8 @@ namespace OSTGUI.Helpers;
 /// ——2026-09-23 就是这么踩的：事件照常触发、每一步都异常、全被 catch 吞掉，表现成"悬浮什么反应都没有"。
 /// 要用 Composition 做动画就整套都用 Composition（阴影也得换成 composition DropShadow），两边不能混。
 ///
-/// 数值与画刷同步记在 `doc/细节与偏好.md`
+/// 数值（缩放 / 时长 / 阴影 Z）见 `_archive/20260927-细节与偏好.md`（UI 偏好已归档）；
+/// 机制与量测手法见 `doc/开发踩坑-UI.md`。
 /// </summary>
 public static class CardHover
 {

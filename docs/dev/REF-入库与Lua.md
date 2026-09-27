@@ -36,7 +36,7 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
   缺解密密钥警告在两种模式下都保留（无 key 无法解密已加密内容）
 - **取消是"立即"的**：`ct` 贯穿所有会等的环节，唯一不打断的是两处原子写（`tmp + Move`，亚秒 / 毫秒级）
   → 永不留下半个 `.lua` 或半份 manifest；取消后不兜底第二个源、不弹通知
-- 卡片形态（尺寸 / 图标 / 文案 / 按钮）见 `doc/细节与偏好.md`；清单投喂两处 depotcache 见 `REF-清单与版本.md`
+- 卡片形态（尺寸 / 图标 / 文案 / 按钮）见 `_archive/20260927-细节与偏好.md`（UI 偏好已归档）；清单投喂两处 depotcache 见 `REF-清单与版本.md`
 - ⚠️ **取消的两条纪律**（2026-09-22 复核后补，都是上轮踩出来的）：
   ① `catch (OperationCanceledException)` **必须带 `when (ct.IsCancellationRequested)` 过滤** ——
   `HttpClient` 的**超时抛的也是 `TaskCanceledException`（OCE）**，不过滤就会把一次网络超时当成"用户取消"透传，

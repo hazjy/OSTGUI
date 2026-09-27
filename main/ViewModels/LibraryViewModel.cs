@@ -242,15 +242,6 @@ public partial class LibraryViewModel : ObservableObject
         finally
         {
             IsLoading = false;
-
-            // 刷新后的内存事实（2026-09-27，与 App 启动 / 切页那几行同字段）：
-            // 用户报"入库管理刷新也会涨内存" —— 刷新会重建集合与条目（churn ✓），要看清是涨后回落还是只涨不落
-            LogService.Diag($"内存：刷新后 page=library, "
-                          + $"工作集={Environment.WorkingSet / 1048576.0:F1}MB, "
-                          + $"托管堆={GC.GetTotalMemory(false) / 1048576.0:F1}MB, "
-                          + $"已提交={GC.GetGCMemoryInfo().TotalCommittedBytes / 1048576.0:F1}MB, "
-                          + $"累计分配={GC.GetTotalAllocatedBytes() / 1048576.0:F1}MB, "
-                          + $"Gen0回收={GC.CollectionCount(0)}, Gen2回收={GC.CollectionCount(2)}");
         }
     }
 

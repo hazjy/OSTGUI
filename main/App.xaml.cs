@@ -130,15 +130,6 @@ public partial class App : Application
         Log("Config loaded");
         LogService.SetMaxLines(configService.Config.LogMaxLines);
 
-        // 运行时内存事实（2026-09-27）：AOT 产物里**没有** runtimeconfig.json ✗，
-        // GC 模式只能运行时读 ✓（用户报"内存高 + 切页就涨"，配合 GoToPage 里那条一起看曲线）
-        LogService.Diag($"内存：启动 ServerGC={System.Runtime.GCSettings.IsServerGC}, "
-                      + $"工作集={Environment.WorkingSet / 1048576.0:F1}MB, "
-                      + $"托管堆={GC.GetTotalMemory(false) / 1048576.0:F1}MB, "
-                      + $"已提交={GC.GetGCMemoryInfo().TotalCommittedBytes / 1048576.0:F1}MB, "
-                      + $"累计分配={GC.GetTotalAllocatedBytes() / 1048576.0:F1}MB, "
-                      + $"Gen0回收={GC.CollectionCount(0)}, Gen2回收={GC.CollectionCount(2)}");
-
         _window = new MainWindow();
         Log("MainWindow created");
         _window.Activate();
