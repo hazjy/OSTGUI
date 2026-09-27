@@ -236,7 +236,7 @@ public partial class SearchViewModel : ObservableObject
 
         LoadOptionsFromConfig();
 
-        SearchCommand = new AsyncRelayCommand(SearchAsync);
+        SearchCommand = new AsyncRelayCommand(SearchAsyncEntryAsync);
         AddGameCommand = new AsyncRelayCommand<SearchResult?>(AddGameAsync);
         CancelAddCommand = new RelayCommand(CancelAdd);
     }
@@ -287,10 +287,28 @@ public partial class SearchViewModel : ObservableObject
             SaveOptionsToConfig();
     }
 
+    /// <summary>
+    /// 命令入口包装：只为了把异常**记下来**再原样抛出（外面 `_ = ExecuteAsync(null)` 是
+    /// fire-and-forget，异常会被静默吞掉 —— 这条日志是唯一看得见的地方）。
+    /// </summary>
+    private async Task SearchAsyncEntryAsync()
+    {
+        try
+        {
+            await SearchAsync();
+        }
+        catch (Exception ex)
+        {
+            LogService.Diag($"搜索：命令层捕获异常 {ex.GetType().Name}: {ex.Message}");
+            throw;
+        }
+    }
+
     private async Task SearchAsync()
     {
         if (string.IsNullOrWhiteSpace(SearchQuery))
         {
+            LogService.Diag("搜索：关键词为空 → 提前返回（一个请求都没发）");
             SetStatus("请输入游戏名称或 AppID", "Warning");
             return;
         }
@@ -334,6 +352,9 @@ public partial class SearchViewModel : ObservableObject
                 // 按名称搜索
                 LogService.Event($"按名称搜索: {query}");
                 var results = await _searchService.SearchByNameAsync(query);
+                // 常态诊断：这一条决定"到底有没有拿到结果"——有结果却不显示，就该去查渲染而不是网络；
+                // 原来的 Event 只进内存视图、不落盘，查不到
+                LogService.Diag($"搜索：三源返回 {results.Count} 条（query=「{query}」）");
                 if (results.Count > 0)
                 {
                     foreach (var r in results)
@@ -348,12 +369,17 @@ public partial class SearchViewModel : ObservableObject
                         ? "未找到匹配的游戏（Steam 对中文名的搜索支持有限，建议改用英文名或 AppID）"
                         : "未找到匹配的游戏，请尝试使用 AppID";
                     LogService.Event(msg);
+                    // 失败路径必须落盘：Event 只进运行时日志、**不写文件**，
+                    // 用户报"搜什么都超时或无结果"时文件里一条都看不到（2026-09-27 补）
+                    LogService.Diag($"搜索「{query}」三个源都没结果（storesearch / 商店搜索页 / 关键词接口）");
                     SetStatus(msg, "Error");
                 }
             }
         }
         catch (Exception ex)
         {
+            // 同上层：这条以前完全没记录（连运行时日志都没有），失败原因查不到（2026-09-27 补）
+            LogService.Diag($"搜索「{SearchQuery.Trim()}」异常：{ex.GetType().Name}: {ex.Message}");
             SetStatus($"搜索失败: {ex.Message}", "Error");
         }
         finally

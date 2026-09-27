@@ -42,7 +42,26 @@ public static class CardHover
     {
         public Storyboard? Running;       // 留住引用：交给 GC 有可能半路停掉
         public ThemeShadow? Shadow;
+
+        // ── 复用（2026-09-27）：进出两条 storyboard 一次建好、反复 Begin，热路径上零分配 ──
+        // Bound = 建它们时绑定的那个 Transform；**只用引用相等判断**，不做任何类型判定
+        // （理由见 Animate() 里那段：AOT 下类型判定会静默判负）
+        public Transform? Bound;
+        public float InTo;                // In 那条 storyboard 当前的目标缩放（判断要不要重建 ✓）
+        public Storyboard? In;
+        public Storyboard? Out;
+        public DoubleAnimation? InX;
+        public DoubleAnimation? InY;
+        public DoubleAnimation? OutX;
+        public DoubleAnimation? OutY;
     }
+
+    /// <summary>
+    /// 详细日志开关（默认关 ✗）。悬浮是**热路径**，每次进出都落盘会疯狂写文件（用户实测
+    /// 触发几次后卡顿 + 内存飙升，2026-09-27）；只有排查时才置 true，会输出
+    /// "放大：…" 与 "放大完成：…" 两条（后者只在创建 storyboard 时订阅一次，不会累积 ✓）。
+    /// </summary>
+    internal static bool Trace { get; set; }
 
     private static readonly ConditionalWeakTable<Border, State> States = new();
 
@@ -118,36 +137,69 @@ public static class CardHover
         // 目标对象 + 属性路径由 XAML 运行时自己解析（不走 CLR 类型），照样匹配得到 ScaleX / ScaleY。
         var transform = card.RenderTransform ??= new ScaleTransform();
 
-        var storyboard = new Storyboard();
-        foreach (var property in new[] { "ScaleX", "ScaleY" })
+        // ── 复用：两条 storyboard 一次建好（进/出各一条），之后直接 Begin ✓ 热路径零分配 ──
+        // 只在"目标变换换了"或"进的目标值变了"时重建；判定只用**引用相等 / 值比较**，
+        // 不涉及 CLR 类型判定 ✓（transform 是本类拿到的 WinUI 对象）
+        // ⚠️ 刻意**不在每次 Begin 前改 animation.To**：那是 WinRT 属性，写一次要包一次
+        //    `IReference<double>` ✗（等于每个方向两次小分配）。改成"进的目标值写进缓存的
+        //    storyboard"，稳态下连属性写都没有 ✓
+        var isExit = MathF.Abs(to - 1f) < 0.0001f;
+        if (state.In is null
+            || !ReferenceEquals(state.Bound, transform)
+            || (!isExit && MathF.Abs(state.InTo - to) > 0.0001f))
         {
-            var animation = new DoubleAnimation
-            {
-                To = to,
-                Duration = Duration,
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
-            };
-            Storyboard.SetTarget(animation, transform);
-            Storyboard.SetTargetProperty(animation, property);
-            storyboard.Children.Add(animation);
+            state.Bound = transform;
+            state.InTo = isExit ? 1f : to;
+            (state.In, state.InX, state.InY) = CreateScaleStoryboard(transform, state.InTo);
+            (state.Out, state.OutX, state.OutY) = CreateScaleStoryboard(transform, 1f);
         }
+
+        var storyboard = (isExit ? state.Out : state.In)!;
 
         state.Running?.Stop();
         state.Running = storyboard;
 
-        // 动画跑完才说明"目标匹配成功"；只打了 Begin 那条却没等到 Completed，
-        // 就能区分出"匹配失败"与"动画跑了但没效果"。
-        // 不读 transform.ScaleX —— 那是 CLR 强类型属性，跑一次就要一次类型判定（见上面的 AOT 坑），
-        // 卡片的缩放肉眼即可验证，这里只记类型。
-        storyboard.Completed += (_, _) => Log($"放大完成：{to:F3} 变换 {transform.GetType().FullName}");
-
-        // 先记一条（Begin 之前）：变换类型只要不是 ScaleTransform，这里直接暴露
-        Log($"放大：{to:F3} 变换类型 {transform.GetType().FullName} 时长 {Duration.TotalMilliseconds:F0}ms");
+        if (Trace)
+            Log($"放大：{to:F3} 变换类型 {transform.GetType().FullName} 时长 {Duration.TotalMilliseconds:F0}ms");
 
         storyboard.Begin();
 
         // 系统关掉动画时 Duration 是 0 —— 补间没了，只会立刻到位
-        if (Duration == TimeSpan.Zero) Log($"放大即时生效（系统动画已关）：{to:F3}");
+        if (Trace && Duration == TimeSpan.Zero) Log($"放大即时生效（系统动画已关）：{to:F3}");
+    }
+
+    /// <summary>
+    /// 建"缩放到 to（ScaleX + ScaleY）"的一条 storyboard。只在**首次**或目标变换换了时调用 ✓
+    /// 不在热路径上分配 ✓；<c>To</c> 之后每次 Begin 前按需改写 ✓。
+    /// Trace 打开时在这里订一次 <c>Completed</c> —— **绝不**在 Animate 里每次 `+=`（那会累积订阅 ✗）
+    /// </summary>
+    private static (Storyboard board, DoubleAnimation x, DoubleAnimation y) CreateScaleStoryboard(Transform transform, float to)
+    {
+        var x = new DoubleAnimation
+        {
+            To = to,
+            Duration = Duration,
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        var y = new DoubleAnimation
+        {
+            To = to,
+            Duration = Duration,
+            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+        };
+        Storyboard.SetTarget(x, transform);
+        Storyboard.SetTargetProperty(x, "ScaleX");
+        Storyboard.SetTarget(y, transform);
+        Storyboard.SetTargetProperty(y, "ScaleY");
+
+        var board = new Storyboard();
+        board.Children.Add(x);
+        board.Children.Add(y);
+
+        if (Trace)
+            board.Completed += (_, _) => Log($"放大完成：To={x.To:F3} 变换 {transform.GetType().FullName}");
+
+        return (board, x, y);
     }
 
     private static bool ReadAnimationsEnabled()

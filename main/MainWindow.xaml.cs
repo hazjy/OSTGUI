@@ -748,5 +748,14 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
         };
 
         ContentFrame.Navigate(pageType, null, new Microsoft.UI.Xaml.Media.Animation.EntranceNavigationTransitionInfo());
+
+        // 切页后记一行内存事实（2026-09-27，关键字 `内存：`）：用来区分"切页后只涨不回收"✗
+        // 与"基数本来就高"✗ —— 配合 App 启动那条一起看
+        LogService.Diag($"内存：切页后 page={pageTag}, "
+                      + $"工作集={Environment.WorkingSet / 1048576.0:F1}MB, "
+                      + $"托管堆={GC.GetTotalMemory(false) / 1048576.0:F1}MB, "
+                      + $"已提交={GC.GetGCMemoryInfo().TotalCommittedBytes / 1048576.0:F1}MB, "
+                      + $"累计分配={GC.GetTotalAllocatedBytes() / 1048576.0:F1}MB, "
+                      + $"Gen0回收={GC.CollectionCount(0)}, Gen2回收={GC.CollectionCount(2)}");
     }
 }

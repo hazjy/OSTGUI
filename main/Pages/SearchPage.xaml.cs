@@ -27,6 +27,68 @@ public sealed partial class SearchPage : Page
 
         // 切换控件按上次选择回设（初始化期那次 SelectionChanged 已被 null 守卫挡掉）
         ViewSegmented.SelectedIndex = VM.IsGridView ? 1 : 0;
+
+        // 兜底触发点：订的是**单例 VM** ✗ —— 在构造函数里订阅会让 VM 永久持住页面实例
+        // → 一律走 Loaded / Unloaded 成对，且**先 `-=` 再 `+=`**（页面被 Frame 缓存会反复 Loaded，
+        //   不退订就重复订阅；与 SettingsPage 同一规范）。
+        // ⚠️ **这段不是探针**：它是 `ApplyListFallback()` 的唯一触发点 —— 删了搜索又会 Items=0、界面空白
+        Loaded += (s, e) =>
+        {
+            VM.PropertyChanged -= OnSearchStateChanged;
+            VM.PropertyChanged += OnSearchStateChanged;
+
+            // 进页面补一次：万一"搜索完成时页面已经 Unloaded"（搜完立刻切走），那次兜底不会跑
+            ApplyListFallback();
+        };
+
+        Unloaded += (s, e) => VM.PropertyChanged -= OnSearchStateChanged;
+    }
+
+    /// <summary>搜索状态变化：一结束（IsSearching→false）就排一次兜底（**每次搜索都必须跑** ✓）</summary>
+    private void OnSearchStateChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(SearchViewModel.IsSearching) && VM.IsSearching == false)
+            OnSearchFinished();
+    }
+
+    private void OnSearchFinished()
+    {
+        var dq = this.DispatcherQueue;
+        if (dq == null)
+        {
+            ApplyListFallback();
+            return;
+        }
+
+        dq.TryEnqueue(ApplyListFallback);
+    }
+
+    /// <summary>
+    /// 兜底：给控件一份 <c>List&lt;T&gt;</c>。
+    /// AOT 下 <c>ObservableCollection&lt;T&gt;</c> 的 CollectionChanged 传不到控件（绑定时集合还是空的
+    /// → `Items` 恒 0 ✗，与实测一致）；<c>List&lt;T&gt;</c> 有内建映射且控件会**立刻读完**（不依赖通知 ✓）。
+    /// 每次搜索都重新赋一次（每次都是新 List 实例 ⇒ `ItemsSource` 的 DP 值真的变了 ⇒ 控件重新枚举 ✓）。
+    /// ⚠️ 绝不置 null：实测 `ItemsSource = null` 会让进程崩在 CoreMessagingXP / 0xc000027b（stowed）✗；
+    ///    整段包 try/catch，抛了也只落盘不崩 ✓
+    /// </summary>
+    private void ApplyListFallback()
+    {
+        try
+        {
+            if (VM.SearchResults.Count == 0) return;   // 没结果就不动控件（也不清掉上一次的显示）
+
+            ResultGrid.ItemsSource = VM.SearchResults.ToList();
+            ResultList.ItemsSource = VM.SearchResults.ToList();
+
+            LogService.Diag($"搜索：兜底List → Grid.Items={ResultGrid.Items.Count}"
+                          + $"（可见={ResultGrid.Visibility == Visibility.Visible}, 容器={ResultGrid.ItemsPanelRoot?.Children.Count}）, "
+                          + $"List.Items={ResultList.Items.Count}"
+                          + $"（可见={ResultList.Visibility == Visibility.Visible}）, VM.Count={VM.SearchResults.Count}");
+        }
+        catch (Exception ex)
+        {
+            LogService.Diag($"搜索：兜底List 抛异常 {ex.GetType().Name}: {ex.Message}");
+        }
     }
 
     // ==================== 卡片悬浮微交互 ====================
@@ -67,6 +129,10 @@ public sealed partial class SearchPage : Page
             if (sender is TextBox tb)
                 VM.SearchQuery = tb.Text;
             LogService.Clear();
+            // 常态诊断（1 行/次搜索）：区分"命令压根没触发"与"触发了但内部退出"。
+            // 放在 Clear() 之后，这样这行在内存视图里也留得住（Clear 只清视图，不清文件）
+            LogService.Diag($"搜索：回车触发（文本框「{VM.SearchQuery}」, VM.IsSearching={VM.IsSearching}, "
+                          + $"命令可执行={VM.SearchCommand.CanExecute(null)}, 命令运行中={VM.SearchCommand.IsRunning}）");
             _ = VM.SearchCommand.ExecuteAsync(null);
         }
     }
@@ -74,6 +140,10 @@ public sealed partial class SearchPage : Page
     private void SearchButton_Click(object sender, RoutedEventArgs e)
     {
         LogService.Clear();
+        // 常态诊断：按钮被 IsEnabled="{Binding IsSearching, BoolNegateConverter}" 挡掉时
+        // 这个处理器根本不会跑 → "只有回车有日志、点击没日志"本身就是证据
+        LogService.Diag($"搜索：按钮点击触发（关键词「{VM.SearchQuery}」, VM.IsSearching={VM.IsSearching}, "
+                      + $"命令可执行={VM.SearchCommand.CanExecute(null)}, 命令运行中={VM.SearchCommand.IsRunning}）");
         _ = VM.SearchCommand.ExecuteAsync(null);
     }
 

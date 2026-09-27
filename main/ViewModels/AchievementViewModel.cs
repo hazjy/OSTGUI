@@ -353,6 +353,14 @@ public partial class AchievementViewModel : ObservableObject
         finally
         {
             IsBusy = false;
+
+            // 刷新后的内存事实（2026-09-27，与入库管理那条同字段）：成就页刷新同样会重建 Games/Rows
+            LogService.Diag($"内存：刷新后(成就) page=achievement, "
+                          + $"工作集={Environment.WorkingSet / 1048576.0:F1}MB, "
+                          + $"托管堆={GC.GetTotalMemory(false) / 1048576.0:F1}MB, "
+                          + $"已提交={GC.GetGCMemoryInfo().TotalCommittedBytes / 1048576.0:F1}MB, "
+                          + $"累计分配={GC.GetTotalAllocatedBytes() / 1048576.0:F1}MB, "
+                          + $"Gen0回收={GC.CollectionCount(0)}, Gen2回收={GC.CollectionCount(2)}");
         }
     }
 

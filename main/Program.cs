@@ -58,12 +58,15 @@ public static class Program
         try
         {
             var notifications = Microsoft.Windows.AppNotifications.AppNotificationManager.Default;
-            notifications.Register();
 
-            // 本项目原本**没有**通知点击处理逻辑（旧实现也没订阅过），所以这里只订阅 + 记一行日志，
-            // 不做任何导航/动作（要做事再单独提）。
+            // ⚠️ 顺序不能反：WinRT 要求**先订阅 NotificationInvoked、再调 Register()**，
+            // 反了 Register() 直接抛 COMException「找不到元素。Must register event handlers before calling Register()」
+            // （用户实跑日志每次启动都出现；2026-09-27 修）。本项目原本**没有**通知点击处理逻辑
+            // （旧实现也没订阅过），所以这里只订阅 + 记一行日志，不做任何导航/动作（要做事再单独提）。
             notifications.NotificationInvoked += (_, e) =>
                 Services.LogService.Diag($"系统通知被点击：{e.Argument}");
+
+            notifications.Register();
         }
         catch (Exception ex)
         {

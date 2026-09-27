@@ -20,6 +20,15 @@ public class SteamSearchProvider
     /// <summary>名称搜索最多返回的结果数</summary>
     private const int MaxSearchResults = 20;
 
+    /// <summary>四个 endpoint 全在同一个 host（只写进日志，不写 URL：查询串不进日志）</summary>
+    private const string StoreHost = "store.steampowered.com";
+
+    /// <summary>请求失败落盘诊断：区分"超时/被取消"与"其它失败"，只带 host 不带查询串</summary>
+    private static string DescribeFailure(string source, Exception ex) =>
+        ex is OperationCanceledException
+            ? $"搜索[{source}] 请求超时或被取消：{ex.GetType().Name}（host={StoreHost}）"
+            : $"搜索[{source}] 请求失败：{ex.GetType().Name}: {ex.Message}（host={StoreHost}）";
+
     public const string SteamNotFoundMessage = "Steam 上未找到该 AppID 对应的游戏";
 
     // 匹配 Steam 商店搜索页中的游戏链接：<a href="https://store.steampowered.com/app/730/...">...</a>
@@ -51,11 +60,15 @@ public class SteamSearchProvider
         }
         catch (Exception ex)
         {
+            LogService.Diag(DescribeFailure("appdetails", ex));
             return new SearchResult { AppId = appId, Success = false, ErrorMessage = $"Steam API 请求失败: {ex.Message}" };
         }
 
         if (!response.IsSuccessStatusCode)
+        {
+            LogService.Diag($"搜索[appdetails] HTTP {(int)response.StatusCode}（host={StoreHost}, appid={appId}）");
             return new SearchResult { AppId = appId, Success = false, ErrorMessage = $"Steam API 返回 HTTP {(int)response.StatusCode}" };
+        }
 
         try
         {
@@ -63,7 +76,10 @@ public class SteamSearchProvider
             var doc = JsonDocument.Parse(json);
 
             if (!doc.RootElement.TryGetProperty(appId, out var appData))
+            {
+                LogService.Diag($"搜索[appdetails] 响应里没有 appid 键（appid={appId}, host={StoreHost}）");
                 return new SearchResult { AppId = appId, Success = false, ErrorMessage = "Steam API 响应格式异常" };
+            }
 
             // 明确返回未找到
             if (!appData.TryGetProperty("success", out var success) || !success.GetBoolean())
@@ -78,10 +94,12 @@ public class SteamSearchProvider
                 return new SearchResult { AppId = appId, Name = name, Success = true };
             }
 
+            LogService.Diag($"搜索[appdetails] 响应里没有游戏名称（appid={appId}, host={StoreHost}）");
             return new SearchResult { AppId = appId, Success = false, ErrorMessage = "Steam API 未返回游戏名称" };
         }
         catch (Exception ex)
         {
+            LogService.Diag($"搜索[appdetails] 响应解析失败：{ex.GetType().Name}: {ex.Message}（appid={appId}, host={StoreHost}）");
             return new SearchResult { AppId = appId, Success = false, ErrorMessage = $"Steam API 响应解析失败: {ex.Message}" };
         }
     }
@@ -98,15 +116,24 @@ public class SteamSearchProvider
             var url = $"{SteamStoreSearchApi}?term={encodedQuery}&l=schinese&cc=us";
             var response = await _http.GetAsync(url);
             if (!response.IsSuccessStatusCode)
+            {
+                LogService.Diag($"搜索[storesearch] HTTP {(int)response.StatusCode}（host={StoreHost}）");
                 return results;
+            }
 
             var json = await response.Content.ReadAsStringAsync();
             if (!json.StartsWith("{"))
+            {
+                LogService.Diag($"搜索[storesearch] 响应不是 JSON（长度 {json.Length}, host={StoreHost}）");
                 return results;
+            }
 
             var root = JsonSerializer.Deserialize(json, AppJsonCompactContext.Default.JsonElement);
             if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("items", out var itemsArr))
+            {
+                LogService.Diag($"搜索[storesearch] 拿到 JSON 但没有 items（root kind={root.ValueKind}, 长度 {json.Length}, host={StoreHost}）");
                 return results;
+            }
 
             foreach (var item in itemsArr.EnumerateArray())
             {
@@ -137,10 +164,13 @@ public class SteamSearchProvider
                 if (results.Count >= MaxSearchResults)
                     break;
             }
+
+            if (results.Count == 0)
+                LogService.Diag($"搜索[storesearch] 请求成功但解析出 0 条（items kind={itemsArr.ValueKind}, host={StoreHost}）");
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine("Steam storesearch 失败: " + ex.Message);
+            LogService.Diag(DescribeFailure("storesearch", ex));
         }
         return results;
     }
@@ -159,7 +189,10 @@ public class SteamSearchProvider
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(15));
             var response = await _http.GetAsync(url, cts.Token);
             if (!response.IsSuccessStatusCode)
+            {
+                LogService.Diag($"搜索[网页] HTTP {(int)response.StatusCode}（host={StoreHost}）");
                 return results;
+            }
 
             var html = await response.Content.ReadAsStringAsync();
             var seen = new HashSet<string>();
@@ -190,10 +223,13 @@ public class SteamSearchProvider
                 if (results.Count >= MaxSearchResults)
                     break;
             }
+
+            if (results.Count == 0)
+                LogService.Diag($"搜索[网页] 请求成功但没解析出条目（HTML 长度 {html.Length}, host={StoreHost}）");
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine("Steam 商店搜索失败: " + ex.Message);
+            LogService.Diag(DescribeFailure("网页(超时上限15s)", ex));
         }
         return results;
     }
@@ -210,15 +246,24 @@ public class SteamSearchProvider
             var url = $"{SteamKeywordApi}?keyword={encodedQuery}&cc=us&l=english";
             var response = await _http.GetAsync(url);
             if (!response.IsSuccessStatusCode)
+            {
+                LogService.Diag($"搜索[keywords] HTTP {(int)response.StatusCode}（host={StoreHost}）");
                 return results;
+            }
 
             var json = await response.Content.ReadAsStringAsync();
             if (!(json.StartsWith("{") || json.StartsWith("[")))
+            {
+                LogService.Diag($"搜索[keywords] 响应不是 JSON（长度 {json.Length}, host={StoreHost}）");
                 return results;
+            }
 
             var root = JsonSerializer.Deserialize(json, AppJsonCompactContext.Default.JsonElement);
             if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("items", out var itemsArr))
+            {
+                LogService.Diag($"搜索[keywords] 拿到 JSON 但没有 items（root kind={root.ValueKind}, 长度 {json.Length}, host={StoreHost}）");
                 return results;
+            }
 
             foreach (var item in itemsArr.EnumerateArray())
             {
@@ -243,10 +288,13 @@ public class SteamSearchProvider
                 if (results.Count >= MaxSearchResults)
                     break;
             }
+
+            if (results.Count == 0)
+                LogService.Diag($"搜索[keywords] 请求成功但解析出 0 条（items kind={itemsArr.ValueKind}, host={StoreHost}）");
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine("Steam 关键词搜索失败: " + ex.Message);
+            LogService.Diag(DescribeFailure("keywords", ex));
         }
         return results;
     }
