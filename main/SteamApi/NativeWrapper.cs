@@ -24,11 +24,16 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 
 namespace SAM.API
 {
-    public abstract class NativeWrapper<TNativeFunctions> : INativeWrapper
+    // AOT 适配：Marshal.PtrToStructure<T> 要求 T 声明构造器可见性（否则 ILC 报 IL2091）——
+    // native 函数表 struct 的字段是委托（TNativeFunctions 也可能是接口），实例化由 marshaller 内部完成。
+    public abstract class NativeWrapper<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+        TNativeFunctions> : INativeWrapper
     {
         protected IntPtr ObjectAddress;
         protected TNativeFunctions Functions;

@@ -1,5 +1,7 @@
 using System.Diagnostics;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
 using Microsoft.Extensions.Logging;
 using NoSteamLauncher.Models;
@@ -12,6 +14,14 @@ public sealed class GBEDeploymentService
     private readonly string _goldbergRoot;
     private readonly string _templateConfigPath;
     private readonly ILogger<GBEDeploymentService> _logger;
+
+    // SteamAPICheckBypass.json 的序列化（源生成 + 实例选项，见 Services/NoSteamJsonContext.cs）
+    private static readonly JsonSerializerOptions BypassJsonOptions = new()
+    {
+        WriteIndented = true,
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
+    };
+    private static readonly NoSteamJsonContext BypassJsonCtx = new(BypassJsonOptions);
 
     // SAC 接口名称列表（从 EMUApply.cs 复制）
     private static readonly List<string> InterfaceNames = new()
@@ -499,13 +509,13 @@ public sealed class GBEDeploymentService
 
     private void GenerateBypassConfig(string gameDir, string? targetExePath)
     {
-        var jsonContent = new Dictionary<string, object>();
+        var jsonContent = new Dictionary<string, BypassRule>();
 
         // 1. 添加 EXE 重定向规则（如果存在 .bak 文件）
         if (!string.IsNullOrEmpty(targetExePath) && File.Exists(targetExePath + ".bak"))
         {
             var exeName = Path.GetFileName(targetExePath);
-            jsonContent[exeName] = new
+            jsonContent[exeName] = new BypassRule
             {
                 mode = "file_redirect",
                 to = exeName + ".bak",
@@ -523,7 +533,7 @@ public sealed class GBEDeploymentService
             var relativePath = Path.GetRelativePath(gameDir, apiDll);
             if (File.Exists(apiDll + ".bak"))
             {
-                jsonContent[relativePath] = new
+                jsonContent[relativePath] = new BypassRule
                 {
                     mode = "file_redirect",
                     to = relativePath + ".bak",
@@ -540,7 +550,7 @@ public sealed class GBEDeploymentService
         foreach (var steamsettingsPath in steamsettingsPaths)
         {
             var relativePath = Path.GetRelativePath(gameDir, steamsettingsPath);
-            jsonContent[relativePath] = new
+            jsonContent[relativePath] = new BypassRule
             {
                 mode = "file_hide"
             };
@@ -570,7 +580,7 @@ public sealed class GBEDeploymentService
         foreach (var filePath in steamsettingsFilePaths)
         {
             var relativePath = Path.GetRelativePath(gameDir, filePath);
-            jsonContent[relativePath] = new
+            jsonContent[relativePath] = new BypassRule
             {
                 mode = "file_hide",
                 hook_times_mode = "not_nth_time_only",
@@ -578,9 +588,8 @@ public sealed class GBEDeploymentService
             };
         }
 
-        // 5. 写入 JSON 文件
-        var jsonOptions = new System.Text.Json.JsonSerializerOptions { WriteIndented = true };
-        var jsonString = System.Text.Json.JsonSerializer.Serialize(jsonContent, jsonOptions);
+        // 5. 写入 JSON 文件（源生成，替代反射序列化：AOT 下反射序列化会被禁用）
+        var jsonString = JsonSerializer.Serialize(jsonContent, BypassJsonCtx.DictionaryStringBypassRule);
         File.WriteAllText(Path.Combine(gameDir, "SteamAPICheckBypass.json"), jsonString);
         _logger.LogInformation("Generated SteamAPICheckBypass.json");
     }

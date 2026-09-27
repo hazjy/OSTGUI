@@ -23,6 +23,7 @@
  */
 
 using System;
+using System.Diagnostics.CodeAnalysis;
 using System.Runtime.InteropServices;
 
 namespace SAM.API
@@ -42,7 +43,11 @@ namespace SAM.API
         }
     }
 
-    public abstract class Callback<TParameter> : ICallback
+    // AOT 适配：Marshal.PtrToStructure<T> 要求 T 声明构造器可见性（否则 ILC 报 IL2091）——
+    // 实例化 T 由 marshaller 内部完成（含委托类型），这里按 ILC 的要求原样声明。
+    public abstract class Callback<
+        [DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicConstructors | DynamicallyAccessedMemberTypes.NonPublicConstructors)]
+        TParameter> : ICallback
         where TParameter : struct
     {
         public delegate void CallbackFunction(TParameter arg);
