@@ -32,6 +32,12 @@ public static class Program
         }
 
         WinRT.ComWrappersSupport.InitializeComWrappers();
+
+        // 系统通知注册：必须早于 Application.Start（早于任何 Show），且**只在这里**——
+        // 监控子进程上面已经 return；--extract-ticket / --stats 等子进程虽然会进 OnLaunched，
+        // 但它们的返回点在 OnLaunched 里，放在这里注册就不会沾上它们。
+        RegisterNotifications();
+
         Microsoft.UI.Xaml.Application.Start(_ =>
         {
             // DispatcherQueue 的同步上下文：WinUI 里 await 回来要在 UI 线程上（生成 Main 同样这两行）
@@ -41,5 +47,27 @@ public static class Program
             new App();
         });
         return 0;
+    }
+
+    /// <summary>
+    /// 系统通知注册（WinAppSDK 内置 <c>AppNotificationManager</c>，见 Services/ToastService.cs）。
+    /// 注册失败不能拖死启动（旧机器/受限环境注册可能不支持）→ 只记日志、继续开窗口。
+    /// </summary>
+    private static void RegisterNotifications()
+    {
+        try
+        {
+            var notifications = Microsoft.Windows.AppNotifications.AppNotificationManager.Default;
+            notifications.Register();
+
+            // 本项目原本**没有**通知点击处理逻辑（旧实现也没订阅过），所以这里只订阅 + 记一行日志，
+            // 不做任何导航/动作（要做事再单独提）。
+            notifications.NotificationInvoked += (_, e) =>
+                Services.LogService.Diag($"系统通知被点击：{e.Argument}");
+        }
+        catch (Exception ex)
+        {
+            Services.LogService.Diag($"系统通知注册失败（该环境不支持应用通知？）：{ex.GetType().Name}: {ex.Message}");
+        }
     }
 }

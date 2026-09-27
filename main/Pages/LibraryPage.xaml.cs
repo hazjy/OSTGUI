@@ -6,6 +6,7 @@ using OSTGUI.Helpers;
 using OSTGUI.Models;
 using OSTGUI.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
+using WinRT;   // .As<T>()：AOT 下 XAML 侧资源的 CLR 硬转会抛 InvalidCastException（CsWinRT #2516）
 
 
 namespace OSTGUI.Pages;
@@ -135,7 +136,7 @@ public sealed partial class LibraryPage : Page
         if (sender is Button btn && btn.Tag is LibraryItem item)
         {
             VM.LastRightClickedItem = item;
-            var menu = (MenuFlyout)Resources["MoreMenu"];
+            var menu = Resources["MoreMenu"].As<MenuFlyout>();
             menu.ShowAt(btn, new Windows.Foundation.Point(0, btn.ActualHeight));
         }
     }

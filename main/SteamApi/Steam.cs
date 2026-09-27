@@ -47,13 +47,14 @@ namespace SAM.API
         }
 
         private static Delegate GetExportDelegate<TDelegate>(IntPtr module, string name)
+            where TDelegate : Delegate
         {
             IntPtr address = Native.GetProcAddress(module, name);
-            return address == IntPtr.Zero ? null : Marshal.GetDelegateForFunctionPointer(address, typeof(TDelegate));
+            return address == IntPtr.Zero ? null : Marshal.GetDelegateForFunctionPointer<TDelegate>(address);
         }
 
         private static TDelegate GetExportFunction<TDelegate>(IntPtr module, string name)
-            where TDelegate : class
+            where TDelegate : Delegate
         {
             return (TDelegate)((object)GetExportDelegate<TDelegate>(module, name));
         }

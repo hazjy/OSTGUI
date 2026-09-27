@@ -47,8 +47,19 @@ public static class CardHover
     private static readonly ConditionalWeakTable<Border, State> States = new();
 
     private static bool? _animationsEnabled;
-    private static TimeSpan Duration =>
-        (_animationsEnabled ??= ReadAnimationsEnabled()) ? TimeSpan.FromMilliseconds(DurationMs) : TimeSpan.Zero;
+    private static TimeSpan Duration
+    {
+        get
+        {
+            if (_animationsEnabled is null)
+            {
+                _animationsEnabled = ReadAnimationsEnabled();
+                // 只记一次：系统动画关掉时 Duration=0，没有补间，缩小"只加了日志还是查不出"的余地
+                if (!_animationsEnabled.Value) Log("系统动画已关（Duration=0），放大不补间");
+            }
+            return _animationsEnabled.Value ? TimeSpan.FromMilliseconds(DurationMs) : TimeSpan.Zero;
+        }
+    }
 
     /// <summary>指针进入卡片</summary>
     public static void Enter(Border card, Brush? hoverBackground, float scale, float shadowZ)
@@ -98,7 +109,14 @@ public static class CardHover
     /// <summary>把卡片缩放到 <paramref name="to"/>（进出都走这里，只有目标值不同）</summary>
     private static void Animate(Border card, State state, float to)
     {
-        if (card.RenderTransform is not ScaleTransform transform) return;
+        // ⚠️ 这里**不能**用 `is` / `as` / 硬转来判类型：模板里那个 ScaleTransform 是 XAML 侧建的，
+        // AOT 下 `card.RenderTransform is ScaleTransform` 会**静默判负**（CsWinRT #2516 / #2475 / #2536
+        // 同一类：vtable 查表不匹配、不抛异常）—— 原来那句判定 + return 就是"高亮阴影都正常、
+        // 只有放大不生效"的全部原因（2026-09-27）。硬转同样不行：本 App 的 AOT 构建里
+        // `(MenuFlyout)Resources["MoreMenu"]` 就在抛 InvalidCastException。
+        // 所以只判 null：模板里挂了就直接拿来用，没有就补一个（判定结果由下面那条日志暴露）。
+        // 目标对象 + 属性路径由 XAML 运行时自己解析（不走 CLR 类型），照样匹配得到 ScaleX / ScaleY。
+        var transform = card.RenderTransform ??= new ScaleTransform();
 
         var storyboard = new Storyboard();
         foreach (var property in new[] { "ScaleX", "ScaleY" })
@@ -116,7 +134,20 @@ public static class CardHover
 
         state.Running?.Stop();
         state.Running = storyboard;
+
+        // 动画跑完才说明"目标匹配成功"；只打了 Begin 那条却没等到 Completed，
+        // 就能区分出"匹配失败"与"动画跑了但没效果"。
+        // 不读 transform.ScaleX —— 那是 CLR 强类型属性，跑一次就要一次类型判定（见上面的 AOT 坑），
+        // 卡片的缩放肉眼即可验证，这里只记类型。
+        storyboard.Completed += (_, _) => Log($"放大完成：{to:F3} 变换 {transform.GetType().FullName}");
+
+        // 先记一条（Begin 之前）：变换类型只要不是 ScaleTransform，这里直接暴露
+        Log($"放大：{to:F3} 变换类型 {transform.GetType().FullName} 时长 {Duration.TotalMilliseconds:F0}ms");
+
         storyboard.Begin();
+
+        // 系统关掉动画时 Duration 是 0 —— 补间没了，只会立刻到位
+        if (Duration == TimeSpan.Zero) Log($"放大即时生效（系统动画已关）：{to:F3}");
     }
 
     private static bool ReadAnimationsEnabled()
@@ -125,5 +156,5 @@ public static class CardHover
         catch { return true; }
     }
 
-    private static void Log(string message) => OSTGUI.Services.LogService.Event($"[Hover] {message}");
+    private static void Log(string message) => OSTGUI.Services.LogService.Diag($"[Hover] {message}");
 }

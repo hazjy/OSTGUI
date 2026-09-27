@@ -48,39 +48,38 @@ namespace SAM.API
 
             this.ObjectAddress = objectAddress;
 
-            var iface = (NativeClass)Marshal.PtrToStructure(
-                this.ObjectAddress,
-                typeof(NativeClass));
+            var iface = Marshal.PtrToStructure<NativeClass>(this.ObjectAddress);
 
-            this.Functions = (TNativeFunctions)Marshal.PtrToStructure(
-                iface.VirtualTable,
-                typeof(TNativeFunctions));
+            this.Functions = Marshal.PtrToStructure<TNativeFunctions>(iface.VirtualTable);
         }
 
         private readonly Dictionary<IntPtr, Delegate> _FunctionCache = new();
 
         protected Delegate GetDelegate<TDelegate>(IntPtr pointer)
+            where TDelegate : Delegate
         {
             if (this._FunctionCache.TryGetValue(pointer, out var function) == false)
             {
-                function = Marshal.GetDelegateForFunctionPointer(pointer, typeof(TDelegate));
+                function = Marshal.GetDelegateForFunctionPointer<TDelegate>(pointer);
                 this._FunctionCache[pointer] = function;
             }
             return function;
         }
 
         protected TDelegate GetFunction<TDelegate>(IntPtr pointer)
-            where TDelegate : class
+            where TDelegate : Delegate
         {
             return (TDelegate)((object)this.GetDelegate<TDelegate>(pointer));
         }
 
         protected void Call<TDelegate>(IntPtr pointer, params object[] args)
+            where TDelegate : Delegate
         {
             this.GetDelegate<TDelegate>(pointer).DynamicInvoke(args);
         }
 
         protected TReturn Call<TReturn, TDelegate>(IntPtr pointer, params object[] args)
+            where TDelegate : Delegate
         {
             return (TReturn)this.GetDelegate<TDelegate>(pointer).DynamicInvoke(args);
         }

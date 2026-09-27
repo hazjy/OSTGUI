@@ -54,7 +54,7 @@ namespace SAM.API
 
         public void Run(IntPtr pvParam)
         {
-            var data = (TParameter)Marshal.PtrToStructure(pvParam, typeof(TParameter));
+            var data = Marshal.PtrToStructure<TParameter>(pvParam);
             this.OnRun(data);
         }
     }

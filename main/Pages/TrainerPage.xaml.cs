@@ -5,6 +5,7 @@ using Microsoft.UI.Xaml.Input;
 using OSTGUI.Models;
 using OSTGUI.Services;
 using OSTGUI.ViewModels;
+using WinRT;   // .As<T>()：AOT 下 XAML 侧资源的 CLR 硬转会抛 InvalidCastException（CsWinRT #2516）
 
 namespace OSTGUI.Pages;
 
@@ -86,7 +87,7 @@ public sealed partial class TrainerPage : Page
         if (sender is not FrameworkElement button || button.Tag is not TrainerInfo item) return;
 
         _menuItem = item;
-        ((MenuFlyout)Resources["MoreMenu"]).ShowAt(button, new Windows.Foundation.Point(0, button.ActualHeight));
+        Resources["MoreMenu"].As<MenuFlyout>().ShowAt(button, new Windows.Foundation.Point(0, button.ActualHeight));
     }
 
     /// <summary>复制 exe 的完整文件名（= 索引里的名称，也是绑定用的名字）</summary>

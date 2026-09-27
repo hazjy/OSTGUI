@@ -7,6 +7,7 @@ using OSTGUI.Pages;
 using OSTGUI.Services;
 using OSTGUI.ViewModels;
 using System.Runtime.InteropServices;
+using WinRT;   // .As<T>()：AOT 下 XAML 侧资源的 CLR 硬转会抛 InvalidCastException（CsWinRT #2516）
 
 namespace OSTGUI;
 
@@ -540,7 +541,7 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
         if (sender is not NavigationViewItem item) return;
         RotateIcon(RestartGlyphIcon);
 
-        var menu = (MenuFlyout)RootGrid.Resources["RestartSteamMenu"];
+        var menu = RootGrid.Resources["RestartSteamMenu"].As<MenuFlyout>();
         // 弹窗右移，避免遮挡左侧图标的旋转动效
         menu.ShowAt(item, new Windows.Foundation.Point(40, item.ActualHeight));
     }
@@ -646,7 +647,7 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
                     b.BorderThickness = new Thickness(isSelected ? 2 : 1);
                 }
                 // 选中即用框架自带的强调按钮样式（填充/前景色都由框架按当前主题处理）
-                confirmBtn.Style = (Microsoft.UI.Xaml.Style)Application.Current.Resources["AccentButtonStyle"];
+                confirmBtn.Style = Application.Current.Resources["AccentButtonStyle"].As<Microsoft.UI.Xaml.Style>();
                 confirmBtn.IsEnabled = true;
             };
 
