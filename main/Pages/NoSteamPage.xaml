@@ -12,7 +12,6 @@
 
     <Page.Resources>
         <converters:BoolToVisibilityConverter x:Key="BoolToVis" />
-        <converters:StringToVisibilityConverter x:Key="StrToVis" />
         <converters:IntToDoubleConverter x:Key="IntToDoubleConverter" />
         <Style TargetType="TextBlock" x:Key="LabelStyle">
             <Setter Property="FontWeight" Value="SemiBold" />

@@ -98,22 +98,6 @@ public partial class VersionModeToBrushConverter : IValueConverter
     }
 
     /// <summary>
-    /// 非空字符串到 Visibility 转换器
-    /// </summary>
-    public partial class StringToVisibilityConverter : IValueConverter
-    {
-        public object Convert(object value, Type targetType, object parameter, string language)
-        {
-            return !string.IsNullOrWhiteSpace(value as string) ? Visibility.Visible : Visibility.Collapsed;
-        }
-
-        public object ConvertBack(object value, Type targetType, object parameter, string language)
-        {
-            throw new NotImplementedException();
-        }
-    }
-
-    /// <summary>
     /// Int 到 Double 转换器（用于 NumberBox 绑定）
     /// </summary>
     public partial class IntToDoubleConverter : IValueConverter

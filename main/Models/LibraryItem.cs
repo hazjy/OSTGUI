@@ -17,8 +17,29 @@ public class DlcInfo
 [WinRT.GeneratedBindableCustomProperty]
 public partial class LibraryItem : ObservableObject
 {
-    public string AppId { get; set; } = string.Empty;
-    public string GameName { get; set; } = "未知游戏";
+    // ⚠️ 下面三个属性是**被 XAML 绑定的**（AppId 6 处 / GameName 7 处 / SourceTag 1 处 ✓）：必须是
+    // **手写**的带通知属性 —— AOT 下 `[ObservableProperty]` 源生成成员对绑定提供器不可见 ✗
+    // （与 SearchResult 同一套底座：ObservableObject + SetProperty ✓）
+    private string _appId = string.Empty;
+
+    public string AppId
+    {
+        get => _appId;
+        set
+        {
+            if (SetProperty(ref _appId, value))
+                OnPropertyChanged(nameof(AppIdDisplay));   // 次级行显示拼的就是它
+        }
+    }
+
+    private string _gameName = "未知游戏";
+
+    public string GameName
+    {
+        get => _gameName;
+        set => SetProperty(ref _gameName, value);
+    }
+
     public string FileName { get; set; } = string.Empty;
 
     /// <summary>卡片次级行（WinUI 的 {Binding} 不支持 StringFormat，故在此拼好）</summary>
@@ -26,8 +47,14 @@ public partial class LibraryItem : ObservableObject
 
     public string UnlockerType { get; set; } = "ost"; // ost = OpenSteamTool
 
+    private string _sourceTag = "";
+
     /// <summary>来源标签（成就页用来区分「lua」入库游戏 / 「正版」客户端认为拥有的游戏）；为空则不显示</summary>
-    public string SourceTag { get; set; } = "";
+    public string SourceTag
+    {
+        get => _sourceTag;
+        set => SetProperty(ref _sourceTag, value);
+    }
     private string _versionMode = "auto";
     public string VersionMode // auto, fixed
     {

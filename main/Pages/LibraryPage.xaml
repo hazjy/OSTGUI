@@ -10,7 +10,6 @@
     <Page.Resources>
         <helpers:BoolToVisibilityConverter x:Key="BoolToVis" />
         <helpers:VersionModeToBrushConverter x:Key="VersionModeToBrushConverter" />
-        <helpers:StatusToBrushConverter x:Key="StatusToBrushConverter" />
 
         <!-- 卡片外观：Background **必须**由 Style 提供，不能直接写在 Border 属性上 ——
              悬浮高亮结束后代码用 ClearValue 退回这条「{ThemeResource}」引用（见 Helpers/CardHover.cs）。
