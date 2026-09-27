@@ -27,6 +27,9 @@
 - **配置与状态**：`ConfigService` → `%LOCALAPPDATA%\OSTGUI\config.json`（**改动只写内存，退出时统一落盘**）；视图档位 `LibraryViewMode` / `SearchViewMode`、联机「其他」下拉 `OnlineOtherMode`、成就页来源勾选 `AchievementShowLua/Owned`、`BackdropMode` 等偏好都落在这一份里
 - **成就编辑（成就页）**：左侧 = `LibraryScanner` 扫出的入库游戏；成就定义读本地 `<Steam>\appcache\stats\UserGameStatsSchema_<appid>.bin`（二进制 KV，`SteamStatsSchema`）。勾选**只写本地留底** `%LOCALAPPDATA%\OSTGUI\achievements\<appid>.json`；点「保存到 Steam」才 spawn `OSTGUI.exe --stats-apply`（`SteamStatsChild`，短命子进程 + 结果 JSON 文件，理由与 `SteamTicketExtractor` 相同）用 SAM 封装（`main/SteamApi/`，zlib）→ `ISteamUserStats013` 写回。**写入会进 Valve（重启 Steam 后仍在）**，但内核会对 addappid 游戏清空 819 里的成就数据 → 成就页可能显示不出来（显示层问题，不是没写进去）；证据与边界见 `docs/dev/REF-成就.md`
 
+- **Native AOT 适配（跨模块）**：打包参数与六类坑（绑定成员要手写 / 集合声明 `IList<T>` / XAML→CLR 投影用 `As<T>()` /
+  JSON 源生成 / 绑定集合显式赋 `List<T>` / 日志面板 LOH 节流）。出处：`docs/dev/REF-AOT适配.md`
+
 ## 3. 服务索引（当前）
 
 | 服务 | 职责 |
