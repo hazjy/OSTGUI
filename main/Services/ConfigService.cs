@@ -13,6 +13,8 @@ public class ConfigService
         "OSTGUI");
     private static readonly string ConfigPath = Path.Combine(ConfigDir, "config.json");
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+    // AOT 源生成：把上面这套选项（缩进 + 中文不转义）塞回 context；静态缓存，别在调用点反复 new
+    private static readonly AppJsonConfigContext JsonCtx = new(JsonOptions);
 
     private AppConfig _config = AppConfig.GetDefault();
 
@@ -34,7 +36,7 @@ public class ConfigService
             if (File.Exists(ConfigPath))
             {
                 var json = await File.ReadAllTextAsync(ConfigPath).ConfigureAwait(false);
-                var loaded = JsonSerializer.Deserialize<AppConfig>(json, JsonOptions);
+                var loaded = JsonSerializer.Deserialize(json, JsonCtx.AppConfig);
                 if (loaded != null)
                 {
                     // 合并默认值，确保新字段有默认值
@@ -67,7 +69,7 @@ public class ConfigService
         try
         {
             Directory.CreateDirectory(ConfigDir);
-            var json = JsonSerializer.Serialize(_config, JsonOptions);
+            var json = JsonSerializer.Serialize(_config, JsonCtx.AppConfig);
             await File.WriteAllTextAsync(ConfigPath, json).ConfigureAwait(false);
         }
         catch (Exception ex)

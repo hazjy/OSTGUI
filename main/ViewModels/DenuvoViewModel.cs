@@ -12,6 +12,7 @@ namespace OSTGUI.ViewModels;
 /// 「正版账户授权」面板为静态说明；本 VM 仅支撑「导出 .ost / 导入 .ost」两条链路。
 /// 历史遗留的方案管理（profiles/tickets CRUD）已随 UI 一并移除。
 /// </summary>
+[WinRT.GeneratedBindableCustomProperty]
 public partial class DenuvoViewModel : ObservableObject
 {
     private readonly TicketService _ticketService;
@@ -21,15 +22,77 @@ public partial class DenuvoViewModel : ObservableObject
     private readonly SteamService _steamService;
 
     // OST 授权文件导入/导出
-    [ObservableProperty] private string _exportAppId = "";
-    [ObservableProperty] private bool _isExporting;
-    [ObservableProperty] private string _selectedOstPath = "";
-    [ObservableProperty] private OstFile? _selectedOst;
-    [ObservableProperty] private bool _hasValidOst;
-    [ObservableProperty] private string _ostStatusText = "";
-    [ObservableProperty] private string _ostStatusType = "ok";
-    [ObservableProperty] private string _ostCreatedText = "";
-    [ObservableProperty] private string _ostExpiresText = "";
+    private string _exportAppId = "";
+
+    public string ExportAppId
+    {
+        get => _exportAppId;
+        set => SetProperty(ref _exportAppId, value);
+    }
+
+    private bool _isExporting;
+
+    public bool IsExporting
+    {
+        get => _isExporting;
+        set => SetProperty(ref _isExporting, value);
+    }
+
+    private string _selectedOstPath = "";
+
+    public string SelectedOstPath
+    {
+        get => _selectedOstPath;
+        set => SetProperty(ref _selectedOstPath, value);
+    }
+
+    private OstFile? _selectedOst;
+
+    public OstFile? SelectedOst
+    {
+        get => _selectedOst;
+        set => SetProperty(ref _selectedOst, value);
+    }
+
+    private bool _hasValidOst;
+
+    public bool HasValidOst
+    {
+        get => _hasValidOst;
+        set => SetProperty(ref _hasValidOst, value);
+    }
+
+    private string _ostStatusText = "";
+
+    public string OstStatusText
+    {
+        get => _ostStatusText;
+        set => SetProperty(ref _ostStatusText, value);
+    }
+
+    private string _ostStatusType = "ok";
+
+    public string OstStatusType
+    {
+        get => _ostStatusType;
+        set => SetProperty(ref _ostStatusType, value);
+    }
+
+    private string _ostCreatedText = "";
+
+    public string OstCreatedText
+    {
+        get => _ostCreatedText;
+        set => SetProperty(ref _ostCreatedText, value);
+    }
+
+    private string _ostExpiresText = "";
+
+    public string OstExpiresText
+    {
+        get => _ostExpiresText;
+        set => SetProperty(ref _ostExpiresText, value);
+    }
 
     public DenuvoViewModel(
         TicketService ticketService,

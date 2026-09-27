@@ -11,6 +11,7 @@ namespace OSTGUI.ViewModels;
 /// 入库游戏管理 ViewModel
 /// 支持列表/卡片视图切换、多选、右键菜单操作
 /// </summary>
+[WinRT.GeneratedBindableCustomProperty]
 public partial class LibraryViewModel : ObservableObject
 {
     private readonly LuaConfigService _luaService;
@@ -21,21 +22,77 @@ public partial class LibraryViewModel : ObservableObject
     private readonly GameNameCacheService _nameCache;
     private readonly CoverImageService _coverService;
 
-    [ObservableProperty] private ObservableCollection<LibraryItem> _libraryItems = new();
-    [ObservableProperty] private ObservableCollection<LibraryItem> _selectedItems = new();
-    [ObservableProperty] private LibraryItem? _lastRightClickedItem;
+    // 命令手写在 VM 上：Native AOT 下 CsWinRT 绑定提供器看不到源生成成员，XAML {Binding} 会失效
+    public IAsyncRelayCommand LoadLibraryCommand { get; }
+    public IAsyncRelayCommand ToggleVersionCommand { get; }
+    public IAsyncRelayCommand RepairVersionConfigCommand { get; }
+    public IAsyncRelayCommand CopyAppIdCommand { get; }
+    public IRelayCommand EditLuaCommand { get; }
+    public IAsyncRelayCommand DeleteItemCommand { get; }
+    public IAsyncRelayCommand ViewOnSteamStoreCommand { get; }
+    public IRelayCommand SelectAllCommand { get; }
+    public IRelayCommand ClearSelectionCommand { get; }
+
+    private ObservableCollection<LibraryItem> _libraryItems = new();
+
+    // 声明类型用 IList<T>：WinRT 内建映射（IVector<T>），Native AOT 下无需在
+    // WinRTGlobalVtableLookup 里登记闭合泛型；运行时对象仍是 ObservableCollection（见字段），
+    // 集合变更通知行为不变。
+    public IList<LibraryItem> LibraryItems
+    {
+        get => _libraryItems;
+        set => SetProperty(ref _libraryItems, value as ObservableCollection<LibraryItem> ?? new(value));
+    }
+    private ObservableCollection<LibraryItem> _selectedItems = new();
+
+    public ObservableCollection<LibraryItem> SelectedItems
+    {
+        get => _selectedItems;
+        set => SetProperty(ref _selectedItems, value);
+    }
+
+    private LibraryItem? _lastRightClickedItem;
+
+    public LibraryItem? LastRightClickedItem
+    {
+        get => _lastRightClickedItem;
+        set => SetProperty(ref _lastRightClickedItem, value);
+    }
+
     // 全量主列表：排序/过滤的数据源；LibraryItems 仅是它的视图投影
     private List<LibraryItem> _allItems = new();
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsBusy))]
+
     private bool _isLoading;
+
+    public bool IsLoading
+    {
+        get => _isLoading;
+        set
+        {
+            if (SetProperty(ref _isLoading, value))
+            {
+                OnPropertyChanged(nameof(IsBusy));
+            }
+        }
+    }
 
     public bool IsBusy => IsLoading;
 
     /// <summary>入库管理视图形态：list / grid。持久化在 config.json 的 LibraryViewMode</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsListView), nameof(IsGridView))]
     private string _viewMode = "list";
+
+    public string ViewMode
+    {
+        get => _viewMode;
+        set
+        {
+            if (SetProperty(ref _viewMode, value))
+            {
+                OnPropertyChanged(nameof(IsListView));
+                OnPropertyChanged(nameof(IsGridView));
+            }
+        }
+    }
 
     public bool IsListView => ViewMode != "grid";
     public bool IsGridView => ViewMode == "grid";
@@ -44,13 +101,57 @@ public partial class LibraryViewModel : ObservableObject
     /// WinUI 的 {Binding} 不支持 StringFormat，故按惯例在 VM 里拼；0（还没扫完）时只显示"入库管理"，免得闪一下</summary>
     public string TitleText => TotalCount > 0 ? $"入库管理 「{TotalCount}」" : "入库管理";
 
-    [ObservableProperty] private string _searchFilter = "";
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(TitleText))]
+    private string _searchFilter = "";
+
+    public string SearchFilter
+    {
+        get => _searchFilter;
+        set
+        {
+            if (SetProperty(ref _searchFilter, value))
+            {
+                OnSearchFilterChanged(value);
+            }
+        }
+    }
+
     private int _totalCount;
-    [ObservableProperty] private int _fixedCount;
-    [ObservableProperty] private int _autoCount;
-    [ObservableProperty] private double _progressValue;
+
+    public int TotalCount
+    {
+        get => _totalCount;
+        set
+        {
+            if (SetProperty(ref _totalCount, value))
+            {
+                OnPropertyChanged(nameof(TitleText));
+            }
+        }
+    }
+
+    private int _fixedCount;
+
+    public int FixedCount
+    {
+        get => _fixedCount;
+        set => SetProperty(ref _fixedCount, value);
+    }
+
+    private int _autoCount;
+
+    public int AutoCount
+    {
+        get => _autoCount;
+        set => SetProperty(ref _autoCount, value);
+    }
+
+    private double _progressValue;
+
+    public double ProgressValue
+    {
+        get => _progressValue;
+        set => SetProperty(ref _progressValue, value);
+    }
 
     public LibraryViewModel(
         LuaConfigService luaService,
@@ -71,12 +172,21 @@ public partial class LibraryViewModel : ObservableObject
 
         // 视图形态跟着上次选择（脏值一律归一到 list）
         _viewMode = configService.Config.LibraryViewMode == "grid" ? "grid" : "list";
+
+        LoadLibraryCommand = new AsyncRelayCommand(LoadLibraryAsync);
+        ToggleVersionCommand = new AsyncRelayCommand<LibraryItem?>(ToggleVersionAsync);
+        RepairVersionConfigCommand = new AsyncRelayCommand<LibraryItem?>(RepairVersionConfigAsync);
+        CopyAppIdCommand = new AsyncRelayCommand<LibraryItem?>(CopyAppIdAsync);
+        EditLuaCommand = new RelayCommand<LibraryItem?>(EditLua);
+        DeleteItemCommand = new AsyncRelayCommand<LibraryItem?>(DeleteItemAsync);
+        ViewOnSteamStoreCommand = new AsyncRelayCommand<LibraryItem?>(ViewOnSteamStoreAsync);
+        SelectAllCommand = new RelayCommand(SelectAll);
+        ClearSelectionCommand = new RelayCommand(ClearSelection);
     }
 
     /// <summary>
     /// 加载入库游戏列表
     /// </summary>
-    [RelayCommand]
     private async Task LoadLibraryAsync()
     {
         IsLoading = true;
@@ -216,7 +326,7 @@ item.DlcList = dlcInfo;
     /// <summary>
     /// 搜索关键词变化时触发输入即过滤
     /// </summary>
-    partial void OnSearchFilterChanged(string value) => RefreshView();
+    private void OnSearchFilterChanged(string value) => RefreshView();
 
     /// <summary>
     /// 以全量主列表为源，应用排序与搜索过滤后刷新视图
@@ -238,7 +348,6 @@ item.DlcList = dlcInfo;
     /// <summary>
     /// 切换版本模式（锁定/解锁游戏版本）
     /// </summary>
-    [RelayCommand]
     private async Task ToggleVersionAsync(LibraryItem? item = null)
     {
         item ??= LastRightClickedItem;
@@ -268,7 +377,6 @@ item.DlcList = dlcInfo;
 /// <summary>
     /// 补齐版本配置：从 CDN 获取 depot / GID，写入注释形式的 setManifestid 对应关系（不下载清单）
     /// </summary>
-    [RelayCommand]
     private async Task RepairVersionConfigAsync(LibraryItem? item = null)
     {
         item ??= LastRightClickedItem;
@@ -310,7 +418,6 @@ item.DlcList = dlcInfo;
     /// <summary>
     /// 复制 AppID 到剪贴板
     /// </summary>
-    [RelayCommand]
     private async Task CopyAppIdAsync(LibraryItem? item = null)
     {
         item ??= LastRightClickedItem;
@@ -330,7 +437,6 @@ item.DlcList = dlcInfo;
     /// <summary>
     /// 使用记事本编辑 Lua 配置
     /// </summary>
-    [RelayCommand]
     private void EditLua(LibraryItem? item = null)
     {
         item ??= LastRightClickedItem;
@@ -365,7 +471,6 @@ item.DlcList = dlcInfo;
     /// <summary>
     /// 删除入库
     /// </summary>
-    [RelayCommand]
     private async Task DeleteItemAsync(LibraryItem? item = null)
     {
         item ??= LastRightClickedItem;
@@ -394,7 +499,6 @@ item.DlcList = dlcInfo;
     /// <summary>
     /// 在 Steam 商店查看
     /// </summary>
-    [RelayCommand]
     private async Task ViewOnSteamStoreAsync(LibraryItem? item = null)
     {
         item ??= LastRightClickedItem;
@@ -411,7 +515,6 @@ item.DlcList = dlcInfo;
     /// <summary>
     /// 选择全部
     /// </summary>
-    [RelayCommand]
     private void SelectAll()
     {
         SelectedItems = new ObservableCollection<LibraryItem>(
@@ -421,7 +524,6 @@ item.DlcList = dlcInfo;
     /// <summary>
     /// 取消选择
     /// </summary>
-    [RelayCommand]
     private void ClearSelection()
     {
         SelectedItems.Clear();

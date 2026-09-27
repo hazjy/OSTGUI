@@ -11,7 +11,8 @@ namespace OSTGUI.Models;
 /// 既对应界面的「复制名称」，又不会因为更新换了文件名/路径而失效——更新时只需改索引，
 /// 绑定不用动）。
 /// </summary>
-public class TrainerBinding
+[WinRT.GeneratedBindableCustomProperty]
+public partial class TrainerBinding
 {
     /// <summary>修改器名称（= 已下载列表里显示的名字），实际路径按它去索引查</summary>
     public string TrainerName { get; set; } = "";

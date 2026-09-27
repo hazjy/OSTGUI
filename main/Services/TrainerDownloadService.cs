@@ -47,7 +47,7 @@ public class TrainerDownloadService
     private static string IndexPath { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OSTGUI", "trainers.json");
 
-    private sealed class IndexEntry
+    internal sealed class IndexEntry
     {
         public string Name { get; set; } = "";
         public string Path { get; set; } = "";
@@ -95,7 +95,7 @@ public class TrainerDownloadService
         try
         {
             if (!File.Exists(IndexPath)) return new List<IndexEntry>();
-            return System.Text.Json.JsonSerializer.Deserialize<List<IndexEntry>>(File.ReadAllText(IndexPath))
+            return System.Text.Json.JsonSerializer.Deserialize(File.ReadAllText(IndexPath), AppJsonIndentedContext.Default.ListIndexEntry)
                    ?? new List<IndexEntry>();
         }
         catch (Exception ex)
@@ -112,7 +112,7 @@ public class TrainerDownloadService
             Directory.CreateDirectory(Path.GetDirectoryName(IndexPath)!);
             var temp = IndexPath + ".tmp";
             File.WriteAllText(temp, System.Text.Json.JsonSerializer.Serialize(entries,
-                new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+                AppJsonIndentedContext.Default.ListIndexEntry));
             File.Move(temp, IndexPath, overwrite: true);
         }
         catch (Exception ex)

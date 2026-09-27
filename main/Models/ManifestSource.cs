@@ -9,7 +9,8 @@ namespace OSTGUI.Models;
 ///   {depotid}   Depot ID（下载清单时替换）
 ///   {manifestid} Manifest GID（下载清单时替换）
 /// </summary>
-public class ManifestSource
+[WinRT.GeneratedBindableCustomProperty]
+public partial class ManifestSource
 {
     public const string PlaceholderAppId = "{appid}";
     public const string PlaceholderKey = "{key}";

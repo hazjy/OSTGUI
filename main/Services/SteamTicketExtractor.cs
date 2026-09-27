@@ -95,7 +95,7 @@ public class SteamTicketExtractor
                 };
 
             var json = await File.ReadAllTextAsync(outFile);
-            var result = JsonSerializer.Deserialize<ExtractResult>(json);
+            var result = JsonSerializer.Deserialize(json, AppJsonCompactContext.Default.ExtractResult);
             return result ?? new ExtractResult { Success = false, Message = "提取结果解析失败" };
         }
         catch (Exception ex)

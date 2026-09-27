@@ -104,7 +104,7 @@ public class SteamSearchProvider
             if (!json.StartsWith("{"))
                 return results;
 
-            var root = JsonSerializer.Deserialize<JsonElement>(json);
+            var root = JsonSerializer.Deserialize(json, AppJsonCompactContext.Default.JsonElement);
             if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("items", out var itemsArr))
                 return results;
 
@@ -216,7 +216,7 @@ public class SteamSearchProvider
             if (!(json.StartsWith("{") || json.StartsWith("[")))
                 return results;
 
-            var root = JsonSerializer.Deserialize<JsonElement>(json);
+            var root = JsonSerializer.Deserialize(json, AppJsonCompactContext.Default.JsonElement);
             if (root.ValueKind != JsonValueKind.Object || !root.TryGetProperty("items", out var itemsArr))
                 return results;
 

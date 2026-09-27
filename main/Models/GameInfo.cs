@@ -30,7 +30,8 @@ public class DepotInfo
     public string DecryptionKey { get; set; } = string.Empty;
 }
 
-public class SearchResult : ObservableObject
+[WinRT.GeneratedBindableCustomProperty]
+public partial class SearchResult : ObservableObject
 {
     public string AppId { get; set; } = string.Empty;
     public string Name { get; set; } = string.Empty;

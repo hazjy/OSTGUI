@@ -31,7 +31,7 @@ namespace SAM.API
 {
     internal class NativeStrings
     {
-        public sealed class StringHandle : SafeHandleZeroOrMinusOneIsInvalid
+        public sealed partial class StringHandle : SafeHandleZeroOrMinusOneIsInvalid
         {
             internal StringHandle(IntPtr preexistingHandle, bool ownsHandle)
                 : base(ownsHandle)

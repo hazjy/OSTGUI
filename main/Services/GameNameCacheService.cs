@@ -12,7 +12,7 @@ public class GameNameCacheService
 
     private const int CacheTtlDays = 30;
 
-    private class CacheEntry
+    internal class CacheEntry
     {
         public string Name { get; set; } = "";
         public DateTime Time { get; set; }
@@ -63,7 +63,7 @@ public class GameNameCacheService
             if (File.Exists(_cachePath))
             {
                 var json = File.ReadAllText(_cachePath);
-                var data = JsonSerializer.Deserialize<Dictionary<string, CacheEntry>>(json);
+                var data = JsonSerializer.Deserialize(json, AppJsonCompactContext.Default.DictionaryStringCacheEntry);
                 if (data != null)
                 {
                     foreach (var (key, entry) in data)
@@ -85,7 +85,7 @@ public class GameNameCacheService
         {
             Directory.CreateDirectory(Path.GetDirectoryName(_cachePath)!);
             var data = _nameCache.ToDictionary(k => k.Key, v => new CacheEntry { Name = v.Value.name, Time = v.Value.time });
-            File.WriteAllText(_cachePath, JsonSerializer.Serialize(data));
+            File.WriteAllText(_cachePath, JsonSerializer.Serialize(data, AppJsonCompactContext.Default.DictionaryStringCacheEntry));
         }
         catch (Exception ex) { System.Diagnostics.Debug.WriteLine("保存名称缓存失败: " + ex.Message); }
     }

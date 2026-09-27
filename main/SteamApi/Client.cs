@@ -29,7 +29,7 @@ using System.Linq;
 
 namespace SAM.API
 {
-    public class Client : IDisposable
+    public partial class Client : IDisposable
     {
         public Wrappers.SteamClient018 SteamClient;
         public Wrappers.SteamUser012 SteamUser;

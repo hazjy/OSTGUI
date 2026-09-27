@@ -51,7 +51,7 @@ internal static class SteamStatsChild
             var owned = new List<string>();
             try
             {
-                var candidates = JsonSerializer.Deserialize<List<string>>(File.ReadAllText(inFile)) ?? new();
+                var candidates = JsonSerializer.Deserialize(File.ReadAllText(inFile), AppJsonCompactContext.Default.ListString) ?? new();
                 Steam.InstallPath = steamPath;
                 using var client = new Client();
                 client.Initialize(0);                            // 0 = 不锁 appid
@@ -65,10 +65,10 @@ internal static class SteamStatsChild
             catch (Exception ex)
             {
                 LogService.Diag($"stats-owned 失败: {ex.Message}");
-                File.WriteAllText(outOwnedFile, JsonSerializer.Serialize(new List<string>()));
+                File.WriteAllText(outOwnedFile, JsonSerializer.Serialize(new List<string>(), AppJsonCompactContext.Default.ListString));
                 return 1;
             }
-            File.WriteAllText(outOwnedFile, JsonSerializer.Serialize(owned));
+            File.WriteAllText(outOwnedFile, JsonSerializer.Serialize(owned, AppJsonCompactContext.Default.ListString));
             return 0;
         }
 
@@ -91,7 +91,8 @@ internal static class SteamStatsChild
         try
         {
             File.WriteAllText(outFile, JsonSerializer.Serialize(
-                new StatsChildResult { Ok = false, Message = "子进程未完成（崩溃或被杀）" }));
+                new StatsChildResult { Ok = false, Message = "子进程未完成（崩溃或被杀）" },
+                AppJsonCompactContext.Default.StatsChildResult));
         }
         catch { }
 
@@ -99,7 +100,7 @@ internal static class SteamStatsChild
         try
         {
             var changes = apply
-                ? JsonSerializer.Deserialize<List<AchievementRecord>>(File.ReadAllText(args[4])) ?? new()
+                ? JsonSerializer.Deserialize(File.ReadAllText(args[4]), AppJsonCompactContext.Default.ListAchievementRecord) ?? new()
                 : null;
             result = Execute(args[3], appId, changes);
         }
@@ -110,7 +111,7 @@ internal static class SteamStatsChild
 
         try
         {
-            File.WriteAllText(outFile, JsonSerializer.Serialize(result, new JsonSerializerOptions { WriteIndented = true }));
+            File.WriteAllText(outFile, JsonSerializer.Serialize(result, AppJsonIndentedContext.Default.StatsChildResult));
         }
         catch (Exception ex)
         {

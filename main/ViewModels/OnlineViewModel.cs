@@ -6,6 +6,7 @@ namespace OSTGUI.ViewModels;
 /// <summary>
 /// 联机页面 ViewModel - 480 联机（OST -onlinefix）
 /// </summary>
+[WinRT.GeneratedBindableCustomProperty]
 public partial class OnlineViewModel : ObservableObject
 {
     private readonly OnlineFixService _onlineFixService;
@@ -13,34 +14,114 @@ public partial class OnlineViewModel : ObservableObject
     private readonly SteamGameInfoService _gameInfoService;
     private readonly ConfigService _configService;
 
-    [ObservableProperty] private string _onlineAppId = "";
-    [ObservableProperty] private string _gameName = "";
+    private string _onlineAppId = "";
+
+    public string OnlineAppId
+    {
+        get => _onlineAppId;
+        set => SetProperty(ref _onlineAppId, value);
+    }
+
+    private string _gameName = "";
+
+    public string GameName
+    {
+        get => _gameName;
+        set => SetProperty(ref _gameName, value);
+    }
 
     /// <summary>「其他」下拉的选中项（0 = DLL 注入，1 = AppID Changer）；改内存，退出落盘，重开记住上次选择</summary>
-    [ObservableProperty] private int _otherModeIndex;
+    private int _otherModeIndex;
 
-    partial void OnOtherModeIndexChanged(int value)
+    public int OtherModeIndex
+    {
+        get => _otherModeIndex;
+        set
+        {
+            if (SetProperty(ref _otherModeIndex, value))
+            {
+                OnOtherModeIndexChanged(value);
+            }
+        }
+    }
+
+    private void OnOtherModeIndexChanged(int value)
         => _configService.Update(c => c.OnlineOtherMode = value);
 
     // 联机会话身份：默认 Spacewar(480)，自定义时用 SessionAppId
     // 两个联机视图共用这份状态；各视图内的单选靠各自 GroupName 分组（两个视图的名字必须不同）
-    [ObservableProperty] private bool _isDefaultSession = true;
-    [ObservableProperty] private bool _isCustomSession;
-    [ObservableProperty] private string _sessionAppId = "";
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(StatusText))]
-    [NotifyPropertyChangedFor(nameof(CanStart))]
+    private bool _isDefaultSession = true;
+
+    public bool IsDefaultSession
+    {
+        get => _isDefaultSession;
+        set => SetProperty(ref _isDefaultSession, value);
+    }
+
+    private bool _isCustomSession;
+
+    public bool IsCustomSession
+    {
+        get => _isCustomSession;
+        set => SetProperty(ref _isCustomSession, value);
+    }
+
+    private string _sessionAppId = "";
+
+    public string SessionAppId
+    {
+        get => _sessionAppId;
+        set => SetProperty(ref _sessionAppId, value);
+    }
+
     private bool _isRunning;
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanStart))]
+
+    public bool IsRunning
+    {
+        get => _isRunning;
+        set
+        {
+            if (SetProperty(ref _isRunning, value))
+            {
+                OnPropertyChanged(nameof(StatusText));
+                OnPropertyChanged(nameof(CanStart));
+            }
+        }
+    }
+
     private bool _isBusy;
+
+    public bool IsBusy
+    {
+        get => _isBusy;
+        set
+        {
+            if (SetProperty(ref _isBusy, value))
+            {
+                OnPropertyChanged(nameof(CanStart));
+            }
+        }
+    }
 
     public string StatusText => IsRunning ? "联机游戏中" : "未运行";
     public bool CanStart => !IsRunning && !IsBusy;
 
     // 「其他」页 —— DLL 注入：游戏 AppID（查询定位游戏程序）与定位结果
-    [ObservableProperty] private string _dllGameAppId = "";
-    [ObservableProperty] private string _dllGameExePath = "";
+    private string _dllGameAppId = "";
+
+    public string DllGameAppId
+    {
+        get => _dllGameAppId;
+        set => SetProperty(ref _dllGameAppId, value);
+    }
+
+    private string _dllGameExePath = "";
+
+    public string DllGameExePath
+    {
+        get => _dllGameExePath;
+        set => SetProperty(ref _dllGameExePath, value);
+    }
 
     /// <summary>协议 AppID：默认 480，或自定义（两个联机视图共用同一份状态）</summary>
     private (bool ok, string value) ResolveSessionAppId()

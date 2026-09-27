@@ -42,6 +42,8 @@ public class AchievementListCache
     }
 
     private static readonly JsonSerializerOptions Options = new() { WriteIndented = false };
+    // AOT 源生成：把上面这套选项（紧凑）塞回 context；静态缓存，别在调用点反复 new
+    private static readonly AppJsonCompactContext JsonCtx = new(Options);
 
     public static string CachePath { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -52,7 +54,7 @@ public class AchievementListCache
         try
         {
             if (!File.Exists(CachePath)) return null;
-            var snap = JsonSerializer.Deserialize<Snapshot>(File.ReadAllText(CachePath), Options);
+            var snap = JsonSerializer.Deserialize(File.ReadAllText(CachePath), JsonCtx.Snapshot);
             if (snap == null || snap.Version != CurrentVersion) return null;
             return snap;
         }
@@ -69,7 +71,7 @@ public class AchievementListCache
         {
             Directory.CreateDirectory(Path.GetDirectoryName(CachePath)!);
             var temp = CachePath + ".tmp";
-            File.WriteAllText(temp, JsonSerializer.Serialize(snapshot, Options));
+            File.WriteAllText(temp, JsonSerializer.Serialize(snapshot, JsonCtx.Snapshot));
             File.Move(temp, CachePath, overwrite: true);   // 原子替换：不会留下半截文件（半截＝下次当没有）
             LogService.Diag($"成就列表缓存已写入（lua {snapshot.LuaGames.Count} / 正版 {snapshot.OwnedGames.Count}）");
         }
@@ -134,7 +136,7 @@ public class AchievementListCache
             OwnedGames = { new Item { AppId = "2", GameName = "乙", SourceTag = "正版" } },
         };
 
-        var round = JsonSerializer.Deserialize<Snapshot>(JsonSerializer.Serialize(snapshot, Options), Options);
+        var round = JsonSerializer.Deserialize(JsonSerializer.Serialize(snapshot, JsonCtx.Snapshot), JsonCtx.Snapshot);
         if (round == null) return "序列化往返返回空";
         if (round.LuaGames.Count != 1 || round.LuaGames[0].GameName != "甲") return "序列化往返丢了 lua 条目";
         if (round.OwnedGames.Count != 1 || round.OwnedGames[0].SourceTag != "正版") return "序列化往返丢了正版条目";

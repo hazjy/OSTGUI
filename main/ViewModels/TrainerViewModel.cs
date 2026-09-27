@@ -11,6 +11,7 @@ namespace OSTGUI.ViewModels;
 /// 修改器页：搜索 / 已下载两个列表 + 下载、启动、删除 + 「进程绑定」
 /// （把修改器绑到某个游戏，游戏一跑就自动启动它，见 Services/TrainerMonitor.cs）。
 /// </summary>
+[WinRT.GeneratedBindableCustomProperty]
 public partial class TrainerViewModel : ObservableObject
 {
     private readonly TrainerCatalogService _catalog;
@@ -24,8 +25,11 @@ public partial class TrainerViewModel : ObservableObject
     private bool _searchLoaded;
     private string _loadedQuery = "";
 
-    public ObservableCollection<TrainerInfo> Items { get; } = new();
-    public ObservableCollection<TrainerBinding> Bindings { get; } = new();
+    // 声明类型用 IList<T>：WinRT 内建映射（IVector<T>），Native AOT 下无需在
+    // WinRTGlobalVtableLookup 里登记闭合泛型；运行时对象仍是 ObservableCollection，
+    // 集合变更通知行为不变。
+    public IList<TrainerInfo> Items { get; } = new ObservableCollection<TrainerInfo>();
+    public IList<TrainerBinding> Bindings { get; } = new ObservableCollection<TrainerBinding>();
 
     /// <summary>已下载的修改器（绑定对话框的候选）</summary>
     public ObservableCollection<TrainerInfo> LocalTrainers { get; } = new();
@@ -35,22 +39,108 @@ public partial class TrainerViewModel : ObservableObject
     /// 刻意不复用搜索用的 <see cref="Items"/>：两边共用一个集合时，搜索的网络请求晚回来
     /// 会把搜索结果糊到"已下载"上（2026-09-25 实测踩到）。
     /// </summary>
-    public ObservableCollection<TrainerInfo> LocalItems { get; } = new();
+    public IList<TrainerInfo> LocalItems { get; } = new ObservableCollection<TrainerInfo>();
 
-    [ObservableProperty] private string _query = "";
+    // 命令手写在 VM 上：Native AOT 下 CsWinRT 绑定提供器看不到源生成成员，XAML {Binding} 会失效
+    public IAsyncRelayCommand SearchCommand { get; }
+    public IAsyncRelayCommand DownloadCommand { get; }
+    public IRelayCommand LaunchCommand { get; }
+    public IAsyncRelayCommand UpdateCommand { get; }
+    public IRelayCommand RevealCommand { get; }
+    public IRelayCommand DeleteCommand { get; }
+    public IRelayCommand RemoveBindingCommand { get; }
+
+    private string _query = "";
+
+    public string Query
+    {
+        get => _query;
+        set
+        {
+            if (SetProperty(ref _query, value))
+            {
+                OnQueryChanged(value);
+            }
+        }
+    }
+
     /// <summary>「已下载」视图的本地过滤词（只筛本地，不发请求；与网页搜索的 Query 各管一摊）</summary>
-    [ObservableProperty] private string _localFilter = "";
-    [ObservableProperty] private int _viewIndex;          // 0 搜索 / 1 已下载
-    [ObservableProperty] private bool _isBusy;
-    [ObservableProperty] private string _statusText = "";
-    [ObservableProperty] private string _monitorStatus = "";
+    private string _localFilter = "";
+
+    public string LocalFilter
+    {
+        get => _localFilter;
+        set
+        {
+            if (SetProperty(ref _localFilter, value))
+            {
+                OnLocalFilterChanged(value);
+            }
+        }
+    }
+
+    private int _viewIndex;          // 0 搜索 / 1 已下载
+
+    public int ViewIndex
+    {
+        get => _viewIndex;
+        set
+        {
+            if (SetProperty(ref _viewIndex, value))
+            {
+                OnViewIndexChanged(value);
+            }
+        }
+    }
+    private bool _isBusy;
+
+    public bool IsBusy
+    {
+        get => _isBusy;
+        set => SetProperty(ref _isBusy, value);
+    }
+
+    private string _statusText = "";
+
+    public string StatusText
+    {
+        get => _statusText;
+        set => SetProperty(ref _statusText, value);
+    }
+
+    private string _monitorStatus = "";
+
+    public string MonitorStatus
+    {
+        get => _monitorStatus;
+        set => SetProperty(ref _monitorStatus, value);
+    }
 
     /// <summary>监控按钮的可用状态：跑着时只能点「停止」，停着时只能点「运行」</summary>
-    [ObservableProperty] private bool _canStartMonitor = true;
-    [ObservableProperty] private bool _canStopMonitor;
+    private bool _canStartMonitor = true;
+
+    public bool CanStartMonitor
+    {
+        get => _canStartMonitor;
+        set => SetProperty(ref _canStartMonitor, value);
+    }
+
+    private bool _canStopMonitor;
+
+    public bool CanStopMonitor
+    {
+        get => _canStopMonitor;
+        set => SetProperty(ref _canStopMonitor, value);
+    }
 
     /// <summary>当前下载目录（显示用；改目录见 SetDownloadDir）</summary>
-    [ObservableProperty] private string _downloadDirText = "";
+    private string _downloadDirText = "";
+
+    public string DownloadDirText
+    {
+        get => _downloadDirText;
+        set => SetProperty(ref _downloadDirText, value);
+    }
 
     /// <summary>运行监控：建立后台服务，使修改器随游戏启停（GUI 退出了也继续）</summary>
     public void StartMonitor()
@@ -88,11 +178,19 @@ public partial class TrainerViewModel : ObservableObject
         _downloads = downloads;
         _bindingService = bindingService;
         _config = config;
+
+        SearchCommand = new AsyncRelayCommand(SearchAsync);
+        DownloadCommand = new AsyncRelayCommand<TrainerInfo?>(DownloadAsync);
+        LaunchCommand = new RelayCommand<TrainerInfo?>(Launch);
+        UpdateCommand = new AsyncRelayCommand<TrainerInfo?>(UpdateAsync);
+        RevealCommand = new RelayCommand<TrainerInfo?>(Reveal);
+        DeleteCommand = new RelayCommand<TrainerInfo?>(Delete);
+        RemoveBindingCommand = new RelayCommand<TrainerBinding?>(RemoveBinding);
     }
 
-    partial void OnViewIndexChanged(int value) => _ = LoadViewAsync();
-    partial void OnLocalFilterChanged(string value) => ApplyLocalFilter();
-    partial void OnQueryChanged(string value) => _searchLoaded = false;   // 查询词变了，旧结果作废
+    private void OnViewIndexChanged(int value) => _ = LoadViewAsync();
+    private void OnLocalFilterChanged(string value) => ApplyLocalFilter();
+    private void OnQueryChanged(string value) => _searchLoaded = false;   // 查询词变了，旧结果作废
 
     /// <summary>每次进页面：刷新已下载、绑定与监控状态（列表按当前视图按需拉）</summary>
     public async Task InitializeAsync()
@@ -170,7 +268,6 @@ public partial class TrainerViewModel : ObservableObject
         return $"搜索「{_loadedQuery}」{Items.Count} 条";
     }
 
-    [RelayCommand]
     private async Task SearchAsync()
     {
         _searchLoaded = false;                        // 点搜索 = 明确要求重搜
@@ -178,7 +275,6 @@ public partial class TrainerViewModel : ObservableObject
         else ViewIndex = 0;                           // 从「已下载」切回搜索视图
     }
 
-    [RelayCommand]
     private async Task DownloadAsync(TrainerInfo? trainer)
     {
         if (trainer == null || trainer.IsDownloading) return;
@@ -215,7 +311,6 @@ public partial class TrainerViewModel : ObservableObject
     }
 
     /// <summary>启动修改器：只有用户点了才运行（下载完不自动执行）</summary>
-    [RelayCommand]
     private void Launch(TrainerInfo? trainer)
     {
         var exe = trainer?.LocalPath ?? "";
@@ -245,7 +340,6 @@ public partial class TrainerViewModel : ObservableObject
     /// 找文章优先用条目里存的详情页；没有（早先下载的记录）就用**官方 RSS** 按名字搜出来——
     /// 但文件直链官方只在文章页里给（RSS 没有 enclosure、正文也不含附件表），只能从那一页取一次。
     /// </summary>
-    [RelayCommand]
     private async Task UpdateAsync(TrainerInfo? trainer)
     {
         if (trainer == null) return;
@@ -340,13 +434,11 @@ public partial class TrainerViewModel : ObservableObject
             ? $"{verb} {gameName} {v.Percent:0}%"
             : $"{verb} {gameName} {v.Bytes / 1024.0 / 1024.0:0.0} MB");
 
-    [RelayCommand]
     private void Reveal(TrainerInfo? trainer)
     {
         if (trainer != null) _downloads.RevealInExplorer(trainer.LocalPath);
     }
 
-    [RelayCommand]
     private void Delete(TrainerInfo? trainer)
     {
         if (trainer == null || string.IsNullOrEmpty(trainer.LocalPath)) return;
@@ -403,7 +495,6 @@ public partial class TrainerViewModel : ObservableObject
         ToastService.ShowSuccess("已绑定", $"{Path.GetFileNameWithoutExtension(gameExe)} → {trainerName}");
     }
 
-    [RelayCommand]
     private void RemoveBinding(TrainerBinding? binding)
     {
         if (binding == null) return;

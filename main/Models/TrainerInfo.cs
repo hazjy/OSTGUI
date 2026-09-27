@@ -4,7 +4,8 @@ namespace OSTGUI.Models;
 /// 修改器列表条目：搜索结果的（只有名字/链接/日期），或已下载的（带本地路径与来源页）。
 /// 不做封面图。
 /// </summary>
-public class TrainerInfo
+[WinRT.GeneratedBindableCustomProperty]
+public partial class TrainerInfo
 {
     /// <summary>显示名：搜索结果里是游戏名，已下载里是 exe 文件名（= 绑定的名称）</summary>
     public string GameName { get; set; } = "";

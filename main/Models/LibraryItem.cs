@@ -14,7 +14,8 @@ public class DlcInfo
     public string StatusText => IsInstalled ? "已入库" : "未入库";
 }
 
-public class LibraryItem : ObservableObject
+[WinRT.GeneratedBindableCustomProperty]
+public partial class LibraryItem : ObservableObject
 {
     public string AppId { get; set; } = string.Empty;
     public string GameName { get; set; } = "未知游戏";

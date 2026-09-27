@@ -8,7 +8,8 @@ namespace OSTGUI.Services;
 /// OST 授权文件（.ost）模型
 /// 明文 JSON，无加密；元数据记录来源、生成/失效时间
 /// </summary>
-public class OstFile
+[WinRT.GeneratedBindableCustomProperty]
+public partial class OstFile
 {
     public const string FormatId = "OST-AUTH";
     public const int CurrentVersion = 1;
@@ -64,7 +65,7 @@ public class OstFileService
                 ExporterVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown",
             };
 
-            var json = JsonSerializer.Serialize(ost, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(ost, AppJsonIndentedContext.Default.OstFile);
             await File.WriteAllTextAsync(outputPath, json, new System.Text.UTF8Encoding(false));
             return (true, $"已导出 {appIdTrimmed}.ost", outputPath);
         }
@@ -82,7 +83,7 @@ public class OstFileService
         try
         {
             var json = await File.ReadAllTextAsync(filePath);
-            var ost = JsonSerializer.Deserialize<OstFile>(json);
+            var ost = JsonSerializer.Deserialize(json, AppJsonIndentedContext.Default.OstFile);
             if (ost == null)
                 return (false, "文件内容无效", null);
 
@@ -114,7 +115,7 @@ public class OstFileService
     {
         try
         {
-            var json = JsonSerializer.Serialize(ost, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(ost, AppJsonIndentedContext.Default.OstFile);
             await File.WriteAllTextAsync(filePath, json, new System.Text.UTF8Encoding(false));
         }
         catch

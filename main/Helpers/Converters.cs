@@ -19,7 +19,7 @@ internal static class ThemeColorHelper
 /// <summary>
 /// Bool 取反转换器
 /// </summary>
-public class BoolNegateConverter : IValueConverter
+public partial class BoolNegateConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, string language)
     {
@@ -37,7 +37,7 @@ public class BoolNegateConverter : IValueConverter
 /// <summary>
 /// Bool 到 Visibility 转换器
 /// </summary>
-public class BoolToVisibilityConverter : IValueConverter
+public partial class BoolToVisibilityConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, string language)
     {
@@ -55,7 +55,7 @@ public class BoolToVisibilityConverter : IValueConverter
 /// <summary>
 /// VersionMode 到颜色转换器
 /// </summary>
-public class VersionModeToBrushConverter : IValueConverter
+public partial class VersionModeToBrushConverter : IValueConverter
 {
     public object Convert(object value, Type targetType, object parameter, string language)
     {
@@ -79,7 +79,7 @@ public class VersionModeToBrushConverter : IValueConverter
 /// <summary>
     /// 入库状态到颜色转换器（异常状态 → 红色，正常 → 默认文本色）
     /// </summary>
-    public class StatusToBrushConverter : IValueConverter
+    public partial class StatusToBrushConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, string language)
         {
@@ -100,7 +100,7 @@ public class VersionModeToBrushConverter : IValueConverter
     /// <summary>
     /// 非空字符串到 Visibility 转换器
     /// </summary>
-    public class StringToVisibilityConverter : IValueConverter
+    public partial class StringToVisibilityConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, string language)
         {
@@ -116,7 +116,7 @@ public class VersionModeToBrushConverter : IValueConverter
     /// <summary>
     /// Int 到 Double 转换器（用于 NumberBox 绑定）
     /// </summary>
-    public class IntToDoubleConverter : IValueConverter
+    public partial class IntToDoubleConverter : IValueConverter
     {
         public object Convert(object value, Type targetType, object parameter, string language)
         {

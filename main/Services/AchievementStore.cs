@@ -35,6 +35,9 @@ public class AchievementStore
         PropertyNameCaseInsensitive = true,
     };
 
+    // AOT 源生成：源生成属性里没有"大小写不敏感"开关，只能把上面这套选项塞回 context；静态缓存
+    private static readonly AppJsonIndentedContext JsonCtx = new(JsonOpts);
+
     private static string Dir => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "OSTGUI", "achievements");
@@ -47,7 +50,7 @@ public class AchievementStore
         {
             var path = PathFor(appId);
             if (!File.Exists(path)) return null;
-            return JsonSerializer.Deserialize<AchievementFile>(File.ReadAllText(path), JsonOpts);
+            return JsonSerializer.Deserialize(File.ReadAllText(path), JsonCtx.AchievementFile);
         }
         catch (Exception ex)
         {
@@ -67,7 +70,7 @@ public class AchievementStore
             file.UpdatedAt = DateTimeOffset.UtcNow.ToString("o");
             var path = PathFor(file.AppId);
             var tmp = path + ".tmp";
-            File.WriteAllText(tmp, JsonSerializer.Serialize(file, JsonOpts));
+            File.WriteAllText(tmp, JsonSerializer.Serialize(file, JsonCtx.AchievementFile));
             File.Move(tmp, path, true);
             return true;
         }

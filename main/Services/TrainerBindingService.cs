@@ -11,6 +11,8 @@ namespace OSTGUI.Services;
 public class TrainerBindingService
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
+    // AOT 源生成：把上面这套选项（缩进）塞回 context；静态缓存，别在调用点反复 new
+    private static readonly AppJsonIndentedContext JsonCtx = new(JsonOptions);
 
     public static string BindingsPath { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OSTGUI", "bindings.json");
@@ -21,7 +23,7 @@ public class TrainerBindingService
         try
         {
             if (!File.Exists(BindingsPath)) return list;
-            list = JsonSerializer.Deserialize<List<TrainerBinding>>(File.ReadAllText(BindingsPath), JsonOptions)
+            list = JsonSerializer.Deserialize(File.ReadAllText(BindingsPath), JsonCtx.ListTrainerBinding)
                    ?? new List<TrainerBinding>();
         }
         catch (Exception ex)
@@ -44,7 +46,7 @@ public class TrainerBindingService
         {
             Directory.CreateDirectory(Path.GetDirectoryName(BindingsPath)!);
             var temp = BindingsPath + ".tmp";
-            File.WriteAllText(temp, JsonSerializer.Serialize(bindings, JsonOptions));
+            File.WriteAllText(temp, JsonSerializer.Serialize(bindings, JsonCtx.ListTrainerBinding));
             File.Move(temp, BindingsPath, overwrite: true);   // 原子替换，监控读到的永远是一份完整文件
             LogService.Diag($"trainer 绑定已保存 {bindings.Count} 条（启用 {bindings.Count(b => b.IsEnabled)}）");
         }

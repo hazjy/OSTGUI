@@ -10,6 +10,7 @@ using System.Text.RegularExpressions;
 namespace OSTGUI.ViewModels;
 
 /// <summary>成就列表的一行：定义（来自 schema）+ 当前状态（来自留底或 Steam）</summary>
+[WinRT.GeneratedBindableCustomProperty]
 public partial class AchievementRow : ObservableObject
 {
     public AchievementRow(AchievementDef def, bool achieved, long unlockTime)
@@ -27,17 +28,42 @@ public partial class AchievementRow : ObservableObject
         ? DateTimeOffset.FromUnixTimeSeconds(UnlockTime).LocalDateTime.ToString("yyyy-MM-dd HH:mm")
         : "";
 
-    [ObservableProperty] private bool _achieved;
-    [ObservableProperty] private long _unlockTime;
+    private bool _achieved;
 
-    partial void OnAchievedChanged(bool value)
+    public bool Achieved
+    {
+        get => _achieved;
+        set
+        {
+            if (SetProperty(ref _achieved, value))
+            {
+                OnAchievedChanged(value);
+            }
+        }
+    }
+
+    private long _unlockTime;
+
+    public long UnlockTime
+    {
+        get => _unlockTime;
+        set
+        {
+            if (SetProperty(ref _unlockTime, value))
+            {
+                OnUnlockTimeChanged(value);
+            }
+        }
+    }
+
+    private void OnAchievedChanged(bool value)
     {
         OnPropertyChanged(nameof(Title));
         OnPropertyChanged(nameof(Subtitle));
         OnPropertyChanged(nameof(UnlockText));
     }
 
-    partial void OnUnlockTimeChanged(long value) => OnPropertyChanged(nameof(UnlockText));
+    private void OnUnlockTimeChanged(long value) => OnPropertyChanged(nameof(UnlockText));
 }
 
 /// <summary>
@@ -45,6 +71,7 @@ public partial class AchievementRow : ObservableObject
 /// （%LOCALAPPDATA%\OSTGUI\achievements\&lt;appid&gt;.json），点「保存到 Steam」才写回客户端。
 /// 假入库游戏的 Steam 端状态本来就会被服务端/内核清空，留底才是唯一可靠副本。
 /// </summary>
+[WinRT.GeneratedBindableCustomProperty]
 public partial class AchievementViewModel : ObservableObject
 {
     private readonly SteamService _steam;
@@ -71,26 +98,195 @@ public partial class AchievementViewModel : ObservableObject
     /// <summary>lua 入库涉及的所有 appid（文件名 + 各 addappid），用来把正版候选排除掉</summary>
     private readonly HashSet<string> _luaIds = new(StringComparer.Ordinal);
 
-    [ObservableProperty] private ObservableCollection<LibraryItem> _games = new();
-    [ObservableProperty] private LibraryItem? _selectedGame;
-    [ObservableProperty] private ObservableCollection<AchievementRow> _rows = new();
+    // 命令手写在 VM 上：Native AOT 下 CsWinRT 绑定提供器看不到源生成成员，XAML {Binding} 会失效
+    public IAsyncRelayCommand RefreshCommand { get; }
+    public IRelayCommand UnlockAllCommand { get; }
+    public IRelayCommand LockAllCommand { get; }
+    public IAsyncRelayCommand SaveToSteamCommand { get; }
+    public IAsyncRelayCommand ReadFromSteamCommand { get; }
+
+    private ObservableCollection<LibraryItem> _games = new();
+
+    // 声明类型用 IList<T>：WinRT 内建映射（IVector<T>），Native AOT 下无需在
+    // WinRTGlobalVtableLookup 里登记闭合泛型；运行时对象仍是 ObservableCollection（见字段），
+    // 集合变更通知行为不变。
+    public IList<LibraryItem> Games
+    {
+        get => _games;
+        set => SetProperty(ref _games, value as ObservableCollection<LibraryItem> ?? new(value));
+    }
+
+    private LibraryItem? _selectedGame;
+
+    public LibraryItem? SelectedGame
+    {
+        get => _selectedGame;
+        set
+        {
+            if (SetProperty(ref _selectedGame, value))
+            {
+                OnSelectedGameChanged(value);
+            }
+        }
+    }
+
+    private ObservableCollection<AchievementRow> _rows = new();
+
+    public ObservableCollection<AchievementRow> Rows
+    {
+        get => _rows;
+        set
+        {
+            if (SetProperty(ref _rows, value))
+            {
+                OnRowsChanged(value);
+            }
+        }
+    }
+
     /// <summary>列表实际显示的成就（= Rows 经过 RowFilter 过滤；保存仍按 Rows 走）</summary>
-    [ObservableProperty] private ObservableCollection<AchievementRow> _visibleRows = new();
-    [ObservableProperty] private string _filter = "";
+    private ObservableCollection<AchievementRow> _visibleRows = new();
+
+    public IList<AchievementRow> VisibleRows
+    {
+        get => _visibleRows;
+        set => SetProperty(ref _visibleRows, value as ObservableCollection<AchievementRow> ?? new(value));
+    }
+
+    private string _filter = "";
+
+    public string Filter
+    {
+        get => _filter;
+        set
+        {
+            if (SetProperty(ref _filter, value))
+            {
+                OnFilterChanged(value);
+            }
+        }
+    }
+
     /// <summary>成就列表的过滤词</summary>
-    [ObservableProperty] private string _rowFilter = "";
+    private string _rowFilter = "";
+
+    public string RowFilter
+    {
+        get => _rowFilter;
+        set
+        {
+            if (SetProperty(ref _rowFilter, value))
+            {
+                OnRowFilterChanged(value);
+            }
+        }
+    }
+
     /// <summary>显示入库（lua）的游戏</summary>
-    [ObservableProperty] private bool _showLua = true;
+    private bool _showLua = true;
+
+    public bool ShowLua
+    {
+        get => _showLua;
+        set
+        {
+            if (SetProperty(ref _showLua, value))
+            {
+                OnShowLuaChanged(value);
+            }
+        }
+    }
+
     /// <summary>显示客户端认为正版拥有的游戏</summary>
-    [ObservableProperty] private bool _showOwned = true;
-    [ObservableProperty] private string _gameTitle = "未选择游戏";
-    [ObservableProperty] private string _progressText = "";
-    [ObservableProperty] private double _progressValue;
-    [ObservableProperty] private bool _isBusy;
-    [ObservableProperty] private bool _steamRunning;
-    [ObservableProperty] private bool _hasChanges;
-    [ObservableProperty] private string _notice = "";
-    [ObservableProperty] private InfoBarSeverity _noticeSeverity = InfoBarSeverity.Informational;
+    private bool _showOwned = true;
+
+    public bool ShowOwned
+    {
+        get => _showOwned;
+        set
+        {
+            if (SetProperty(ref _showOwned, value))
+            {
+                OnShowOwnedChanged(value);
+            }
+        }
+    }
+
+    private string _gameTitle = "未选择游戏";
+
+    public string GameTitle
+    {
+        get => _gameTitle;
+        set => SetProperty(ref _gameTitle, value);
+    }
+
+    private string _progressText = "";
+
+    public string ProgressText
+    {
+        get => _progressText;
+        set => SetProperty(ref _progressText, value);
+    }
+
+    private double _progressValue;
+
+    public double ProgressValue
+    {
+        get => _progressValue;
+        set => SetProperty(ref _progressValue, value);
+    }
+
+    private bool _isBusy;
+
+    public bool IsBusy
+    {
+        get => _isBusy;
+        set => SetProperty(ref _isBusy, value);
+    }
+
+    private bool _steamRunning;
+
+    public bool SteamRunning
+    {
+        get => _steamRunning;
+        set => SetProperty(ref _steamRunning, value);
+    }
+
+    private bool _hasChanges;
+
+    public bool HasChanges
+    {
+        get => _hasChanges;
+        set
+        {
+            if (SetProperty(ref _hasChanges, value))
+            {
+                OnHasChangesChanged(value);
+            }
+        }
+    }
+
+    private string _notice = "";
+
+    public string Notice
+    {
+        get => _notice;
+        set
+        {
+            if (SetProperty(ref _notice, value))
+            {
+                OnNoticeChanged(value);
+            }
+        }
+    }
+
+    private InfoBarSeverity _noticeSeverity = InfoBarSeverity.Informational;
+
+    public InfoBarSeverity NoticeSeverity
+    {
+        get => _noticeSeverity;
+        set => SetProperty(ref _noticeSeverity, value);
+    }
 
     public AchievementViewModel(
         SteamService steam, LibraryScanner scanner, GameNameCacheService names,
@@ -107,36 +303,41 @@ public partial class AchievementViewModel : ObservableObject
         // 勾选状态沿用上次的选择（直接写字段：构造期不触发过滤与保存）
         _showLua = config.Config.AchievementShowLua;
         _showOwned = config.Config.AchievementShowOwned;
+
+        RefreshCommand = new AsyncRelayCommand(RefreshAsync);
+        UnlockAllCommand = new RelayCommand(UnlockAll);
+        LockAllCommand = new RelayCommand(LockAll);
+        SaveToSteamCommand = new AsyncRelayCommand(SaveToSteamAsync);
+        ReadFromSteamCommand = new AsyncRelayCommand(ReadFromSteamAsync);
     }
 
     public bool HasNotice => !string.IsNullOrEmpty(Notice);
     public string DirtyText => HasChanges ? "有未保存的改动" : "";
 
-    partial void OnNoticeChanged(string value) => OnPropertyChanged(nameof(HasNotice));
-    partial void OnHasChangesChanged(bool value) => OnPropertyChanged(nameof(DirtyText));
-    partial void OnFilterChanged(string value) => ApplyFilter();
-    partial void OnRowFilterChanged(string value) => ApplyRowFilter();
+    private void OnNoticeChanged(string value) => OnPropertyChanged(nameof(HasNotice));
+    private void OnHasChangesChanged(bool value) => OnPropertyChanged(nameof(DirtyText));
+    private void OnFilterChanged(string value) => ApplyFilter();
+    private void OnRowFilterChanged(string value) => ApplyRowFilter();
 
     /// <summary>Rows 被整体替换（或增删）时重新过滤——只挂这一处，省得每个赋值点都记得调</summary>
-    partial void OnRowsChanged(ObservableCollection<AchievementRow> value)
+    private void OnRowsChanged(ObservableCollection<AchievementRow> value)
     {
         value.CollectionChanged += (_, _) => ApplyRowFilter();
         ApplyRowFilter();
     }
-    partial void OnShowLuaChanged(bool value)
+    private void OnShowLuaChanged(bool value)
     {
         ApplyFilter();
         RememberToggles();
     }
 
-    partial void OnShowOwnedChanged(bool value)
+    private void OnShowOwnedChanged(bool value)
     {
         ApplyFilter();
         RememberToggles();
     }
 
     /// <summary>重扫左侧列表（入库 + 正版）并重读当前游戏</summary>
-    [RelayCommand]
     private async Task RefreshAsync()
     {
         if (IsBusy) return;
@@ -164,7 +365,7 @@ public partial class AchievementViewModel : ObservableObject
         _config.Config.AchievementShowLua = ShowLua;
         _config.Config.AchievementShowOwned = ShowOwned;
     }
-    partial void OnSelectedGameChanged(LibraryItem? value) => _ = LoadGameAsync(value);
+    private void OnSelectedGameChanged(LibraryItem? value) => _ = LoadGameAsync(value);
 
     public async Task InitializeAsync()
     {
@@ -551,7 +752,6 @@ public partial class AchievementViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
     private void UnlockAll()
     {
         _suppress = true;
@@ -560,7 +760,6 @@ public partial class AchievementViewModel : ObservableObject
         AfterBulkChange();
     }
 
-    [RelayCommand]
     private void LockAll()
     {
         _suppress = true;
@@ -576,7 +775,6 @@ public partial class AchievementViewModel : ObservableObject
         SaveStore("local");
     }
 
-    [RelayCommand]
     private async Task SaveToSteamAsync()
     {
         if (SelectedGame == null || IsBusy) return;
@@ -629,7 +827,6 @@ public partial class AchievementViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
     private async Task ReadFromSteamAsync()
     {
         if (SelectedGame == null || IsBusy) return;

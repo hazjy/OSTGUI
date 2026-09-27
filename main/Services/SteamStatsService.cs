@@ -13,6 +13,8 @@ public class SteamStatsService
     private readonly SteamService _steam;
     private static readonly SemaphoreSlim Gate = new(1, 1);   // 一次只跑一个子进程
     private const int TimeoutMs = 30000;
+    // AOT 源生成：源生成属性里没有"大小写不敏感"开关，把选项塞回 context；静态缓存，别在调用点反复 new
+    private static readonly AppJsonCompactContext CaseInsensitiveCtx = new(new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
     public SteamStatsService(SteamService steam) => _steam = steam;
 
@@ -37,7 +39,7 @@ public class SteamStatsService
         await Gate.WaitAsync();
         try
         {
-            await File.WriteAllTextAsync(inFile, JsonSerializer.Serialize(appIds));
+            await File.WriteAllTextAsync(inFile, JsonSerializer.Serialize(appIds, AppJsonCompactContext.Default.IReadOnlyListString));
             var psi = new ProcessStartInfo
             {
                 FileName = exe,
@@ -61,7 +63,7 @@ public class SteamStatsService
             }
 
             if (!File.Exists(outFile)) return empty;
-            var list = JsonSerializer.Deserialize<List<string>>(await File.ReadAllTextAsync(outFile)) ?? new List<string>();
+            var list = JsonSerializer.Deserialize(await File.ReadAllTextAsync(outFile), AppJsonCompactContext.Default.ListString) ?? new List<string>();
             return new HashSet<string>(list, StringComparer.Ordinal);
         }
         catch (Exception ex)
@@ -94,7 +96,7 @@ public class SteamStatsService
             if (changes != null)
             {
                 inFile = Path.Combine(Path.GetTempPath(), $"ost_stats_in_{Guid.NewGuid():N}.json");
-                await File.WriteAllTextAsync(inFile, JsonSerializer.Serialize(changes));
+                await File.WriteAllTextAsync(inFile, JsonSerializer.Serialize(changes, AppJsonCompactContext.Default.IReadOnlyListAchievementRecord));
                 args = $"{mode} {appId} \"{steamPath}\" \"{inFile}\" \"{outFile}\"";
             }
 
@@ -124,7 +126,7 @@ public class SteamStatsService
                 return new StatsChildResult { Ok = false, Message = $"子进程无输出（退出码 {proc.ExitCode}）" };
 
             var json = await File.ReadAllTextAsync(outFile);
-            var result = JsonSerializer.Deserialize<StatsChildResult>(json, new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+            var result = JsonSerializer.Deserialize(json, CaseInsensitiveCtx.StatsChildResult)
                          ?? new StatsChildResult { Ok = false, Message = "子进程结果解析失败" };
 
             // 占位结果 = 子进程没跑完（原生调用越界属进程级死亡，子进程自己 catch 不住）

@@ -159,7 +159,7 @@ public partial class App : Application
             var result = extractor.Extract(appId);
 
             if (!string.IsNullOrEmpty(outFile))
-                File.WriteAllText(outFile, JsonSerializer.Serialize(result));
+                File.WriteAllText(outFile, JsonSerializer.Serialize(result, AppJsonCompactContext.Default.ExtractResult));
 
             Log($"extract mode done: success={result.Success} {result.Message}");
         }

@@ -71,7 +71,7 @@ public class SudamaKeyCache
                     await resp.Content.CopyToAsync(ms, ct).ConfigureAwait(false);
                     sw.Stop();
                     ms.Position = 0;
-                    var data = await JsonSerializer.DeserializeAsync<Dictionary<string, string>>(ms, cancellationToken: ct).ConfigureAwait(false);
+                    var data = await JsonSerializer.DeserializeAsync(ms, AppJsonCompactContext.Default.DictionaryStringString, cancellationToken: ct).ConfigureAwait(false);
                     if (data is not { Count: > 0 })
                     {
                         Log($"{label}返回空数据");
@@ -109,7 +109,7 @@ public class SudamaKeyCache
         var cachePath = CacheFilePath(cacheFileName);
         Directory.CreateDirectory(Path.GetDirectoryName(cachePath)!);
         var cache = new SudamaCache { Data = data };
-        var json = JsonSerializer.Serialize(cache);
+        var json = JsonSerializer.Serialize(cache, AppJsonCompactContext.Default.SudamaCache);
         var tmpPath = cachePath + "." + Guid.NewGuid().ToString("N") + ".tmp";
         await File.WriteAllTextAsync(tmpPath, json).ConfigureAwait(false);
         File.Move(tmpPath, cachePath, true);
@@ -318,11 +318,11 @@ public class SudamaKeyCache
                 Dictionary<string, string>? data = null;
                 try
                 {
-                    var wrapper = JsonSerializer.Deserialize<SudamaCache>(json);
+                    var wrapper = JsonSerializer.Deserialize(json, AppJsonCompactContext.Default.SudamaCache);
                     if (wrapper?.Data is { Count: > 0 }) data = wrapper.Data;
                 }
                 catch { }
-                data ??= JsonSerializer.Deserialize<Dictionary<string, string>>(json);
+                data ??= JsonSerializer.Deserialize(json, AppJsonCompactContext.Default.DictionaryStringString);
                 if (data is not { Count: > 0 }) { msgs.Add($"{name}：未解析出有效数据"); continue; }
 
                 var kind = DetectKind(name, data);
@@ -424,7 +424,7 @@ public class SudamaKeyCache
         {
             if (File.Exists(cachePath))
             {
-                var cache = JsonSerializer.Deserialize<SudamaCache>(File.ReadAllText(cachePath));
+                var cache = JsonSerializer.Deserialize(File.ReadAllText(cachePath), AppJsonCompactContext.Default.SudamaCache);
                 if (cache?.Data != null && cache.Data.Count > 0)
                     return cache.Data;
             }

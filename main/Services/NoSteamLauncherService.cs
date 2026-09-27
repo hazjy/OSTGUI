@@ -10,7 +10,7 @@ namespace OSTGUI.Services;
 /// OSTGUI 对 NoSteamLauncher 库的封装器。
 /// 负责把嵌入资源解压到临时目录、构造带资源目录的编排器实例、转发进度与日志。
 /// </summary>
-public sealed class NoSteamLauncherService : IDisposable
+public sealed partial class NoSteamLauncherService : IDisposable
 {
     private readonly ILogger<NoSteamLauncherService> _logger;
     private readonly string _tempRoot;

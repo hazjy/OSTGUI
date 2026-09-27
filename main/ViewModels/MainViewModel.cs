@@ -9,6 +9,7 @@ namespace OSTGUI.ViewModels;
 /// <summary>
 /// 主窗口 ViewModel - 管理全局状态和导航
 /// </summary>
+[WinRT.GeneratedBindableCustomProperty]
 public partial class MainViewModel : ObservableObject
 {
     public ConfigService ConfigService { get; }
@@ -18,7 +19,13 @@ public partial class MainViewModel : ObservableObject
     public LuaConfigService LuaService { get; }
     public ManifestDownloadService ManifestService { get; }
 
-    [ObservableProperty] private string _statusMessage = "就绪";
+    private string _statusMessage = "就绪";
+
+    public string StatusMessage
+    {
+        get => _statusMessage;
+        set => SetProperty(ref _statusMessage, value);
+    }
     private bool _isSteamRunning;
     public bool IsSteamRunning
     {
@@ -45,7 +52,13 @@ public partial class MainViewModel : ObservableObject
             }
         }
     }
-    [ObservableProperty] private string _steamPathDisplay = "未检测到";
+    private string _steamPathDisplay = "未检测到";
+
+    public string SteamPathDisplay
+    {
+        get => _steamPathDisplay;
+        set => SetProperty(ref _steamPathDisplay, value);
+    }
     public string OstStatusText => IsOstInjected ? "已注入" : "未注入";
     public string SteamRunningText => IsSteamRunning ? "运行中" : "未运行";
 

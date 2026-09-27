@@ -10,6 +10,7 @@ namespace OSTGUI.ViewModels;
 /// <summary>
 /// 搜索入库页 ViewModel
 /// </summary>
+[WinRT.GeneratedBindableCustomProperty]
 public partial class SearchViewModel : ObservableObject
 {
     private readonly GameSearchService _searchService;
@@ -22,36 +23,155 @@ public partial class SearchViewModel : ObservableObject
     /// <summary>当前入库任务的取消源（每次 AddGameAsync 新建、finally 里释放）；取消只作用于"当前这次"</summary>
     private CancellationTokenSource? _addCts;
 
-    [ObservableProperty] private string _searchQuery = "";
-    [ObservableProperty] private bool _isSearching;
-    [ObservableProperty] private bool _isAdding;
+    // 命令手写在 VM 上：Native AOT 下 CsWinRT 绑定提供器看不到源生成成员，XAML {Binding} 会失效
+    public IAsyncRelayCommand SearchCommand { get; }
+    public IAsyncRelayCommand AddGameCommand { get; }
+    public IRelayCommand CancelAddCommand { get; }
+
+    private string _searchQuery = "";
+
+    public string SearchQuery
+    {
+        get => _searchQuery;
+        set => SetProperty(ref _searchQuery, value);
+    }
+
+    private bool _isSearching;
+
+    public bool IsSearching
+    {
+        get => _isSearching;
+        set => SetProperty(ref _isSearching, value);
+    }
+
+    private bool _isAdding;
+
+    public bool IsAdding
+    {
+        get => _isAdding;
+        set => SetProperty(ref _isAdding, value);
+    }
 
     /// <summary>取消已按下、链路还在 unwind。用它给按钮上"取消中…"的即时反馈，手感不依赖链路返回速度</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CancelButtonText))]
     private bool _isCancelling;
+
+    public bool IsCancelling
+    {
+        get => _isCancelling;
+        set
+        {
+            if (SetProperty(ref _isCancelling, value))
+            {
+                OnPropertyChanged(nameof(CancelButtonText));
+            }
+        }
+    }
 
     /// <summary>取消按钮文案</summary>
     public string CancelButtonText => IsCancelling ? "取消中…" : "取消任务";
-    [ObservableProperty] private string _statusMessage = "输入游戏名称或 AppID 进行搜索";
-    [ObservableProperty] private string _statusType = "Info";
-    [ObservableProperty] private double _progressValue;
+
+    private string _statusType = "Info";
+
+    public string StatusType
+    {
+        get => _statusType;
+        set => SetProperty(ref _statusType, value);
+    }
+
+    private string _statusMessage = "输入游戏名称或 AppID 进行搜索";
+
+    public string StatusMessage
+    {
+        get => _statusMessage;
+        set => SetProperty(ref _statusMessage, value);
+    }
+
+    private double _progressValue;
+
+    public double ProgressValue
+    {
+        get => _progressValue;
+        set => SetProperty(ref _progressValue, value);
+    }
 
     // 当前选中的结果（用于入库）
-    [ObservableProperty] private SearchResult? _selectedResult;
+    private SearchResult? _selectedResult;
+
+    public SearchResult? SelectedResult
+    {
+        get => _selectedResult;
+        set => SetProperty(ref _selectedResult, value);
+    }
 
     // 搜索结果列表
-    [ObservableProperty] private ObservableCollection<SearchResult> _searchResults = new();
+    private ObservableCollection<SearchResult> _searchResults = new();
+
+    // 声明类型用 IList<T>：WinRT 内建映射（IVector<T>），Native AOT 下无需在
+    // WinRTGlobalVtableLookup 里登记闭合泛型；运行时对象仍是 ObservableCollection（见字段），
+    // 集合变更通知行为不变。
+    public IList<SearchResult> SearchResults
+    {
+        get => _searchResults;
+        set => SetProperty(ref _searchResults, value as ObservableCollection<SearchResult> ?? new(value));
+    }
 
     // 是否已执行过搜索（用于控制"无结果"提示的显示）
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(ShowNoResults))]
     private bool _hasSearched;
 
+    public bool HasSearched
+    {
+        get => _hasSearched;
+        set
+        {
+            if (SetProperty(ref _hasSearched, value))
+            {
+                OnPropertyChanged(nameof(ShowNoResults));
+            }
+        }
+    }
+
     // 入库选项（全局）
-    [ObservableProperty] private bool _addAllDlc;
-    [ObservableProperty] private bool _fixedVersion;
-    [ObservableProperty] private bool _downloadManifest;
+    private bool _addAllDlc;
+
+    public bool AddAllDlc
+    {
+        get => _addAllDlc;
+        set
+        {
+            if (SetProperty(ref _addAllDlc, value))
+            {
+                OnAddAllDlcChanged(value);
+            }
+        }
+    }
+
+    private bool _fixedVersion;
+
+    public bool FixedVersion
+    {
+        get => _fixedVersion;
+        set
+        {
+            if (SetProperty(ref _fixedVersion, value))
+            {
+                OnFixedVersionChanged(value);
+            }
+        }
+    }
+
+    private bool _downloadManifest;
+
+    public bool DownloadManifest
+    {
+        get => _downloadManifest;
+        set
+        {
+            if (SetProperty(ref _downloadManifest, value))
+            {
+                OnDownloadManifestChanged(value);
+            }
+        }
+    }
 
     public ObservableCollection<string> Logs => LogService.Logs;
     public string LogText => string.Join("\n", LogService.Logs);
@@ -60,9 +180,20 @@ public partial class SearchViewModel : ObservableObject
 
     /// <summary>搜索结果视图形态：list / grid。持久化在 config.json 的 SearchViewMode
     /// （与入库管理各自独立记忆；做法与 <see cref="LibraryViewModel"/> 一致）</summary>
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsListView), nameof(IsGridView))]
     private string _viewMode = "list";
+
+    public string ViewMode
+    {
+        get => _viewMode;
+        set
+        {
+            if (SetProperty(ref _viewMode, value))
+            {
+                OnPropertyChanged(nameof(IsListView));
+                OnPropertyChanged(nameof(IsGridView));
+            }
+        }
+    }
 
     public bool IsListView => ViewMode != "grid";
     public bool IsGridView => ViewMode == "grid";
@@ -97,13 +228,17 @@ public partial class SearchViewModel : ObservableObject
         _viewMode = configService.Config.SearchViewMode == "grid" ? "grid" : "list";
 
         // 集合内容变化时同步刷新 HasResults 与无结果提示
-        SearchResults.CollectionChanged += (s, e) =>
+        _searchResults.CollectionChanged += (s, e) =>
         {
             OnPropertyChanged(nameof(HasResults));
             OnPropertyChanged(nameof(ShowNoResults));
         };
 
         LoadOptionsFromConfig();
+
+        SearchCommand = new AsyncRelayCommand(SearchAsync);
+        AddGameCommand = new AsyncRelayCommand<SearchResult?>(AddGameAsync);
+        CancelAddCommand = new RelayCommand(CancelAdd);
     }
 
     public void LoadOptionsFromConfig()
@@ -134,25 +269,24 @@ public partial class SearchViewModel : ObservableObject
     }
 
     // 勾选状态变化时立即保存，防止下次打开页面/重启应用后重置
-    partial void OnAddAllDlcChanged(bool value)
+    private void OnAddAllDlcChanged(bool value)
     {
         if (!_isLoadingOptions && _configService.IsLoaded)
             SaveOptionsToConfig();
     }
 
-    partial void OnFixedVersionChanged(bool value)
+    private void OnFixedVersionChanged(bool value)
     {
         if (!_isLoadingOptions && _configService.IsLoaded)
             SaveOptionsToConfig();
     }
 
-    partial void OnDownloadManifestChanged(bool value)
+    private void OnDownloadManifestChanged(bool value)
     {
         if (!_isLoadingOptions && _configService.IsLoaded)
             SaveOptionsToConfig();
     }
 
-    [RelayCommand]
     private async Task SearchAsync()
     {
         if (string.IsNullOrWhiteSpace(SearchQuery))
@@ -272,7 +406,6 @@ public partial class SearchViewModel : ObservableObject
         return bitmap;
     }
 
-    [RelayCommand]
     private async Task AddGameAsync(SearchResult? result = null)
     {
         var target = result ?? SelectedResult;
@@ -439,7 +572,6 @@ public partial class SearchViewModel : ObservableObject
     /// **所有会等的环节都可取消**（网络、逐份拷贝之间），只剩「lua 的原子写」这最后一步不打断——
     /// 所以点下去基本是立即返回，且永远不会留下半个 .lua。
     /// </summary>
-    [RelayCommand]
     private void CancelAdd()
     {
         if (_addCts is null) return;

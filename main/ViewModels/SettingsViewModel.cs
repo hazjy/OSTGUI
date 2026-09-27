@@ -10,6 +10,7 @@ namespace OSTGUI.ViewModels;
 /// <summary>
 /// 设置页 ViewModel
 /// </summary>
+[WinRT.GeneratedBindableCustomProperty]
 public partial class SettingsViewModel : ObservableObject
 {
     private readonly ConfigService _configService;
@@ -18,37 +19,114 @@ public partial class SettingsViewModel : ObservableObject
     private readonly SudamaKeyCache _sudamaCache;
     private bool _isLoading;
 
+    // 命令手写在 VM 上：Native AOT 下 CsWinRT 绑定提供器看不到源生成成员，XAML {Binding} 会失效
+    public IRelayCommand ApplyNavigationPaneWidthCommand { get; }
+    public IAsyncRelayCommand RefreshSudamaCacheCommand { get; }
+    public IAsyncRelayCommand SaveSettingsCommand { get; }
+    public IAsyncRelayCommand ResetSettingsCommand { get; }
+    public IRelayCommand RefreshOstStatusCommand { get; }
+    public IAsyncRelayCommand InjectOstDllCommand { get; }
+    public IAsyncRelayCommand UnloadOstDllCommand { get; }
+    public IAsyncRelayCommand RestartSteamCommand { get; }
+
     // === 基本设置 ===
     /// <summary>GUI 写入 lua 的目录；改它会同步进内核配置，内核与 GUI 始终共用一个目录</summary>
-    [ObservableProperty] private string _luaPath = "";
-    [ObservableProperty] private bool _showSystemNotifications = true;
-    [ObservableProperty] private bool _showVersionChangeNotifications = true;
-    [ObservableProperty] private string _defaultSource = "auto";
+    private string _luaPath = "";
+
+    public string LuaPath
+    {
+        get => _luaPath;
+        set => SetProperty(ref _luaPath, value);
+    }
+
+    private bool _showSystemNotifications = true;
+
+    public bool ShowSystemNotifications
+    {
+        get => _showSystemNotifications;
+        set => SetProperty(ref _showSystemNotifications, value);
+    }
+
+    private bool _showVersionChangeNotifications = true;
+
+    public bool ShowVersionChangeNotifications
+    {
+        get => _showVersionChangeNotifications;
+        set => SetProperty(ref _showVersionChangeNotifications, value);
+    }
+    private string _defaultSource = "auto";
+
+    public string DefaultSource
+    {
+        get => _defaultSource;
+        set => SetProperty(ref _defaultSource, value);
+    }
 
     // === 入库设置 ===
-    [ObservableProperty] private bool _defaultAddAllDlc = true;
-    [ObservableProperty] private bool _stFixedVersionDefault = true;
+    private bool _defaultAddAllDlc = true;
+
+    public bool DefaultAddAllDlc
+    {
+        get => _defaultAddAllDlc;
+        set => SetProperty(ref _defaultAddAllDlc, value);
+    }
+
+    private bool _stFixedVersionDefault = true;
+
+    public bool StFixedVersionDefault
+    {
+        get => _stFixedVersionDefault;
+        set => SetProperty(ref _stFixedVersionDefault, value);
+    }
 
     // === 外观设置 ===
-    [ObservableProperty] private string _themeMode = "auto";
+    private string _themeMode = "auto";
+
+    public string ThemeMode
+    {
+        get => _themeMode;
+        set => SetProperty(ref _themeMode, value);
+    }
 
     // 显示效果：0 = 无，1 = 云母，2 = 亚克力（改动即时生效并随自动保存落盘）
-    [ObservableProperty] private int _backdropIndex = 2;
+    private int _backdropIndex = 2;
+
+    public int BackdropIndex
+    {
+        get => _backdropIndex;
+        set
+        {
+            if (SetProperty(ref _backdropIndex, value))
+            {
+                OnBackdropIndexChanged(value);
+            }
+        }
+    }
 
     /// <summary>显示效果的字符串形式（存进 config.json 的 BackdropMode）</summary>
     public string BackdropMode => BackdropIndex switch { 0 => "none", 2 => "acrylic", _ => "mica" };
 
     public event EventHandler? BackdropChanged;
 
-    partial void OnBackdropIndexChanged(int value)
+    private void OnBackdropIndexChanged(int value)
     {
         OnPropertyChanged(nameof(BackdropMode));
         if (!_isLoading) BackdropChanged?.Invoke(this, EventArgs.Empty);
     }
 
-    [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(CanApplyNavigationPaneWidth))]
     private string _navigationPaneWidthInput = "200";
+
+    public string NavigationPaneWidthInput
+    {
+        get => _navigationPaneWidthInput;
+        set
+        {
+            if (SetProperty(ref _navigationPaneWidthInput, value))
+            {
+                OnPropertyChanged(nameof(CanApplyNavigationPaneWidth));
+            }
+        }
+    }
 
     /// <summary>输入为 150–600 内整数且与当前已存值不同才可应用（按钮激活条件）</summary>
     public bool CanApplyNavigationPaneWidth =>
@@ -74,7 +152,13 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     /// <summary>内核配置文件路径（界面展示，便于用户直接手改）</summary>
-    [ObservableProperty] private string _denuvoConfigPath = "";
+    private string _denuvoConfigPath = "";
+
+    public string DenuvoConfigPath
+    {
+        get => _denuvoConfigPath;
+        set => SetProperty(ref _denuvoConfigPath, value);
+    }
 
     /// <summary>切换 D 加密模式：写内核配置文件；失败则回读文件真实值，避免界面与文件不一致</summary>
     private void SetDenuvoMode(string mode)
@@ -108,12 +192,21 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     // === 日志显示 ===
-    [ObservableProperty] private string _logsText = "";
+    private string _logsText = "";
+
+    public string LogsText
+    {
+        get => _logsText;
+        set => SetProperty(ref _logsText, value);
+    }
 
     // === 清单源设置 ===
     public ObservableCollection<ManifestSource> Sources { get; } = new();
     // 设置页只显示已接入的有效源，Sources 保留全部用于持久化
-    public ObservableCollection<ManifestSource> VisibleSources { get; } = new();
+    // 声明类型用 IList<T>：WinRT 内建映射（IVector<T>），Native AOT 下无需在
+    // WinRTGlobalVtableLookup 里登记闭合泛型；运行时对象仍是 ObservableCollection，
+    // 集合变更通知行为不变。
+    public IList<ManifestSource> VisibleSources { get; } = new ObservableCollection<ManifestSource>();
 
     public bool IsLightTheme
     {
@@ -155,20 +248,87 @@ public partial class SettingsViewModel : ObservableObject
         };
     }
 
-    [ObservableProperty] private double _logMaxLines = 1000;
+    private double _logMaxLines = 1000;
+
+    public double LogMaxLines
+    {
+        get => _logMaxLines;
+        set => SetProperty(ref _logMaxLines, value);
+    }
 
     // === OST DLL 状态 ===
-    [ObservableProperty] private bool _isOstInjected;
-    [ObservableProperty] private string _ostStatusText = "检查中...";
-    [ObservableProperty] private string _ostStatusType = "Info";
-    [ObservableProperty] private string _ostSourceDir = "";
-    [ObservableProperty] private bool _isOstOperating;
-    [ObservableProperty] private bool _isSteamRunning;
+    private bool _isOstInjected;
+
+    public bool IsOstInjected
+    {
+        get => _isOstInjected;
+        set => SetProperty(ref _isOstInjected, value);
+    }
+
+    private string _ostStatusText = "检查中...";
+
+    public string OstStatusText
+    {
+        get => _ostStatusText;
+        set => SetProperty(ref _ostStatusText, value);
+    }
+
+    private string _ostStatusType = "Info";
+
+    public string OstStatusType
+    {
+        get => _ostStatusType;
+        set => SetProperty(ref _ostStatusType, value);
+    }
+
+    private string _ostSourceDir = "";
+
+    public string OstSourceDir
+    {
+        get => _ostSourceDir;
+        set => SetProperty(ref _ostSourceDir, value);
+    }
+
+    private bool _isOstOperating;
+
+    public bool IsOstOperating
+    {
+        get => _isOstOperating;
+        set => SetProperty(ref _isOstOperating, value);
+    }
+
+    private bool _isSteamRunning;
+
+    public bool IsSteamRunning
+    {
+        get => _isSteamRunning;
+        set => SetProperty(ref _isSteamRunning, value);
+    }
 
     // === 状态 ===
-    [ObservableProperty] private string _statusMessage = "";
-    [ObservableProperty] private string _statusType = "Info";
-    [ObservableProperty] private bool _isRefreshingSudama;
+    private string _statusMessage = "";
+
+    public string StatusMessage
+    {
+        get => _statusMessage;
+        set => SetProperty(ref _statusMessage, value);
+    }
+
+    private string _statusType = "Info";
+
+    public string StatusType
+    {
+        get => _statusType;
+        set => SetProperty(ref _statusType, value);
+    }
+
+    private bool _isRefreshingSudama;
+
+    public bool IsRefreshingSudama
+    {
+        get => _isRefreshingSudama;
+        set => SetProperty(ref _isRefreshingSudama, value);
+    }
 
     public SettingsViewModel(ConfigService configService, SteamService steamService,
         SteamDllService steamDllService, SudamaKeyCache sudamaCache)
@@ -178,11 +338,19 @@ public partial class SettingsViewModel : ObservableObject
         _steamDllService = steamDllService;
         _sudamaCache = sudamaCache;
 
+        ApplyNavigationPaneWidthCommand = new RelayCommand(ApplyNavigationPaneWidth);
+        RefreshSudamaCacheCommand = new AsyncRelayCommand(RefreshSudamaCache);
+        SaveSettingsCommand = new AsyncRelayCommand(SaveSettingsAsync);
+        ResetSettingsCommand = new AsyncRelayCommand(ResetSettingsAsync);
+        RefreshOstStatusCommand = new RelayCommand(RefreshOstStatus);
+        InjectOstDllCommand = new AsyncRelayCommand(InjectOstDllAsync);
+        UnloadOstDllCommand = new AsyncRelayCommand(UnloadOstDllAsync);
+        RestartSteamCommand = new AsyncRelayCommand(RestartSteamAsync);
+
         // 设置变化即自动保存（实时生效）；加载期间由 _isLoading 抑制
         PropertyChanged += (s, e) => SaveAllToConfig();
     }
 
-    [RelayCommand]
     private void ApplyNavigationPaneWidth()
     {
         if (!CanApplyNavigationPaneWidth) return;
@@ -193,7 +361,6 @@ public partial class SettingsViewModel : ObservableObject
     /// <summary>
     /// 手动刷新 Sudama 缓存（密钥 + 令牌）
     /// </summary>
-    [RelayCommand]
     private async Task RefreshSudamaCache()
     {
         if (IsRefreshingSudama) return;
@@ -456,7 +623,6 @@ public partial class SettingsViewModel : ObservableObject
     /// <summary>
     /// 保存设置（兼容旧入口，行为与自动保存一致）
     /// </summary>
-    [RelayCommand]
     private async Task SaveSettingsAsync()
     {
         SaveAllToConfig();
@@ -475,7 +641,6 @@ public partial class SettingsViewModel : ObservableObject
     /// <summary>
     /// 重置为默认设置
     /// </summary>
-    [RelayCommand]
     private async Task ResetSettingsAsync()
     {
         await _configService.ResetAsync();
@@ -488,7 +653,6 @@ public partial class SettingsViewModel : ObservableObject
     /// <summary>
     /// 刷新 OST DLL 状态
     /// </summary>
-    [RelayCommand]
     private void RefreshOstStatus()
     {
         IsSteamRunning = _steamService.IsSteamRunning();
@@ -500,7 +664,6 @@ public partial class SettingsViewModel : ObservableObject
     /// <summary>
     /// 注入 OST DLL
     /// </summary>
-    [RelayCommand]
     private async Task InjectOstDllAsync()
     {
         IsOstOperating = true;
@@ -537,7 +700,6 @@ public partial class SettingsViewModel : ObservableObject
     /// <summary>
     /// 卸载 OST DLL
     /// </summary>
-    [RelayCommand]
     private async Task UnloadOstDllAsync()
     {
         IsOstOperating = true;
@@ -568,7 +730,6 @@ public partial class SettingsViewModel : ObservableObject
     /// <summary>
     /// 重启 Steam
     /// </summary>
-    [RelayCommand]
     private async Task RestartSteamAsync()
     {
         SetStatus("正在重启 Steam...", "Info");

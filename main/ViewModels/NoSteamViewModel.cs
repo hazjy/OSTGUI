@@ -16,6 +16,7 @@ using System.Threading.Tasks;
 
 namespace OSTGUI.ViewModels;
 
+[WinRT.GeneratedBindableCustomProperty]
 public partial class NoSteamViewModel : ObservableObject
 {
     private readonly NoSteamLauncherService _noSteamService;
@@ -27,25 +28,179 @@ public partial class NoSteamViewModel : ObservableObject
     private readonly ILogger<GBEDeploymentService> _gbeLogger;
     private readonly ConfigService _configService;
 
-    [ObservableProperty] private string _gameExePath = "";
-    [ObservableProperty] private string _appId = "";
-    [ObservableProperty] private bool _backupOriginalExe = true;
-    [ObservableProperty] private bool _skipSteamless;
-    [ObservableProperty] private bool _skipGBE;
-    [ObservableProperty] private bool _dryRun;
-    [ObservableProperty] private int _steamlessTimeoutMinutes = 5;
-    [ObservableProperty] private string _progressLog = "";
-    [ObservableProperty] private bool _isRunning;
+    // 命令手写在 VM 上：Native AOT 下 CsWinRT 绑定提供器看不到源生成成员，XAML {Binding} 会失效
+    public IAsyncRelayCommand BrowseGameExeCommand { get; }
+    public IAsyncRelayCommand OpenDeploymentOptionsCommand { get; }
+    public IAsyncRelayCommand OpenAdvancedConfigCommand { get; }
+    public IAsyncRelayCommand DeployCommand { get; }
+    public IAsyncRelayCommand RestoreCommand { get; }
+    public IRelayCommand ClearLogCommand { get; }
+
+    private string _gameExePath = "";
+
+    public string GameExePath
+    {
+        get => _gameExePath;
+        set => SetProperty(ref _gameExePath, value);
+    }
+
+    private string _appId = "";
+
+    public string AppId
+    {
+        get => _appId;
+        set => SetProperty(ref _appId, value);
+    }
+
+    private bool _backupOriginalExe = true;
+
+    public bool BackupOriginalExe
+    {
+        get => _backupOriginalExe;
+        set
+        {
+            if (SetProperty(ref _backupOriginalExe, value))
+            {
+                OnBackupOriginalExeChanged(value);
+            }
+        }
+    }
+
+    private bool _skipSteamless;
+
+    public bool SkipSteamless
+    {
+        get => _skipSteamless;
+        set
+        {
+            if (SetProperty(ref _skipSteamless, value))
+            {
+                OnSkipSteamlessChanged(value);
+            }
+        }
+    }
+
+    private bool _skipGBE;
+
+    public bool SkipGBE
+    {
+        get => _skipGBE;
+        set
+        {
+            if (SetProperty(ref _skipGBE, value))
+            {
+                OnSkipGBEChanged(value);
+            }
+        }
+    }
+
+    private bool _dryRun;
+
+    public bool DryRun
+    {
+        get => _dryRun;
+        set
+        {
+            if (SetProperty(ref _dryRun, value))
+            {
+                OnDryRunChanged(value);
+            }
+        }
+    }
+    private int _steamlessTimeoutMinutes = 5;
+
+    public int SteamlessTimeoutMinutes
+    {
+        get => _steamlessTimeoutMinutes;
+        set
+        {
+            if (SetProperty(ref _steamlessTimeoutMinutes, value))
+            {
+                OnSteamlessTimeoutMinutesChanged(value);
+            }
+        }
+    }
+
+    private string _progressLog = "";
+
+    public string ProgressLog
+    {
+        get => _progressLog;
+        set => SetProperty(ref _progressLog, value);
+    }
+
+    private bool _isRunning;
+
+    public bool IsRunning
+    {
+        get => _isRunning;
+        set => SetProperty(ref _isRunning, value);
+    }
 
     // Advanced GBE config properties
-    [ObservableProperty] private string _advancedAccountName = "";
-    [ObservableProperty] private string _advancedSteamId = "";
-    [ObservableProperty] private string _advancedLanguage = "schinese";
-    [ObservableProperty] private bool _advancedUnlockAllDlc = true;
-    [ObservableProperty] private string _advancedDlcList = "";
-    [ObservableProperty] private bool _advancedOfflineMode;
-    [ObservableProperty] private bool _advancedDisableNetworking;
-    [ObservableProperty] private bool _advancedBypassSteamApiCheck;
+    private string _advancedAccountName = "";
+
+    public string AdvancedAccountName
+    {
+        get => _advancedAccountName;
+        set => SetProperty(ref _advancedAccountName, value);
+    }
+
+    private string _advancedSteamId = "";
+
+    public string AdvancedSteamId
+    {
+        get => _advancedSteamId;
+        set => SetProperty(ref _advancedSteamId, value);
+    }
+
+    private string _advancedLanguage = "schinese";
+
+    public string AdvancedLanguage
+    {
+        get => _advancedLanguage;
+        set => SetProperty(ref _advancedLanguage, value);
+    }
+
+    private bool _advancedUnlockAllDlc = true;
+
+    public bool AdvancedUnlockAllDlc
+    {
+        get => _advancedUnlockAllDlc;
+        set => SetProperty(ref _advancedUnlockAllDlc, value);
+    }
+
+    private string _advancedDlcList = "";
+
+    public string AdvancedDlcList
+    {
+        get => _advancedDlcList;
+        set => SetProperty(ref _advancedDlcList, value);
+    }
+
+    private bool _advancedOfflineMode;
+
+    public bool AdvancedOfflineMode
+    {
+        get => _advancedOfflineMode;
+        set => SetProperty(ref _advancedOfflineMode, value);
+    }
+
+    private bool _advancedDisableNetworking;
+
+    public bool AdvancedDisableNetworking
+    {
+        get => _advancedDisableNetworking;
+        set => SetProperty(ref _advancedDisableNetworking, value);
+    }
+
+    private bool _advancedBypassSteamApiCheck;
+
+    public bool AdvancedBypassSteamApiCheck
+    {
+        get => _advancedBypassSteamApiCheck;
+        set => SetProperty(ref _advancedBypassSteamApiCheck, value);
+    }
 
     public NoSteamViewModel(
         NoSteamLauncherService noSteamService,
@@ -65,6 +220,13 @@ public partial class NoSteamViewModel : ObservableObject
         _steamlessLogger = steamlessLogger;
         _gbeLogger = gbeLogger;
         _configService = configService;
+
+        BrowseGameExeCommand = new AsyncRelayCommand(BrowseGameExeAsync);
+        OpenDeploymentOptionsCommand = new AsyncRelayCommand(OpenDeploymentOptionsAsync);
+        OpenAdvancedConfigCommand = new AsyncRelayCommand(OpenAdvancedConfigAsync);
+        DeployCommand = new AsyncRelayCommand(DeployAsync, CanExecuteDeploy);
+        RestoreCommand = new AsyncRelayCommand(RestoreAsync);
+        ClearLogCommand = new RelayCommand(ClearLog);
 
         LoadOptionsFromConfig();
     }
@@ -122,37 +284,36 @@ public partial class NoSteamViewModel : ObservableObject
         });
     }
 
-    partial void OnBackupOriginalExeChanged(bool value)
+    private void OnBackupOriginalExeChanged(bool value)
     {
         if (_configService.IsLoaded)
             SaveOptionsToConfig();
     }
 
-    partial void OnSkipSteamlessChanged(bool value)
+    private void OnSkipSteamlessChanged(bool value)
     {
         if (_configService.IsLoaded)
             SaveOptionsToConfig();
     }
 
-    partial void OnSkipGBEChanged(bool value)
+    private void OnSkipGBEChanged(bool value)
     {
         if (_configService.IsLoaded)
             SaveOptionsToConfig();
     }
 
-    partial void OnDryRunChanged(bool value)
+    private void OnDryRunChanged(bool value)
     {
         if (_configService.IsLoaded)
             SaveOptionsToConfig();
     }
 
-    partial void OnSteamlessTimeoutMinutesChanged(int value)
+    private void OnSteamlessTimeoutMinutesChanged(int value)
     {
         if (_configService.IsLoaded)
             SaveOptionsToConfig();
     }
 
-    [RelayCommand]
     private async Task OpenDeploymentOptionsAsync()
     {
         if (App.MainWindow is Window window)
@@ -198,7 +359,6 @@ public partial class NoSteamViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
     private async Task OpenAdvancedConfigAsync()
     {
         if (App.MainWindow is not Window window) return;
@@ -387,7 +547,6 @@ public partial class NoSteamViewModel : ObservableObject
         return AdvancedDlcList.Trim();
     }
 
-    [RelayCommand]
     private async Task BrowseGameExeAsync()
     {
         if (App.MainWindow is not Window window) return;
@@ -460,7 +619,6 @@ public partial class NoSteamViewModel : ObservableObject
         }
     }
 
-    [RelayCommand(CanExecute = nameof(CanExecuteDeploy))]
     private async Task DeployAsync()
     {
         if (IsRunning) return;
@@ -548,7 +706,6 @@ public partial class NoSteamViewModel : ObservableObject
     private bool CanExecuteDeploy() => !IsRunning;
 
     /// <summary>一键还原：撤掉部署进游戏目录的模拟器产物（EXE/DLL 备份、steam_settings、Bypass）</summary>
-    [RelayCommand]
     private async Task RestoreAsync()
     {
         if (IsRunning)
@@ -590,7 +747,6 @@ public partial class NoSteamViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
     private void ClearLog()
     {
         ProgressLog = "";
