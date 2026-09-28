@@ -59,7 +59,7 @@ public sealed partial class NoSteamPage : Page
         var dir = UbisoftDirBox.Text.Trim();
         if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
         {
-            Services.ToastService.ShowWarning("免育碧", "请先选择有效的游戏目录");
+            (App.MainWindow as MainWindow)?.Notify("免育碧", "请先选择有效的游戏目录", InfoBarSeverity.Warning);
             return;
         }
 
@@ -82,7 +82,7 @@ public sealed partial class NoSteamPage : Page
         var dir = UbisoftDirBox.Text.Trim();
         if (string.IsNullOrEmpty(dir) || !Directory.Exists(dir))
         {
-            Services.ToastService.ShowWarning("免育碧", "请先选择有效的游戏目录");
+            (App.MainWindow as MainWindow)?.Notify("免育碧", "请先选择有效的游戏目录", InfoBarSeverity.Warning);
             return;
         }
 

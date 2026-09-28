@@ -364,7 +364,7 @@ item.DlcList = dlcInfo;
             {
                 // 成功提示可在设置中开关
                 if (_configService.Config.ShowVersionChangeNotifications)
-                    Services.ToastService.ShowSuccess("版本状态更改", message);
+                    (App.MainWindow as MainWindow)?.Notify("版本状态更改", message);
             }
             else
             {
@@ -427,10 +427,12 @@ item.DlcList = dlcInfo;
         {
             var ids = string.Join("\n", SelectedItems.Select(i => i.AppId));
             CopyToClipboard(ids);
+            (App.MainWindow as MainWindow)?.Notify("已复制", $"{SelectedItems.Count} 个 AppID");
         }
         else
         {
             CopyToClipboard(item.AppId);
+            (App.MainWindow as MainWindow)?.Notify("已复制", $"AppID：{item.AppId}");
         }
     }
 

@@ -24,13 +24,13 @@ public sealed partial class OtherOnlineView : UserControl
         VM.DllGameAppId = DllGameAppIdBox.Text.Trim();
         if (VM.DllGameAppId.Length == 0)
         {
-            ToastService.ShowWarning("DLL 注入", "请先填游戏 AppID");
+            (App.MainWindow as MainWindow)?.Notify("DLL 注入", "请先填游戏 AppID", InfoBarSeverity.Warning);
             return;
         }
 
         // 成功不打扰（路径直接显示在下面一行），只有失败才提示
         if (VM.ResolveDllGameExe() is null)
-            ToastService.ShowWarning("DLL 注入", "没找到该 AppID 的已安装游戏");
+            (App.MainWindow as MainWindow)?.Notify("DLL 注入", "没找到该 AppID 的已安装游戏", InfoBarSeverity.Warning);
     }
 
     /// <summary>启动：按当前方式分派（DLL 注入 / AppID Changer）</summary>

@@ -158,7 +158,8 @@ public sealed partial class LibraryPage : Page
             var data = new Windows.ApplicationModel.DataTransfer.DataPackage();
             data.SetText(VM.LastRightClickedItem.GameName);
             Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(data);
-            Services.ToastService.ShowSuccess("已复制", $"游戏名称: {VM.LastRightClickedItem.GameName}");
+            // 应用内通知（窗口顶部，见 MainWindow.Notify）——不再走系统通知中心
+            (App.MainWindow as MainWindow)?.Notify("已复制", $"游戏名称：{VM.LastRightClickedItem.GameName}");
         }
     }
 

@@ -21,7 +21,7 @@ public sealed partial class InfoPage : Page
 
     // ponytail: 更新检查还没做，先占位提示；接上真实检查后替换
     private void CheckUpdate_Click(object sender, RoutedEventArgs e)
-        => Services.ToastService.ShowInfo("检查更新", "更新检查尚未接入");
+        => (App.MainWindow as MainWindow)?.Notify("检查更新", "更新检查尚未接入");
 
     private void OpenGitHub_Click(object sender, RoutedEventArgs e)
     {

@@ -60,6 +60,6 @@ public sealed partial class OnlineFixView : UserControl
         var pkg = new Windows.ApplicationModel.DataTransfer.DataPackage();
         pkg.SetText("steam://install/480");
         Windows.ApplicationModel.DataTransfer.Clipboard.SetContent(pkg);
-        ToastService.ShowInfo("已复制", "steam://install/480");
+        (App.MainWindow as MainWindow)?.Notify("已复制", "steam://install/480");
     }
 }

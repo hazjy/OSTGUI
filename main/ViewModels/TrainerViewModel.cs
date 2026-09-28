@@ -164,7 +164,7 @@ public partial class TrainerViewModel : ObservableObject
         UpdateDownloadDirText();
         RefreshLocalTrainers();
         if (ViewIndex == 1) _ = LoadViewAsync();
-        ToastService.ShowSuccess("下载目录已切换", DownloadDirText);
+        (App.MainWindow as MainWindow)?.Notify("下载目录已切换", DownloadDirText);
     }
 
     private void UpdateDownloadDirText() =>
@@ -326,7 +326,7 @@ public partial class TrainerViewModel : ObservableObject
             });
 
             LogService.Event($"trainer 手动启动 {Path.GetFileName(exe)}");
-            ToastService.ShowSuccess("已启动", Path.GetFileName(exe));
+            (App.MainWindow as MainWindow)?.Notify("已启动", Path.GetFileName(exe));
         }
         catch (Exception ex)
         {
@@ -376,7 +376,7 @@ public partial class TrainerViewModel : ObservableObject
             {
                 StatusText = $"已是最新：{trainer.GameName}";
                 _ = RevertStatusLaterAsync();
-                ToastService.ShowInfo("已是最新", trainer.GameName);
+                (App.MainWindow as MainWindow)?.Notify("已是最新", trainer.GameName);
                 return;
             }
 
@@ -492,7 +492,7 @@ public partial class TrainerViewModel : ObservableObject
             IsEnabled = enabled,
         });
         SaveBindings();
-        ToastService.ShowSuccess("已绑定", $"{Path.GetFileNameWithoutExtension(gameExe)} → {trainerName}");
+        (App.MainWindow as MainWindow)?.Notify("已绑定", $"{Path.GetFileNameWithoutExtension(gameExe)} → {trainerName}");
     }
 
     private void RemoveBinding(TrainerBinding? binding)

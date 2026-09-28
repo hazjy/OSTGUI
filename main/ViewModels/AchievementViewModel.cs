@@ -780,7 +780,7 @@ public partial class AchievementViewModel : ObservableObject
         if (SelectedGame == null || IsBusy) return;
         if (!SteamRunning)
         {
-            ToastService.ShowWarning("成就", "Steam 没在运行");
+            (App.MainWindow as MainWindow)?.Notify("成就", "Steam 没在运行", Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning);
             return;
         }
 
@@ -832,7 +832,7 @@ public partial class AchievementViewModel : ObservableObject
         if (SelectedGame == null || IsBusy) return;
         if (!SteamRunning)
         {
-            ToastService.ShowWarning("成就", "Steam 没在运行");
+            (App.MainWindow as MainWindow)?.Notify("成就", "Steam 没在运行", Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning);
             return;
         }
 

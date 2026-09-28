@@ -179,7 +179,7 @@ public partial class SettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(IsDenuvoCompatMode));
         LogService.Event(message);
         SetStatus(message, "Success");
-        ToastService.ShowSuccess("D 加密模式已切换", message);
+        (App.MainWindow as MainWindow)?.Notify("D 加密模式已切换", message);
     }
 
     /// <summary>从内核配置文件读回当前模式（进入设置页时调用，可覆盖外部手改）</summary>

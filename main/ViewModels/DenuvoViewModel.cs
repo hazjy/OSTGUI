@@ -116,14 +116,13 @@ public partial class DenuvoViewModel : ObservableObject
         var appId = ExportAppId.Trim();
         if (string.IsNullOrEmpty(appId))
         {
-            ToastService.ShowWarning("导出授权", "请先输入 AppID");
+            (App.MainWindow as MainWindow)?.Notify("导出授权", "请先输入 AppID", Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning);
             return (false, "AppID 为空");
         }
 
         IsExporting = true;
         try
         {
-            ToastService.ShowInfo("导出授权", $"正在从 Steam 提取 AppID {appId} 的授权，请稍候...");
             var extract = await SteamTicketExtractor.ExtractInSubprocessAsync(appId);
 
             if (!extract.Success)
