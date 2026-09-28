@@ -4,26 +4,24 @@ using System.Text;
 namespace OSTGUI.Services;
 
 /// <summary>
-/// 日志服务。**两条通道，用途分开**（2026-09-26 拆分）：
-///
-/// - <see cref="Diag"/>：崩溃/诊断 —— 写文件 + 进运行时日志（视图里带 <c>[诊断]</c> 前缀）。
-///   启动退出、异常、外部失败、关键状态变化走这里；**别往这里塞流水账**。
-/// - <see cref="Event"/>：流水账 —— 只进运行时日志（内存，设置页可看/复制/清空），不落盘。
+/// 日志服务。**单一日志流：文件与日志栏收同样的内容**（2026-09-28 按用户要求合并，
+/// 原先"诊断 / 流水账两条通道"的差别作废）。<see cref="Diag"/> 与 <see cref="Event"/> 行为完全一致，
+/// 保留两个名字只是让调用处读得出语义（异常与失败 vs 流水），将来若要重新分档不必回头改调用点。
 ///
 /// 文件（<c>%LOCALAPPDATA%\OSTGUI\logs\ostgui.log</c>）：毫秒时间戳 + pid，追加写且用
 /// <c>FileShare.ReadWrite</c>——监控子进程与 stats 子进程也会写同一个文件，互相不能踩；
-/// 超过 <see cref="MaxFileBytes"/> 轮转为 <c>ostgui.1.log</c> / <c>ostgui.2.log</c>，
-/// 不再"读全文件再重写"（那既抖又和别的进程抢文件）。
+/// **超过 <see cref="MaxLines"/> 行就直接裁剪**：重写为最后若干行，更早的真的丢掉，
+/// 不留 <c>.1</c>/<c>.2</c> 备份（用户要求：设置里的行数就是硬上限，不结转）。
 ///
-/// 视图：<see cref="Logs"/> 绑着设置页，任意线程可写（非 UI 线程封送），上限 <see cref="MaxLines"/> 行。
-/// 行数上限**只管内存视图**，不影响文件。
+/// 日志栏：<see cref="Logs"/> 是**全量**（会话内不裁剪）；面板只显示尾部若干行（见 <see cref="GetText"/>）。
 /// </summary>
 public static class LogService
 {
     private static readonly ObservableCollection<string> _logs = new();
     private static readonly object _lock = new();
-    private const long MaxFileBytes = 2 * 1024 * 1024;
-    private const int FileBackups = 2;
+    /// <summary>检查间隔：按上限自适应——读一次文件的代价与上限成正比，小上限就查勤点，免得长期超限</summary>
+    private static int CheckEvery => Math.Clamp(MaxLines / 8, 4, 512);
+    private static int _appendsSinceLineCount;
 
     public static ObservableCollection<string> Logs => _logs;
 
@@ -34,7 +32,7 @@ public static class LogService
     public static string DefaultPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "OSTGUI", "logs", "ostgui.log");
 
-    /// <summary>运行时日志保留行数（只作用于内存视图）</summary>
+    /// <summary>日志文件**每份**保留行数（超出即轮转；不影响内存视图）</summary>
     public static int MaxLines { get; private set; } = 1000;
 
     public static void Initialize(string filePath)
@@ -51,27 +49,22 @@ public static class LogService
         }
     }
 
-    /// <summary>设置运行时日志保留行数并立即裁剪视图</summary>
+    /// <summary>设置日志文件保留行数；不立刻动文件，下一次追加时按新上限检查并裁剪</summary>
     public static void SetMaxLines(int maxLines)
     {
         if (maxLines < 10) maxLines = 10;
-        void Apply()
+        lock (_lock)
         {
-            lock (_lock)
-            {
-                MaxLines = maxLines;
-                while (_logs.Count > MaxLines) _logs.RemoveAt(0);
-            }
+            MaxLines = maxLines;
+            _appendsSinceLineCount = CheckEvery;   // 让下次追加立刻查（用户调小上限后马上生效）
         }
-
-        RunOnUiThread(Apply);
     }
 
-    /// <summary>流水账：**只进运行时日志**，不落盘</summary>
-    public static void Event(string message) => Write(message, toFile: false);
+    /// <summary>写一条日志：**文件与日志栏都收**（两个名字行为一致，见类型注释）</summary>
+    public static void Event(string message) => Write(message);
 
-    /// <summary>诊断：**写文件 + 进运行时日志**（启动退出、异常、外部失败、关键状态变化）</summary>
-    public static void Diag(string message) => Write(message, toFile: true);
+    /// <inheritdoc cref="Event"/>
+    public static void Diag(string message) => Write(message);
 
     /// <summary>
     /// 崩溃专用：文件里留**完整堆栈**（多行、带 FATAL 标记），视图里只留一行摘要。
@@ -98,22 +91,37 @@ public static class LogService
         });
     }
 
-    private static void Write(string message, bool toFile)
+    /// <summary>
+    /// 取日志文本。<paramref name="maxLines"/> ≤ 0 取**全部**（"复制全部"用）；
+    /// 给正数则只拼**尾部**该行数（日志栏显示用）——
+    /// 逐索引取，代价只与要的段长成正比，不会因为总量大而变慢（2026-09-28）。
+    /// </summary>
+    public static string GetText(int maxLines = 0)
+    {
+        lock (_lock)
+        {
+            var count = _logs.Count;
+            var start = maxLines > 0 && count > maxLines ? count - maxLines : 0;
+            var sb = new StringBuilder();
+            for (var i = start; i < count; i++)
+            {
+                if (i > start) sb.Append('\n');
+                sb.Append(_logs[i]);
+            }
+            return sb.ToString();
+        }
+    }
+
+    private static void Write(string message)
     {
         var now = DateTime.Now;
-        if (toFile)
-            AppendFile($"[{now:yyyy-MM-dd HH:mm:ss.fff}] [p{Environment.ProcessId}] [D] {message}");
-
-        AddToView($"[{now:HH:mm:ss}] {(toFile ? "[诊断] " : "")}{message}");
+        AppendFile($"[{now:yyyy-MM-dd HH:mm:ss.fff}] [p{Environment.ProcessId}] [D] {message}");
+        AddToView($"[{now:HH:mm:ss}] {message}");
     }
 
     private static void AddToView(string line) => RunOnUiThread(() =>
     {
-        lock (_lock)
-        {
-            _logs.Add(line);
-            while (_logs.Count > MaxLines) _logs.RemoveAt(0);
-        }
+        lock (_lock) _logs.Add(line);
     });
 
     /// <summary>任意线程可调用：非 UI 线程要封送回 UI 线程再动集合</summary>
@@ -138,7 +146,7 @@ public static class LogService
             {
                 try
                 {
-                    RollIfTooBig();
+                    TrimIfNeeded();
                     using var stream = new FileStream(LogFilePath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
                     using var writer = new StreamWriter(stream, Encoding.UTF8);
                     writer.WriteLine(line);
@@ -152,21 +160,58 @@ public static class LogService
         }
     }
 
-    /// <summary>文件超过上限就轮转：ostgui.log → .1 → .2（保留最近两份，旧的丢弃）</summary>
-    private static void RollIfTooBig()
+    /// <summary>
+    /// 当前文件超过行数上限就**直接裁剪**：重写为最后 <see cref="MaxLines"/> 行，更早的丢掉。
+    /// 只在追加路径里按节流调用；重写代价与上限行数成正比（几百到一万行，可忽略）。
+    /// </summary>
+    private static void TrimIfNeeded()
     {
-        var info = new FileInfo(LogFilePath);
-        if (!info.Exists || info.Length < MaxFileBytes) return;
+        // 读一次文件才能知道行数，所以隔若干次追加才真查一次（这期间最多多出 CheckEvery 行）
+        if (++_appendsSinceLineCount < CheckEvery) return;
+        _appendsSinceLineCount = 0;
 
-        var dir = Path.GetDirectoryName(LogFilePath) ?? ".";
-        string Backup(int i) => Path.Combine(dir, $"{Path.GetFileNameWithoutExtension(LogFilePath)}.{i}.log");
+        var lines = ReadAllLinesShared(LogFilePath);
+        if (lines.Count <= MaxLines) return;
 
-        for (var i = FileBackups; i >= 1; i--)
+        try
         {
-            var from = i == 1 ? LogFilePath : Backup(i - 1);
-            if (!File.Exists(from)) continue;
-            if (File.Exists(Backup(i))) File.Delete(Backup(i));
-            File.Move(from, Backup(i));
+            using (var stream = new FileStream(LogFilePath, FileMode.Create, FileAccess.Write, FileShare.ReadWrite))
+            using (var writer = new StreamWriter(stream, Encoding.UTF8))
+            {
+                for (var i = lines.Count - MaxLines; i < lines.Count; i++)
+                    writer.WriteLine(lines[i]);
+            }
         }
+        catch
+        {
+            return;   // 被别的进程占着就这轮不裁，下次追加再试
+        }
+
+        // 旧版按大小轮转留下的备份：现在只有一个日志文件，顺手清掉（免得误以为还在轮转）
+        try
+        {
+            var dir = Path.GetDirectoryName(LogFilePath) ?? ".";
+            var stem = Path.GetFileNameWithoutExtension(LogFilePath);
+            for (var i = 1; i <= 2; i++)
+            {
+                var backup = Path.Combine(dir, $"{stem}.{i}.log");
+                if (File.Exists(backup)) File.Delete(backup);
+            }
+        }
+        catch { }
+    }
+
+    /// <summary>读全部行（多进程共享：只读且允许并发写）</summary>
+    private static List<string> ReadAllLinesShared(string path)
+    {
+        var lines = new List<string>();
+        try
+        {
+            using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite);
+            using var reader = new StreamReader(stream, Encoding.UTF8, detectEncodingFromByteOrderMarks: true);
+            while (reader.ReadLine() is { } line) lines.Add(line);
+        }
+        catch { }
+        return lines;
     }
 }

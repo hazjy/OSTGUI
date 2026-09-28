@@ -218,9 +218,10 @@
                             <TextBlock Grid.Column="0" Text="日志文件" FontSize="16" FontWeight="SemiBold" />
                             <Button Grid.Column="1" Content="打开日志文件夹" Click="OpenLogFile_Click" />
                         </Grid>
-                        <NumberBox Header="运行时日志保留行数" Minimum="100" Maximum="10000"
+                        <NumberBox Header="日志文件保留行数" Minimum="100" Maximum="10000"
                                    SmallChange="100" LargeChange="500"
                                    SpinButtonPlacementMode="Inline"
+                                   ToolTipService.ToolTip="超过此行数就直接裁掉更早的日志；日志栏不受影响"
                                    Value="{Binding LogMaxLines, Mode=TwoWay}" />
                     </StackPanel>
                 </Border>

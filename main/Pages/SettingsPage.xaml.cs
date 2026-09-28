@@ -50,7 +50,7 @@ public sealed partial class SettingsPage : Page
             LogService.Logs.CollectionChanged += OnLogsChanged;
 
             // 每次进入页面同步一次当前日志：仅在无新日志事件时，日志栏不依赖事件也有内容
-            VM.LogsText = string.Join("\n", LogService.Logs);
+            VM.LogsText = LogService.GetText(PanelLines);
             VM.RefreshSudamaCacheAge();
             VM.RefreshPaths();
             VM.RefreshDenuvoModeFromKernel();
@@ -65,6 +65,12 @@ public sealed partial class SettingsPage : Page
         };
     }
 
+    /// <summary>
+    /// 日志栏最多显示多少行。只影响面板显示：集合里仍是全量，"复制全部"也走全量。
+    /// 面板本身只有 400px 高，显示尾部足够看当下；要看更早的翻日志文件。
+    /// </summary>
+    private const int PanelLines = 2000;
+
     /// <summary>日志栏刷新表（见构造里的说明）</summary>
     private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _logRefreshTimer;
 
@@ -73,8 +79,9 @@ public sealed partial class SettingsPage : Page
 
     /// <summary>
     /// 日志变更（可能在**任意线程**）：只置脏 + 叫醒节流表，真正重算交给 <see cref="FlushLogsText"/>。
-    /// 原来这里每来一行就 `string.Join` 全量重拼（≤1000 行 ≈ 60K 字符 ✗ >85KB ⇒ 每次都进 LOH ✗）
-    /// 再刷 TextBox + Select 到底 → 日志一多就疯狂分配（2026-09-27 修成最多 10 次/秒 ✗）
+    /// 原来这里每来一行就 `string.Join` 全量重拼（几千行就是几十万字符 ✗ 每次都进 LOH ✗）
+    /// 再刷 TextBox + Select 到底 → 日志一多就疯狂分配（2026-09-27 修成最多 10 次/秒；
+    /// 2026-09-28 再加面板尾部上限 PanelLines，重算量不再随总量增长）
     /// </summary>
     private void OnLogsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
     {
@@ -99,7 +106,7 @@ public sealed partial class SettingsPage : Page
 
         try
         {
-            VM.LogsText = string.Join("\n", LogService.Logs);
+            VM.LogsText = LogService.GetText(PanelLines);
         }
         catch { }
 
@@ -218,13 +225,15 @@ public sealed partial class SettingsPage : Page
 
     private void CopyLogs_Click(object sender, RoutedEventArgs e)
     {
-        if (string.IsNullOrEmpty(LogsTextBox.Text)) return;
+        // 复制**全量**：面板只显示尾部（PanelLines），"复制全部"必须拿到完整日志
+        var text = LogService.GetText();
+        if (string.IsNullOrEmpty(text)) return;
 
         var dataPackage = new DataPackage();
-        dataPackage.SetText(LogsTextBox.Text);
+        dataPackage.SetText(text);
         Clipboard.SetContent(dataPackage);
 
-        LogService.Event($"已复制日志到剪贴板");
+        LogService.Event($"已复制日志到剪贴板（{LogService.Logs.Count} 行）");
     }
 
     private void OpenLogFile_Click(object sender, RoutedEventArgs e)

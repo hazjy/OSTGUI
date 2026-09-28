@@ -173,8 +173,6 @@ public partial class SearchViewModel : ObservableObject
         }
     }
 
-    public ObservableCollection<string> Logs => LogService.Logs;
-    public string LogText => string.Join("\n", LogService.Logs);
     public bool HasResults => SearchResults.Count > 0;
     public bool ShowNoResults => HasSearched && !HasResults;
 
