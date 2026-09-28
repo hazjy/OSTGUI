@@ -92,7 +92,7 @@ public static class CardHover
         if (hoverBackground is not null)
         {
             try { card.Background = hoverBackground; }
-            catch (Exception ex) { Log($"换高亮背景失败: {ex.GetType().Name} {ex.Message}"); }
+            catch (Exception ex) { Log($"换高亮背景失败：{ex.GetType().Name} {ex.Message}"); }
         }
 
         try
@@ -102,7 +102,7 @@ public static class CardHover
             card.Shadow = state.Shadow;
             card.Translation = new Vector3(0f, 0f, shadowZ);
         }
-        catch (Exception ex) { Log($"阴影失败: {ex.GetType().Name} {ex.Message}"); }
+        catch (Exception ex) { Log($"阴影失败：{ex.GetType().Name} {ex.Message}"); }
     }
 
     /// <summary>指针离开卡片</summary>
@@ -123,7 +123,7 @@ public static class CardHover
             card.Shadow = null;          // 阴影只在悬浮时挂着
             card.Translation = Vector3.Zero;
         }
-        catch (Exception ex) { Log($"复原失败: {ex.GetType().Name} {ex.Message}"); }
+        catch (Exception ex) { Log($"复原失败：{ex.GetType().Name} {ex.Message}"); }
     }
 
     /// <summary>把卡片缩放到 <paramref name="to"/>（进出都走这里，只有目标值不同）</summary>

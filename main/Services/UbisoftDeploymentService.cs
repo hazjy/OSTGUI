@@ -58,7 +58,7 @@ public class UbisoftDeploymentService
         if (!File.Exists(dll))
         {
             using var s = Assembly.GetExecutingAssembly().GetManifestResourceStream($"OSTGUI.Assets.Ubisoft.{EmbeddedDll}")
-                ?? throw new InvalidOperationException($"内嵌资源缺失: OSTGUI.Assets.Ubisoft.{EmbeddedDll}");
+                ?? throw new InvalidOperationException($"内嵌资源缺失：OSTGUI.Assets.Ubisoft.{EmbeddedDll}");
             using var fs = File.Create(dll);
             s.CopyTo(fs);
         }
@@ -96,8 +96,8 @@ public class UbisoftDeploymentService
         }
         catch (Exception ex)
         {
-            Log($"部署失败: {ex.Message}");
-            return (false, $"部署失败: {ex.Message}");
+            Log($"部署失败：{ex.Message}");
+            return (false, $"部署失败：{ex.Message}");
         }
     }
 
@@ -122,8 +122,8 @@ public class UbisoftDeploymentService
         }
         catch (Exception ex)
         {
-            Log($"还原失败: {ex.Message}");
-            return (false, $"还原失败: {ex.Message}");
+            Log($"还原失败：{ex.Message}");
+            return (false, $"还原失败：{ex.Message}");
         }
     }
 

@@ -76,7 +76,7 @@ public static class LogService
         try
         {
             AppendFile($"[{now:yyyy-MM-dd HH:mm:ss.fff}] [p{Environment.ProcessId}] [D] FATAL {context}" +
-                       $"{Environment.NewLine}{ex?.ToString() ?? "(无异常对象)"}");
+                       $"{Environment.NewLine}{ex?.ToString() ?? "（无异常对象）"}");
             AddToView($"[{now:HH:mm:ss}] [诊断] FATAL {context}：{ex?.GetType().Name}: {ex?.Message}");
         }
         catch { }

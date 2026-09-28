@@ -190,7 +190,7 @@ public sealed partial class LibraryPage : Page
         });
         headerPanel.Children.Add(new TextBlock
         {
-            Text = $"版本模式: {item.VersionModeText}",
+            Text = $"版本模式：{item.VersionModeText}",
             FontSize = 13,
             TextAlignment = TextAlignment.Center,
             Foreground = ProbeSecondary.Foreground
@@ -242,8 +242,8 @@ public sealed partial class LibraryPage : Page
                 {
                     Text = mode switch
                     {
-                        1 => "没有已入库的 DLC",
-                        2 => "没有未入库的 DLC",
+                        1 => "暂无已入库的 DLC",
+                        2 => "暂无未入库的 DLC",
                         _ => "无 DLC"
                     },
                     FontSize = 13,

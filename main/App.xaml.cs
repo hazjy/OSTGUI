@@ -161,11 +161,11 @@ public partial class App : Application
             if (!string.IsNullOrEmpty(outFile))
                 File.WriteAllText(outFile, JsonSerializer.Serialize(result, AppJsonCompactContext.Default.ExtractResult));
 
-            Log($"extract mode done: success={result.Success} {result.Message}");
+            Log($"extract mode done：success={result.Success} {result.Message}");
         }
         catch (Exception ex)
         {
-            Log($"extract mode error: {ex}");
+            Log($"extract mode error：{ex}");
         }
         finally
         {

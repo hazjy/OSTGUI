@@ -63,7 +63,7 @@ public class SudamaKeyCache
                 using var resp = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct).ConfigureAwait(false);
                 if (!resp.IsSuccessStatusCode)
                 {
-                    Log($"{label}下载失败 HTTP {(int)resp.StatusCode}" + (attempt == 1 ? "，1.5s 后重试..." : ""));
+                    Log($"{label}下载失败 HTTP {(int)resp.StatusCode}" + (attempt == 1 ? "，1.5s 后重试…" : ""));
                 }
                 else
                 {
@@ -87,7 +87,7 @@ public class SudamaKeyCache
             }
             catch (Exception ex)
             {
-                Log($"{label}下载异常({sw.Elapsed.TotalSeconds:F0}s): {ex.Message}" + (attempt == 1 ? "，1.5s 后重试..." : ""));
+                Log($"{label}下载异常({sw.Elapsed.TotalSeconds:F0}s)：{ex.Message}" + (attempt == 1 ? "，1.5s 后重试…" : ""));
             }
 
             if (attempt == 1)
@@ -139,7 +139,7 @@ public class SudamaKeyCache
         }
 
         // 缓存缺失 / 读不动 → 下载（这条路径本来就要整份数据写盘，写完后只留想要的那几条）
-        Log($"正在下载 {label}...");
+        Log($"正在下载 {label}…");
         var data = await DownloadJsonAsync(url, label, ct).ConfigureAwait(false);
         if (data != null)
         {
@@ -387,7 +387,7 @@ public class SudamaKeyCache
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "OSTGUI", cacheFileName);
 
-        Log($"正在刷新 {label}...");
+        Log($"正在刷新 {label}…");
         try
         {
             var data = await DownloadJsonAsync(url, label).ConfigureAwait(false);
@@ -410,7 +410,7 @@ public class SudamaKeyCache
         {
             var stale = TryLoadStaleCache(cachePath);
             return (stale.Count > 0,
-                $"{label}刷新异常: {ex.Message}，已保留旧缓存");
+                $"{label}刷新异常：{ex.Message}，已保留旧缓存");
         }
     }
 

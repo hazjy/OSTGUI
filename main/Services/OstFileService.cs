@@ -52,7 +52,7 @@ public class OstFileService
             var appTicketTrimmed = appTicket?.Trim() ?? "";
             var eTicketTrimmed = eTicket?.Trim() ?? "";
             if (string.IsNullOrEmpty(appTicketTrimmed) && string.IsNullOrEmpty(eTicketTrimmed))
-                return (false, "没有可导出的授权数据", "");
+                return (false, "无可导出的授权数据", "");
 
             var ost = new OstFile
             {
@@ -71,7 +71,7 @@ public class OstFileService
         }
         catch (Exception ex)
         {
-            return (false, $"导出失败: {ex.Message}", "");
+            return (false, $"导出失败：{ex.Message}", "");
         }
     }
 
@@ -90,11 +90,11 @@ public class OstFileService
             if (ost.Format != OstFile.FormatId)
                 return (false, "不是 OST 授权文件", null);
             if (ost.Version != OstFile.CurrentVersion)
-                return (false, $"不支持的授权文件版本: {ost.Version}", null);
+                return (false, $"不支持的授权文件版本：{ost.Version}", null);
             if (string.IsNullOrWhiteSpace(ost.AppId))
                 return (false, "授权文件缺少 AppID", null);
             if (string.IsNullOrWhiteSpace(ost.AppTicket) && string.IsNullOrWhiteSpace(ost.ETicket))
-                return (false, "授权文件中没有授权数据", null);
+                return (false, "授权文件中无授权数据", null);
 
             return (true, "解析成功", ost);
         }
@@ -104,7 +104,7 @@ public class OstFileService
         }
         catch (Exception ex)
         {
-            return (false, $"读取失败: {ex.Message}", null);
+            return (false, $"读取失败：{ex.Message}", null);
         }
     }
 

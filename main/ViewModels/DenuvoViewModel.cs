@@ -116,7 +116,7 @@ public partial class DenuvoViewModel : ObservableObject
         var appId = ExportAppId.Trim();
         if (string.IsNullOrEmpty(appId))
         {
-            (App.MainWindow as MainWindow)?.Notify("导出授权", "请先输入 AppID", Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning);
+            (App.MainWindow as MainWindow)?.Notify("导出授权", "请先填写游戏 AppID", Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning);
             return (false, "AppID 为空");
         }
 
@@ -321,7 +321,7 @@ public partial class DenuvoViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            return (false, $"补全入库失败: {ex.Message}");
+            return (false, $"补全入库失败：{ex.Message}");
         }
     }
 }

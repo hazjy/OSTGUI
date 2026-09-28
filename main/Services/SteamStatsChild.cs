@@ -64,7 +64,7 @@ internal static class SteamStatsChild
             }
             catch (Exception ex)
             {
-                LogService.Diag($"stats-owned 失败: {ex.Message}");
+                LogService.Diag($"stats-owned 失败：{ex.Message}");
                 File.WriteAllText(outOwnedFile, JsonSerializer.Serialize(new List<string>(), AppJsonCompactContext.Default.ListString));
                 return 1;
             }
@@ -115,7 +115,7 @@ internal static class SteamStatsChild
         }
         catch (Exception ex)
         {
-            LogService.Diag($"成就子进程写结果失败: {ex.Message}");
+            LogService.Diag($"成就子进程写结果失败：{ex.Message}");
         }
         LogService.Diag($"stats {mode} appid={appId} ok={result.Ok} {result.Message} {result.Warning}");
         return result.Ok ? 0 : 1;

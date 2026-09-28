@@ -412,12 +412,12 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
             _mainVM.SearchVM.LoadOptionsFromConfig();
 
             // 排查"启动后空白/数据全空"时先看这一行在不在（初始化有没有跑完）
-            LogService.Event($"[Init] page={page}, steam={_mainVM.SteamPathDisplay}");
+            LogService.Event($"[Init] page={page}，steam={_mainVM.SteamPathDisplay}");
         }
         catch (Exception ex)
         {
             // 以前这里静默吞掉，导致"初始化没跑"和"初始化跑了但失败"完全无法区分
-            LogService.Diag($"[Init] 初始化失败: {ex}");
+            LogService.Diag($"[Init] 初始化失败：{ex}");
         }
     }
 
@@ -586,7 +586,7 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
         var accounts = steamService.GetSteamAccounts();
         if (accounts.Count == 0)
         {
-            Services.ToastService.ShowInfo("未找到账号", "本地没有记住的 Steam 账号");
+            Services.ToastService.ShowInfo("未找到账号", "本地未保存任何 Steam 账号");
             return;
         }
 
@@ -657,7 +657,7 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
 
         var hint = new TextBlock
         {
-            Text = "选中账户后，点击“确认重启”",
+            Text = "选中账户后，单击「确认重启」",
             FontSize = 12,
             Foreground = secondaryBrush,
         };

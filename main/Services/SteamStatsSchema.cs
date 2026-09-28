@@ -82,8 +82,8 @@ public static class SteamStatsSchema
             if (used) groups++;
         }
         if (defs.Count > 4096) { defs = new List<AchievementDef>(); error = "E2（schema 解析失败）"; return false; }
-        LogService.Diag($"schema {appId}: 成就 {defs.Count} 条（来自 {groups} 个 bits 组）");
-        if (defs.Count == 0) { error = "E3（schema 里没有成就条目）"; return false; }
+        LogService.Diag($"schema {appId}：成就 {defs.Count} 条（来自 {groups} 个 bits 组）");
+        if (defs.Count == 0) { error = "E3（schema 中无成就条目）"; return false; }
         return true;
     }
 
@@ -109,7 +109,7 @@ public static class SteamStatsSchema
         }
         catch (Exception ex)
         {
-            LogService.Diag($"schema 解析失败 {path}: {ex.Message}");
+            LogService.Diag($"schema 解析失败 {path}：{ex.Message}");
             return null;
         }
     }

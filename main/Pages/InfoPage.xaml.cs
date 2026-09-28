@@ -13,7 +13,7 @@ public sealed partial class InfoPage : Page
         this.InitializeComponent();
 
         var guiVersion = Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "?";
-        GuiVersionText.Text = $"GUI版本：{guiVersion}";
+        GuiVersionText.Text = $"GUI 版本：{guiVersion}";
 
         var kernelVersion = App.Services.GetRequiredService<SteamDllService>().GetKernelVersion();
         KernelVersionText.Text = $"内核版本：{kernelVersion ?? "未检测到"}";

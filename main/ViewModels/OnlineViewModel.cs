@@ -152,7 +152,7 @@ public partial class OnlineViewModel : ObservableObject
             return (false, "已有联机游戏在运行，请先停止");
 
         if (string.IsNullOrWhiteSpace(DllGameExePath) || !File.Exists(DllGameExePath))
-            return (false, "请先点「查询」定位到游戏程序");
+            return (false, "请先单击「查询」定位游戏程序");
 
         var (sessionOk, sessionAppId) = ResolveSessionAppId();
         if (!sessionOk)
@@ -170,7 +170,7 @@ public partial class OnlineViewModel : ObservableObject
             return (false, "已有联机游戏在运行，请先停止");
 
         if (string.IsNullOrWhiteSpace(DllGameExePath) || !File.Exists(DllGameExePath))
-            return (false, "请先点「查询」定位到游戏程序");
+            return (false, "请先单击「查询」定位游戏程序");
 
         var (sessionOk, sessionAppId) = ResolveSessionAppId();
         if (!sessionOk)
@@ -233,7 +233,7 @@ public partial class OnlineViewModel : ObservableObject
     {
         var appId = OnlineAppId.Trim();
         if (string.IsNullOrEmpty(appId) || !appId.All(char.IsDigit))
-            return (false, "请先输入正确的 AppID");
+            return (false, "请先填写正确的 AppID");
 
         var (sessionOk, sessionAppId) = ResolveSessionAppId();
         if (!sessionOk)

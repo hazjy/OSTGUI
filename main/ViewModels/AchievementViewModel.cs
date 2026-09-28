@@ -422,7 +422,7 @@ public partial class AchievementViewModel : ObservableObject
         var snapshot = AchievementListCache.Load();
         if (snapshot == null)
         {
-            LogService.Diag("成就列表缓存：没有（首次运行或已损坏）");
+            LogService.Diag("成就列表缓存：无（首次运行或已损坏）");
             return false;
         }
 
@@ -503,7 +503,7 @@ public partial class AchievementViewModel : ObservableObject
         if (ids.Count == 0) return;
 
         try { await _search.GetGameNamesBatchAsync(ids); }
-        catch (Exception ex) { LogService.Diag($"成就页补名失败: {ex.Message}"); }
+        catch (Exception ex) { LogService.Diag($"成就页补名失败：{ex.Message}"); }
 
         var changed = false;
         foreach (var item in _allGames.Concat(_ownedGames))
@@ -572,7 +572,7 @@ public partial class AchievementViewModel : ObservableObject
                     };
                 }
             }
-            catch (Exception ex) { LogService.Diag($"正版候选②失败: {ex.Message}"); }
+            catch (Exception ex) { LogService.Diag($"正版候选②失败：{ex.Message}"); }
 
             return map;
         });
@@ -847,7 +847,7 @@ public partial class AchievementViewModel : ObservableObject
                 if (result.ReadOk == 0)
                 {
                     // 客户端手里没有这个游戏的成就数据（不是"全部未解锁"）——别拿它覆盖留底
-                    ToastService.ShowWarning("从 Steam 读取", "客户端里没有这个游戏的成就数据，已保留本地留底");
+                    ToastService.ShowWarning("从 Steam 读取", "Steam 客户端中无该游戏的成就数据，已保留本地留底");
                     return;
                 }
                 MergeFromResult(result);

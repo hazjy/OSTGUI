@@ -50,7 +50,7 @@ public sealed partial class OnlineFixView : UserControl
         }
         catch (Exception ex)
         {
-            ToastService.ShowError("打开使用说明失败", ex.Message);
+            ToastService.ShowError("无法打开使用说明", ex.Message);
         }
     }
 

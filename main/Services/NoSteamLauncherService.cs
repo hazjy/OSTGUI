@@ -77,7 +77,7 @@ public sealed partial class NoSteamLauncherService : IDisposable
             var detail = string.Join("; ", missing);
             _logger.LogError("Required resources missing after extraction: {Missing}", detail);
             throw new InvalidOperationException(
-                $"解压后仍缺少关键资源: {detail}。" +
+                $"解压后仍缺少关键资源：{detail}。" +
                 $"常见原因是杀毒软件（Windows Defender 等）拦截或隔离了 Steamless 组件。" +
                 $"请将目录 {_tempRoot} 加入杀毒软件白名单后重试。");
         }

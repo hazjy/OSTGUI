@@ -327,8 +327,8 @@ public partial class NoSteamViewModel : ObservableObject
             var cbSkipGBE = new CheckBox { Content = "跳过 GBE 部署", IsChecked = SkipGBE };
             ToolTipService.SetToolTip(cbSkipGBE, "仅运行 Steamless，不部署 Goldberg 模拟器");
 
-            var cbDryRun = new CheckBox { Content = "仅干跑 (不修改文件)", IsChecked = DryRun };
-            ToolTipService.SetToolTip(cbDryRun, "模拟部署流程，不实际写入文件，用于预览/调试");
+            var cbDryRun = new CheckBox { Content = "仅试运行（不修改文件）", IsChecked = DryRun };
+            ToolTipService.SetToolTip(cbDryRun, "模拟部署流程，不实际写入文件，用于预览与调试");
 
             var panel = new StackPanel { Spacing = 16, MinWidth = 360 };
             panel.Children.Add(cbBackup);
@@ -406,9 +406,9 @@ public partial class NoSteamViewModel : ObservableObject
         dlcPanel.Children.Add(rbWhitelist);
 
         // DLC 白名单编辑
-        var tbDlcList = new TextBox { PlaceholderText = "DLC 白名单，每行格式: AppID=名称", Text = AdvancedDlcList, MinWidth = 600, MinHeight = 100, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, FontFamily = new FontFamily("Cascadia Code, Consolas, monospace") };
+        var tbDlcList = new TextBox { PlaceholderText = "DLC 白名单，每行格式：AppID=名称", Text = AdvancedDlcList, MinWidth = 600, MinHeight = 100, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, FontFamily = new FontFamily("Cascadia Code, Consolas, monospace") };
         ScrollViewer.SetVerticalScrollBarVisibility(tbDlcList, ScrollBarVisibility.Auto);
-        ToolTipService.SetToolTip(tbDlcList, "白名单模式时生效，写入游戏目录 steam_settings/configs.app.ini 的 [app::dlcs] 段，每行格式: AppID=名称");
+        ToolTipService.SetToolTip(tbDlcList, "白名单模式时生效，写入游戏目录 steam_settings/configs.app.ini 的 [app::dlcs] 段，每行格式：AppID=名称");
 
         // 离线模式
         var cbOffline = new CheckBox { Content = "离线模式", IsChecked = AdvancedOfflineMode };
@@ -416,7 +416,7 @@ public partial class NoSteamViewModel : ObservableObject
 
         // 禁用网络
         var cbDisableNet = new CheckBox { Content = "完全禁用网络", IsChecked = AdvancedDisableNetworking };
-        ToolTipService.SetToolTip(cbDisableNet, "configs.main.ini 的 disable_networking=1，联机游戏慎用");
+        ToolTipService.SetToolTip(cbDisableNet, "configs.main.ini 的 disable_networking=1，联机游戏请慎用");
 
         // SteamAPICheckBypass（反模拟器检测）
         var cbBypass = new CheckBox { Content = "部署 SteamAPICheckBypass", IsChecked = AdvancedBypassSteamApiCheck };
@@ -430,7 +430,7 @@ public partial class NoSteamViewModel : ObservableObject
         networkPanel.Children.Add(cbBypass);
 
         var panel = new StackPanel { Spacing = 12, MinWidth = 700 };
-        panel.Children.Add(new TextBlock { Text = "账号与身份 (选择账户后自动填充)", FontWeight = FontWeights.SemiBold, FontSize = 14, Margin = new Thickness(0, 0, 0, 4) });
+        panel.Children.Add(new TextBlock { Text = "账号与身份（选择账户后自动填充）", FontWeight = FontWeights.SemiBold, FontSize = 14, Margin = new Thickness(0, 0, 0, 4) });
         panel.Children.Add(cbAccount);
         panel.Children.Add(new TextBlock { Text = "语言", FontWeight = FontWeights.SemiBold, FontSize = 14, Margin = new Thickness(0, 8, 0, 4) });
         panel.Children.Add(cbLanguage);
@@ -451,7 +451,7 @@ public partial class NoSteamViewModel : ObservableObject
 
         var dialog = new ContentDialog
         {
-            Title = "高级配置 (GBE)",
+            Title = "高级配置（GBE）",
             PrimaryButtonText = "应用",
             CloseButtonText = "取消",
             DefaultButton = ContentDialogButton.Primary,
@@ -631,13 +631,13 @@ public partial class NoSteamViewModel : ObservableObject
 
         if (string.IsNullOrWhiteSpace(AppId) || !int.TryParse(AppId, out _))
         {
-            ProgressLog += "[ERROR] 请输入有效的 Steam AppID (数字)\n";
+            ProgressLog += "[ERROR] 请输入有效的 Steam AppID（数字）\n";
             return;
         }
 
         IsRunning = true;
         ProgressLog = "";
-        ProgressLog += "[INFO] 开始部署...\n";
+        ProgressLog += "[INFO] 开始部署…\n";
 
         try
         {
@@ -669,7 +669,7 @@ public partial class NoSteamViewModel : ObservableObject
             }
             catch (Exception ex)
             {
-                ProgressLog += $"[ERROR] 配置验证失败: {ex.Message}\n";
+                ProgressLog += $"[ERROR] 配置验证失败：{ex.Message}\n";
                 IsRunning = false;
                 return;
             }
@@ -683,19 +683,19 @@ public partial class NoSteamViewModel : ObservableObject
             if (result.Success)
             {
                 var msg = DryRun
-                    ? $"干跑完成！将部署 {result.GBEDeploy.DeployedFiles.Length} 个文件，耗时 {result.TotalDuration.TotalSeconds:F1}s"
-                    : $"部署成功！部署了 {result.GBEDeploy.DeployedFiles.Length} 个文件，耗时 {result.TotalDuration.TotalSeconds:F1}s";
+                    ? $"试运行完成，将部署 {result.GBEDeploy.DeployedFiles.Length} 个文件，耗时 {result.TotalDuration.TotalSeconds:F1}s"
+                    : $"部署成功，已部署 {result.GBEDeploy.DeployedFiles.Length} 个文件，耗时 {result.TotalDuration.TotalSeconds:F1}s";
                 ProgressLog += $"[SUCCESS] {msg}\n";
             }
             else
             {
-                ProgressLog += $"[ERROR] 部署失败: {result.ErrorMessage}\n";
+                ProgressLog += $"[ERROR] 部署失败：{result.ErrorMessage}\n";
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Deploy failed");
-            ProgressLog += $"[ERROR] 异常: {ex.Message}\n";
+            ProgressLog += $"[ERROR] 异常：{ex.Message}\n";
         }
         finally
         {
@@ -710,7 +710,7 @@ public partial class NoSteamViewModel : ObservableObject
     {
         if (IsRunning)
         {
-            ProgressLog += "[WARN] 正在部署中，稍后再试\n";
+            ProgressLog += "[WARN] 正在部署中，请稍后再试\n";
             return;
         }
 
@@ -733,13 +733,13 @@ public partial class NoSteamViewModel : ObservableObject
                 ProgressLog += $"[WARN] {failure}\n";
 
             ProgressLog += result.Success
-                ? "[SUCCESS] 还原完成！游戏目录已回到部署前状态\n"
-                : "[WARN] 还原未完成：请关掉游戏后重试（文件被占用时无法替换）\n";
+                ? "[SUCCESS] 还原完成，游戏目录已回到部署前状态\n"
+                : "[WARN] 还原未完成：请关闭游戏后重试（文件被占用时无法替换）\n";
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Restore failed");
-            ProgressLog += $"[ERROR] 异常: {ex.Message}\n";
+            ProgressLog += $"[ERROR] 异常：{ex.Message}\n";
         }
         finally
         {

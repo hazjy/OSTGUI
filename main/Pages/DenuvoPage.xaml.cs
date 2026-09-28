@@ -37,7 +37,7 @@ public sealed partial class DenuvoPage : Page
         var appId = VM.ExportAppId.Trim();
         if (string.IsNullOrEmpty(appId))
         {
-            (App.MainWindow as MainWindow)?.Notify("导出授权", "请先输入 AppID", InfoBarSeverity.Warning);
+            (App.MainWindow as MainWindow)?.Notify("导出授权", "请先填写游戏 AppID", InfoBarSeverity.Warning);
             return;
         }
 

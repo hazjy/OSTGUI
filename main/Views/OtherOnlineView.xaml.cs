@@ -46,7 +46,7 @@ public sealed partial class OtherOnlineView : UserControl
         if (ok)
             ToastService.ShowSuccess(title, msg);
         else
-            ToastService.ShowError($"{title}失败", msg);
+            ToastService.ShowError($"{title}启动失败", msg);
     }
 
     /// <summary>停止：两种方式共用（宿主 + 它拉起的游戏一起结束）</summary>

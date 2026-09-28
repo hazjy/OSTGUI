@@ -86,7 +86,7 @@ public class SteamGameInfoService
             }
         }
 
-        Log($"封面 API 失败: {lastError?.Message}");
+        Log($"封面 API 失败：{lastError?.Message}");
         throw lastError!;
     }
 
@@ -116,7 +116,7 @@ public class SteamGameInfoService
                 var response = await client.GetAsync(url, ct);
                 if (!response.IsSuccessStatusCode)
                 {
-                    Log($"SteamCMD API 非成功响应 ({(int)response.StatusCode}), 重试({attempt + 1}/{maxAttempts})");
+                    Log($"SteamCMD API 非成功响应 ({(int)response.StatusCode})，重试({attempt + 1}/{maxAttempts})");
                     continue;
                 }
 
@@ -181,7 +181,7 @@ public class SteamGameInfoService
             }
             catch (Exception ex)
             {
-                Log($"SteamCMD API 异常 ({attempt + 1}/{maxAttempts}): {ex.Message}");
+                Log($"SteamCMD API 异常 ({attempt + 1}/{maxAttempts})：{ex.Message}");
                 if (attempt == maxAttempts - 1)
                     return null;
             }
@@ -211,33 +211,33 @@ public class SteamGameInfoService
     {
         try
         {
-            Log($"请求 Steam API: https://store.steampowered.com/api/appdetails?appids={appId}&cc=us");
+            Log($"请求 Steam API：https://store.steampowered.com/api/appdetails?appids={appId}&cc=us");
             // 刻意不给这一步加新的超时上限（会改变"网络慢但能成"的成功行为），只让它可以被取消
             var response = await _http.GetAsync($"https://store.steampowered.com/api/appdetails?appids={appId}&cc=us", ct);
-            Log($"Steam API 响应: {(int)response.StatusCode}");
+            Log($"Steam API 响应：{(int)response.StatusCode}");
 
             if (!response.IsSuccessStatusCode)
                 return null;
 
             var json = await response.Content.ReadAsStringAsync(ct);
-            Log($"响应长度: {json.Length} 字符");
+            Log($"响应长度：{json.Length} 字符");
 
             var doc = JsonDocument.Parse(json);
             if (!doc.RootElement.TryGetProperty(appId, out var appData))
             {
-                Log("错误: 响应中没有 AppID 属性");
+                Log("错误：响应中无 AppID 属性");
                 return null;
             }
 
             if (!appData.TryGetProperty("success", out var s) || !s.GetBoolean())
             {
-                Log("错误: success 字段为 false 或不存在");
+                Log("错误：success 字段为 false 或不存在");
                 return null;
             }
 
             if (!appData.TryGetProperty("data", out var data))
             {
-                Log("错误: data 字段不存在");
+                Log("错误：data 字段不存在");
                 return null;
             }
 
@@ -254,7 +254,7 @@ public class SteamGameInfoService
                     var depotId = prop.Name;
                     if (!depotId.All(char.IsDigit))
                     {
-                        Log($"跳过非数字 depot 键: {depotId}");
+                        Log($"跳过非数字 depot 键：{depotId}");
                         continue;
                     }
 
@@ -270,20 +270,20 @@ public class SteamGameInfoService
                             if (gid != null)
                             {
                                 depot.Manifests.Add(gid);
-                                Log($"Depot {depotId}: Manifest GID = {gid}");
+                                Log($"Depot {depotId}：Manifest GID = {gid}");
                             }
                         }
                     }
                     else
                     {
-                        Log($"Depot {depotId}: 无 manifest");
+                        Log($"Depot {depotId}：无 manifest");
                     }
 
                     if (depotData.TryGetProperty("encrypted", out var encryptedObj) &&
                         encryptedObj.TryGetProperty("key", out var keyElem))
                     {
                         depot.DecryptionKey = keyElem.GetString() ?? "";
-                        Log($"Depot {depotId}: 有密钥");
+                        Log($"Depot {depotId}：有密钥");
                     }
 
                     game.Depots[depotId] = depot;
@@ -293,7 +293,7 @@ public class SteamGameInfoService
             }
             else
             {
-                Log("警告: 响应中没有 depots 字段");
+                Log("警告：响应中无 depots 字段");
             }
 
             return game;
@@ -304,7 +304,7 @@ public class SteamGameInfoService
         }
         catch (Exception ex)
         {
-            Log($"获取游戏详情异常: {ex.Message}");
+            Log($"获取游戏详情异常：{ex.Message}");
             return null;
         }
     }
@@ -354,7 +354,7 @@ public class SteamGameInfoService
         }
         catch (Exception ex)
         {
-            Log($"获取 DLC 列表异常(SteamCMD): {ex.Message}");
+            Log($"获取 DLC 列表异常(SteamCMD)：{ex.Message}");
         }
 
         return ids;
@@ -437,7 +437,7 @@ public class SteamGameInfoService
         }
         catch (Exception ex)
         {
-            Log($"GetDlcInfoAsync 异常: {ex.Message}");
+            Log($"GetDlcInfoAsync 异常：{ex.Message}");
         }
         return result;
     }

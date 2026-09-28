@@ -29,7 +29,7 @@ public class TrainerBindingService
         catch (Exception ex)
         {
             // 配置坏了别丢用户数据：留一份 .bad 供人工看，然后当空处理
-            LogService.Diag($"trainer 绑定读取失败: {ex.Message}");
+            LogService.Diag($"trainer 绑定读取失败：{ex.Message}");
             try { File.Copy(BindingsPath, BindingsPath + ".bad", overwrite: true); } catch { }
             return new List<TrainerBinding>();
         }
@@ -52,7 +52,7 @@ public class TrainerBindingService
         }
         catch (Exception ex)
         {
-            LogService.Diag($"trainer 绑定保存失败: {ex.Message}");
+            LogService.Diag($"trainer 绑定保存失败：{ex.Message}");
         }
     }
 }

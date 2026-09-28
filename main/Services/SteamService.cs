@@ -188,12 +188,12 @@ public class SteamService
                 UseShellExecute = true
             });
             return (true, string.IsNullOrEmpty(accountName)
-                ? "Steam 正在重启..."
-                : "Steam 正在重启并登录所选账号...");
+                ? "Steam 正在重启…"
+                : "Steam 正在重启并登录所选账号…");
         }
         catch (Exception ex)
         {
-            return (false, $"重启 Steam 失败: {ex.Message}");
+            return (false, $"重启 Steam 失败：{ex.Message}");
         }
     }
 

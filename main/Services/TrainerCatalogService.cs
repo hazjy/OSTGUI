@@ -54,7 +54,7 @@ public class TrainerCatalogService
         }
         catch (Exception ex)
         {
-            LogService.Diag($"trainer 搜索 RSS 解析失败「{query}」: {ex.Message}");
+            LogService.Diag($"trainer 搜索 RSS 解析失败「{query}」：{ex.Message}");
         }
 
         if (result.Count == 0)
@@ -102,11 +102,11 @@ public class TrainerCatalogService
             catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 last = ex;
-                LogService.Diag($"trainer 抓取失败（第 {attempt + 1} 次）{url}: {ex.Message}");
+                LogService.Diag($"trainer 抓取失败（第 {attempt + 1} 次）{url}：{ex.Message}");
                 if (attempt == 0) await Task.Delay(1500, ct);
             }
         }
-        throw last ?? new IOException($"抓取失败: {url}");
+        throw last ?? new IOException($"抓取失败：{url}");
     }
 
     private static string StripTrainerSuffix(string name)

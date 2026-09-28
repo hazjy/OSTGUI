@@ -160,11 +160,11 @@ public class LuaConfigService
                 }
             }
 
-            return (true, $"配置文件已写入: {filePath}", filePath);
+            return (true, $"配置文件已写入：{filePath}", filePath);
         }
         catch (Exception ex)
         {
-            return (false, $"写入配置文件失败: {ex.Message}", "");
+            return (false, $"写入配置文件失败：{ex.Message}", "");
         }
     }
 
@@ -205,7 +205,7 @@ public class LuaConfigService
         }
         catch (Exception ex)
         {
-            return (false, $"删除失败: {ex.Message}");
+            return (false, $"删除失败：{ex.Message}");
         }
     }
 
@@ -268,7 +268,7 @@ else
         }
         catch (Exception ex)
         {
-            return (false, $"切换版本模式失败: {ex.Message}", item.VersionMode);
+            return (false, $"切换版本模式失败：{ex.Message}", item.VersionMode);
         }
     }
 

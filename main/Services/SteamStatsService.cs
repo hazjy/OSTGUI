@@ -68,7 +68,7 @@ public class SteamStatsService
         }
         catch (Exception ex)
         {
-            LogService.Diag($"stats-owned 异常: {ex.Message}");
+            LogService.Diag($"stats-owned 异常：{ex.Message}");
             return empty;
         }
         finally
@@ -137,8 +137,8 @@ public class SteamStatsService
         }
         catch (Exception ex)
         {
-            LogService.Diag($"成就子进程异常 {mode} appid={appId}: {ex.Message}");
-            return new StatsChildResult { Ok = false, Message = $"子进程异常: {ex.Message}" };
+            LogService.Diag($"成就子进程异常 {mode} appid={appId}：{ex.Message}");
+            return new StatsChildResult { Ok = false, Message = $"子进程异常：{ex.Message}" };
         }
         finally
         {

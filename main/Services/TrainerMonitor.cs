@@ -59,7 +59,7 @@ public static class TrainerMonitor
                 var enabled = bindings.Where(b => b.IsEnabled).ToList();
                 if (enabled.Count == 0 && !idleLogged)
                 {
-                    LogService.Diag("trainer 监控：当前没有启用的绑定，待命（开关关掉才会退出）");
+                    LogService.Diag("trainer 监控：当前无启用的绑定，待命（开关关闭后才会退出）");
                     idleLogged = true;
                 }
                 else if (enabled.Count > 0 && idleLogged)
@@ -94,7 +94,7 @@ public static class TrainerMonitor
         }
         catch (Exception ex)
         {
-            LogService.Diag($"trainer 监控异常退出: {ex.Message}");
+            LogService.Diag($"trainer 监控异常退出：{ex.Message}");
             return 1;
         }
         finally
@@ -150,7 +150,7 @@ public static class TrainerMonitor
         }
         catch (Exception ex)
         {
-            LogService.Diag($"trainer 启动失败 {Path.GetFileName(path)}: {ex.Message}");
+            LogService.Diag($"trainer 启动失败 {Path.GetFileName(path)}：{ex.Message}");
         }
     }
 

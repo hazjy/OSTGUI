@@ -48,7 +48,7 @@ public static class ToastService
                 catch (Exception ex)
                 {
                     // 原来是 catch { }：提权运行时这里抛了也看不见（"点了没反应、日志全无"）
-                    LogService.Diag($"系统通知发送失败（提权运行的进程不能收发通知）：{ex.GetType().Name}: {ex.Message}");
+                    LogService.Diag($"系统通知发送失败（提权运行的进程不能收发通知）：{ex.GetType().Name}：{ex.Message}");
                 }
             }
         }

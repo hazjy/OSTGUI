@@ -70,7 +70,7 @@ public static class Program
         }
         catch (Exception ex)
         {
-            Services.LogService.Diag($"系统通知注册失败（该环境不支持应用通知？）：{ex.GetType().Name}: {ex.Message}");
+            Services.LogService.Diag($"系统通知注册失败（该环境不支持应用通知？）：{ex.GetType().Name}：{ex.Message}");
         }
     }
 }

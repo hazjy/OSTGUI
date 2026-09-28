@@ -85,7 +85,7 @@ public class TrainerDownloadService
         }
         catch (Exception ex)
         {
-            LogService.Diag($"trainer 读取索引失败: {ex.Message}");
+            LogService.Diag($"trainer 读取索引失败：{ex.Message}");
         }
         return result.OrderBy(r => r.GameName, StringComparer.OrdinalIgnoreCase).ToList();
     }
@@ -100,7 +100,7 @@ public class TrainerDownloadService
         }
         catch (Exception ex)
         {
-            LogService.Diag($"trainer 索引解析失败（当空处理）: {ex.Message}");
+            LogService.Diag($"trainer 索引解析失败（视为空）：{ex.Message}");
             return new List<IndexEntry>();
         }
     }
@@ -117,7 +117,7 @@ public class TrainerDownloadService
         }
         catch (Exception ex)
         {
-            LogService.Diag($"trainer 索引写入失败: {ex.Message}");
+            LogService.Diag($"trainer 索引写入失败：{ex.Message}");
         }
     }
 
@@ -196,7 +196,7 @@ public class TrainerDownloadService
         }
         catch (Exception ex)
         {
-            LogService.Diag($"trainer 按名称查索引失败: {ex.Message}");
+            LogService.Diag($"trainer 按名称查索引失败：{ex.Message}");
         }
         return null;
     }
@@ -204,13 +204,13 @@ public class TrainerDownloadService
     private static void TryDelete(string path)
     {
         try { if (File.Exists(path)) File.Delete(path); }
-        catch (Exception ex) { LogService.Diag($"trainer 删除旧文件失败 {Path.GetFileName(path)}: {ex.Message}"); }
+        catch (Exception ex) { LogService.Diag($"trainer 删除旧文件失败 {Path.GetFileName(path)}：{ex.Message}"); }
     }
 
     private static void TryDeleteDirectory(string dir)
     {
         try { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); }
-        catch (Exception ex) { LogService.Diag($"trainer 删除旧目录失败 {Path.GetFileName(dir)}: {ex.Message}"); }
+        catch (Exception ex) { LogService.Diag($"trainer 删除旧目录失败 {Path.GetFileName(dir)}：{ex.Message}"); }
     }
 
     private static void RemoveFromIndex(string path)
@@ -279,7 +279,7 @@ public class TrainerDownloadService
         }
         catch (Exception ex)
         {
-            LogService.Diag($"trainer 下载失败 {bare}: {ex.Message}");
+            LogService.Diag($"trainer 下载失败 {bare}：{ex.Message}");
             return (null, ex.Message);
         }
         finally
@@ -335,12 +335,12 @@ public class TrainerDownloadService
             }
 
             var exe = EnumerateExes(dir).FirstOrDefault();
-            LogService.Event($"trainer 已解压到 {Path.GetFileName(dir)}（exe: {(exe == null ? "无" : Path.GetFileName(exe))}）");
+            LogService.Event($"trainer 已解压到 {Path.GetFileName(dir)}（exe：{(exe == null ? "无" : Path.GetFileName(exe))}）");
             return exe;
         }
         catch (Exception ex)
         {
-            LogService.Diag($"trainer 解压失败 {Path.GetFileName(zipPath)}: {ex.Message}");
+            LogService.Diag($"trainer 解压失败 {Path.GetFileName(zipPath)}：{ex.Message}");
             return null;
         }
     }
@@ -380,7 +380,7 @@ public class TrainerDownloadService
         }
         catch (Exception ex)
         {
-            LogService.Diag($"trainer 删除失败 {Path.GetFileName(path)}: {ex.Message}");
+            LogService.Diag($"trainer 删除失败 {Path.GetFileName(path)}：{ex.Message}");
         }
     }
 
@@ -399,7 +399,7 @@ public class TrainerDownloadService
         }
         catch (Exception ex)
         {
-            LogService.Diag($"trainer 打开目录失败: {ex.Message}");
+            LogService.Diag($"trainer 打开目录失败：{ex.Message}");
         }
     }
 

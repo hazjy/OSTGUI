@@ -95,7 +95,7 @@ public class LuaBuilder
         }
         if (missingKeyDepots.Count > 0)
         {
-            Log($"警告: 以下 depot 未找到解密密钥: {string.Join(", ", missingKeyDepots)}" +
+            Log($"警告：以下 depot 未找到解密密钥：{string.Join(", ", missingKeyDepots)}" +
                 "（Steam depot 内容均为 AES-256 加密，缺少密钥将无法解密下载）");
         }
 
@@ -184,7 +184,7 @@ public class LuaBuilder
                     if (merged.ContainsKey(depot.DepotId)) continue;
                     var gid = depot.Manifests.Count > 0 ? depot.Manifests[0] : "";
                     merged[depot.DepotId] = (gid, depot.MaxSize);
-                    Log($"补全缺失 depot: {depot.DepotId}" +
+                    Log($"补全缺失 depot：{depot.DepotId}" +
                         (string.IsNullOrEmpty(gid) ? "（无清单 GID，由内核自动获取）" : ""));
                 }
             }
@@ -195,7 +195,7 @@ public class LuaBuilder
         }
         catch (Exception ex)
         {
-            Log($"补全 depot 失败: {ex.Message}");
+            Log($"补全 depot 失败：{ex.Message}");
         }
 
         return merged
@@ -214,19 +214,19 @@ public class LuaBuilder
             var luaDir = _steamService.GetLuaConfigDir();
             if (string.IsNullOrEmpty(luaDir))
             {
-                Log("警告: 未找到 Lua 配置目录");
+                Log("警告：未找到 Lua 配置目录");
                 return false;
             }
 
             Directory.CreateDirectory(luaDir);
             var luaFilePath = Path.Combine(luaDir, $"{appId}.lua");
             await WriteFileAtomicallyAsync(luaFilePath, content);
-            Log($"已生成 Lua 文件: {luaFilePath}");
+            Log($"已生成 Lua 文件：{luaFilePath}");
             return true;
         }
         catch (Exception ex)
         {
-            Log($"写入 Lua 失败: {ex.Message}");
+            Log($"写入 Lua 失败：{ex.Message}");
             return false;
         }
     }

@@ -165,7 +165,7 @@ public class CoverImageService
                 if (ok)
                 {
                     TryDelete(miss);
-                    Log($"封面已缓存: {appId}");
+                    Log($"封面已缓存：{appId}");
                     return file;
                 }
                 reason = why;
@@ -174,7 +174,7 @@ public class CoverImageService
 
             if (reason == "net")
             {
-                Log($"封面暂不可用（网络异常，不记标记）: {appId}");
+                Log($"封面暂不可用（网络异常，不记标记）：{appId}");
                 return null;
             }
 
@@ -188,7 +188,7 @@ public class CoverImageService
             {
                 // 接口/网络暂时不可用：**不能**记成"确实没有图"，否则 1 天内不再重试
                 // （原实现就是这么把偶发失败变成一天空白的）
-                Log($"封面暂不可用（官方接口失败，不记标记）: {appId}");
+                Log($"封面暂不可用（官方接口失败，不记标记）：{appId}");
                 return null;
             }
 
@@ -201,7 +201,7 @@ public class CoverImageService
                 if (ok)
                 {
                     TryDelete(miss);
-                    Log($"封面已缓存(官方源): {appId}");
+                    Log($"封面已缓存（官方源）：{appId}");
                     return file;
                 }
                 reason = "api-url";
@@ -215,7 +215,7 @@ public class CoverImageService
             Directory.CreateDirectory(CacheDir);
             try { await File.WriteAllBytesAsync(miss, Array.Empty<byte>()).ConfigureAwait(false); }
             catch { }
-            Log($"封面缺失（{MissTtlDays} 天内不再重试）: {appId}（{ReasonText(reason)}）");
+            Log($"封面缺失（{MissTtlDays} 天内不再重试）：{appId}（{ReasonText(reason)}）");
             return null;
         }
         finally
@@ -250,19 +250,19 @@ public class CoverImageService
         }
         catch
         {
-            Log($"缩略图官方接口失败（本次放弃，不落盘也不标记）: {appId}");
+            Log($"缩略图官方接口失败（本次放弃，不落盘也不标记）：{appId}");
             return null;
         }
 
         if (string.IsNullOrWhiteSpace(officialUrl))
         {
-            Log($"缩略图无图（两条静态 header 链都没命中，官方接口也没给 URL）: {appId}");
+            Log($"缩略图无图（两条静态 header 链均未命中，官方接口也未返回 URL）：{appId}");
             return null;
         }
 
         var officialBytes = await TryGetBytesAsync(officialUrl).ConfigureAwait(false);
         if (officialBytes is null)
-            Log($"缩略图官方 URL 下不动: {appId} {officialUrl}");
+            Log($"缩略图官方 URL 下不动：{appId} {officialUrl}");
         return officialBytes;
     }
 
@@ -379,7 +379,7 @@ public class CoverImageService
 
     private static string ReasonText(string reason) => reason switch
     {
-        "404" => "静态链与官方源都没有这张图",
+        "404" => "静态链与官方源均未找到该图",
         "api-none" => "官方接口无图片字段",
         "api-url" => "官方给了 URL 但下不动",
         "status" => "非 200 响应",

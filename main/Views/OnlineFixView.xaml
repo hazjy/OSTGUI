@@ -115,7 +115,7 @@
                         <TextBlock TextWrapping="Wrap" FontSize="13"
                                    Text="1. 游戏 AppID —— 填你要联机的、已入库游戏的 AppID，点「查询」确认是它，再点启动（▶）。" />
                         <TextBlock TextWrapping="Wrap" FontSize="13"
-                                   Text="2. 协议AppID —— 默认「默认（480）」即可；若 480 没有手柄配置、或需要换一个带 Steam Input 配置的免费 AppID，就选「自定义」并在右侧填那个 AppID。" />
+                                   Text="2. 协议 AppID：默认使用「默认（480）」；若 480 无手柄配置，或需要改用带 Steam Input 配置的免费 AppID，请选择「自定义」并在右侧填写该 AppID。" />
                         <TextBlock TextWrapping="Wrap" FontSize="13"
                                    Text="3. 对端必须使用相同的会话身份，否则互相看不到。启动后点停止（■）可结束；下方会显示当前运行情况。" />
                         <TextBlock TextWrapping="Wrap" FontSize="12"

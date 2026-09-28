@@ -57,7 +57,7 @@ public class OnlineFixService
         }
         catch (Exception ex)
         {
-            return (false, $"启动失败: {ex.Message}");
+            return (false, $"启动失败：{ex.Message}");
         }
     }
 
@@ -74,7 +74,7 @@ public class OnlineFixService
     {
         var pids = FindOnlineFixProcessIds();
         if (pids.Count == 0)
-            return (false, "当前没有正在运行的 480 联机游戏");
+            return (false, "当前无正在运行的 480 联机游戏");
 
         var killed = 0;
         foreach (var pid in pids)
@@ -146,7 +146,7 @@ public class OnlineFixService
         }
         catch (Exception ex)
         {
-            return (false, $"启动失败: {ex.Message}");
+            return (false, $"启动失败：{ex.Message}");
         }
     }
 
@@ -196,7 +196,7 @@ public class OnlineFixService
         }
         catch (Exception ex)
         {
-            LogService.Diag($"[AppID Changer] 补还原失败: {ex.Message}");
+            LogService.Diag($"[AppID Changer] 补还原失败：{ex.Message}");
             ToastService.ShowError("AppID Changer", $"上次的 steam_appid.txt 还原失败：{ex.Message}");
         }
     }
@@ -335,7 +335,7 @@ public class OnlineFixService
     {
         var hosts = FindHostProcessIds();
         if (hosts.Count == 0)
-            return (false, "当前没有正在运行的 DLL 注入游戏");
+            return (false, "当前无正在运行的 DLL 注入游戏");
 
         var games = 0;
         var stopped = 0;

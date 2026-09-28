@@ -265,7 +265,7 @@ public partial class SettingsViewModel : ObservableObject
         set => SetProperty(ref _isOstInjected, value);
     }
 
-    private string _ostStatusText = "检查中...";
+    private string _ostStatusText = "检查中…";
 
     public string OstStatusText
     {
@@ -377,7 +377,7 @@ public partial class SettingsViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            var msg = $"Sudama 缓存刷新异常: {ex.Message}";
+            var msg = $"Sudama 缓存刷新异常：{ex.Message}";
             LogService.Event(msg);
             SetStatus(msg, "Error");
             Services.ToastService.ShowError("Sudama 缓存刷新失败", msg);
@@ -406,7 +406,7 @@ public partial class SettingsViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            var msg = $"Sudama 缓存导入异常: {ex.Message}";
+            var msg = $"Sudama 缓存导入异常：{ex.Message}";
             LogService.Event(msg);
             SetStatus(msg, "Error");
             Services.ToastService.ShowError("Sudama 缓存导入失败", msg);
@@ -617,7 +617,7 @@ public partial class SettingsViewModel : ObservableObject
                     c.ManifestSourceEnabled[source.Id] = source.IsEnabled;
             });
         }
-        catch (Exception ex) { LogService.Diag($"[SaveAllToConfig] 失败: {ex.Message}"); }
+        catch (Exception ex) { LogService.Diag($"[SaveAllToConfig] 失败：{ex.Message}"); }
     }
 
     /// <summary>
@@ -634,7 +634,7 @@ public partial class SettingsViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            SetStatus($"保存失败: {ex.Message}", "Error");
+            SetStatus($"保存失败：{ex.Message}", "Error");
         }
     }
 
@@ -667,7 +667,7 @@ public partial class SettingsViewModel : ObservableObject
     private async Task InjectOstDllAsync()
     {
         IsOstOperating = true;
-        SetStatus("正在注入 OST DLL...", "Info");
+        SetStatus("正在注入 OST DLL…", "Info");
 
         try
         {
@@ -689,7 +689,7 @@ public partial class SettingsViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            SetStatus($"注入失败: {ex.Message}", "Error");
+            SetStatus($"注入失败：{ex.Message}", "Error");
         }
         finally
         {
@@ -703,7 +703,7 @@ public partial class SettingsViewModel : ObservableObject
     private async Task UnloadOstDllAsync()
     {
         IsOstOperating = true;
-        SetStatus("正在卸载 OST DLL...", "Info");
+        SetStatus("正在卸载 OST DLL…", "Info");
 
         try
         {
@@ -719,7 +719,7 @@ public partial class SettingsViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            SetStatus($"卸载失败: {ex.Message}", "Error");
+            SetStatus($"卸载失败：{ex.Message}", "Error");
         }
         finally
         {
@@ -732,7 +732,7 @@ public partial class SettingsViewModel : ObservableObject
     /// </summary>
     private async Task RestartSteamAsync()
     {
-        SetStatus("正在重启 Steam...", "Info");
+        SetStatus("正在重启 Steam…", "Info");
         var (success, message) = await _steamService.RestartSteamAsync();
         SetStatus(message, success ? "Success" : "Error");
     }

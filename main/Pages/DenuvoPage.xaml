@@ -237,7 +237,7 @@
                                         </StackPanel>
                                     </Border>
 
-                                    <TextBlock Text="注意：部分游戏的 DLC 也受 D 加密保护，授权文件中没有对应 DLC 授权时，这些 DLC 将无法解锁或启动失败。"
+                                    <TextBlock Text="注意：部分游戏的 DLC 也受 D 加密保护；授权文件中无对应 DLC 授权时，这些 DLC 将无法解锁或启动失败。"
                                                FontSize="12" TextWrapping="Wrap"
                                                Foreground="{ThemeResource SystemFillColorCautionBrush}" />
                                 </StackPanel>

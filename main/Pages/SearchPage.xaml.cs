@@ -82,7 +82,7 @@ public sealed partial class SearchPage : Page
         }
         catch (Exception ex)
         {
-            LogService.Diag($"搜索：兜底List 抛异常 {ex.GetType().Name}: {ex.Message}");
+            LogService.Diag($"搜索：兜底List 抛异常 {ex.GetType().Name}：{ex.Message}");
         }
     }
 

@@ -18,7 +18,7 @@ public class TicketService
         try
         {
             if (!ticket.HasAppTicket && !ticket.HasETicket)
-                return (false, "没有可写入的 ticket 数据");
+                return (false, "无可写入的 ticket 数据");
 
             using var key = Registry.CurrentUser.CreateSubKey($"{SteamAppsRegPath}\\{ticket.AppId}");
 
@@ -41,7 +41,7 @@ public class TicketService
         }
         catch (Exception ex)
         {
-            return (false, $"注册表写入失败: {ex.Message}");
+            return (false, $"注册表写入失败：{ex.Message}");
         }
     }
 

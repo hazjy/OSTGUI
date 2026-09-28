@@ -72,7 +72,7 @@ public class ManifestFileService
             if (copiedAny) count++;
         }
         if (failed.Count > 0)
-            Log($"警告: 以下清单拷贝未全部成功（可重试入库补拷）: {string.Join("; ", failed)}");
+            Log($"警告：以下清单拷贝未全部成功（可重试入库补拷）：{string.Join("; ", failed)}");
         return count;
     }
 

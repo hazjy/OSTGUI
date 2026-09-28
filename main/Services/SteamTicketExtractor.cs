@@ -100,7 +100,7 @@ public class SteamTicketExtractor
         }
         catch (Exception ex)
         {
-            return new ExtractResult { Success = false, Message = $"提取异常: {ex.Message}" };
+            return new ExtractResult { Success = false, Message = $"提取异常：{ex.Message}" };
         }
         finally
         {
@@ -130,7 +130,7 @@ public class SteamTicketExtractor
             SetDllDirectory(steamPath);
             var module = LoadLibraryEx(dllPath, IntPtr.Zero, LoadWithAlteredSearchPath);
             if (module == IntPtr.Zero)
-                return Fail($"加载 steamclient64.dll 失败 (0x{GetLastError():X8})");
+                return Fail($"加载 steamclient64.dll 失败（0x{GetLastError():X8}）");
 
             try
             {
@@ -196,7 +196,7 @@ public class SteamTicketExtractor
         }
         catch (Exception ex)
         {
-            return Fail($"提取异常: {ex.Message}");
+            return Fail($"提取异常：{ex.Message}");
         }
     }
 

@@ -57,7 +57,7 @@ public class SteamDllService
     public (bool success, string message) SetDenuvoMode(string mode)
     {
         if (mode != "normal" && mode != "compat")
-            return (false, $"未知的 D 加密模式: {mode}");
+            return (false, $"未知的 D 加密模式：{mode}");
 
         var path = GetConfigPath();
         if (path == null)
@@ -95,7 +95,7 @@ public class SteamDllService
         }
         catch (Exception ex)
         {
-            return (false, $"写入 {ConfigFileName} 失败: {ex.Message}");
+            return (false, $"写入 {ConfigFileName} 失败：{ex.Message}");
         }
     }
 
@@ -183,7 +183,7 @@ public class SteamDllService
         }
         catch (Exception ex)
         {
-            return (false, $"写入 {ConfigFileName} 失败: {ex.Message}");
+            return (false, $"写入 {ConfigFileName} 失败：{ex.Message}");
         }
     }
 
@@ -287,7 +287,7 @@ public class SteamDllService
             return (false, "Steam 路径未设置，请先在设置中配置 Steam 路径。");
 
         if (!Directory.Exists(sourceDir))
-            return (false, $"源目录不存在: {sourceDir}");
+            return (false, $"源目录不存在：{sourceDir}");
 
         var copied = new List<string>();
         var errors = new List<string>();
@@ -301,7 +301,7 @@ public class SteamDllService
 
                 if (!File.Exists(src))
                 {
-                    errors.Add($"缺少文件: {dll}");
+                    errors.Add($"缺少文件：{dll}");
                     continue;
                 }
 
@@ -317,7 +317,7 @@ public class SteamDllService
             }
             catch (Exception ex)
             {
-                errors.Add($"复制 {dll} 失败: {ex.Message}");
+                errors.Add($"复制 {dll} 失败：{ex.Message}");
             }
         }
 
@@ -325,9 +325,9 @@ public class SteamDllService
             return (false, $"注入失败:\n{string.Join("\n", errors)}");
 
         if (errors.Count > 0)
-            return (true, $"部分成功: 已注入 {string.Join(", ", copied)}\n警告:\n{string.Join("\n", errors)}");
+            return (true, $"部分成功：已注入 {string.Join(", ", copied)}\n警告：\n{string.Join("\n", errors)}");
 
-        return (true, $"OST DLL 已全部注入到 Steam 目录:\n{steamPath}\n\n注入文件: {string.Join(", ", copied)}");
+        return (true, $"OST DLL 已全部注入到 Steam 目录：\n{steamPath}\n\n注入文件：{string.Join(", ", copied)}");
     }
 
     /// <summary>
@@ -362,7 +362,7 @@ public class SteamDllService
             }
             catch (Exception ex)
             {
-                errors.Add($"删除 {dll} 失败: {ex.Message}");
+                errors.Add($"删除 {dll} 失败：{ex.Message}");
             }
         }
 
@@ -370,7 +370,7 @@ public class SteamDllService
             return (false, $"卸载失败:\n{string.Join("\n", errors)}");
 
         var msg = removed.Count > 0
-            ? $"已从 Steam 目录移除: {string.Join(", ", removed)}"
+            ? $"已从 Steam 目录移除：{string.Join(", ", removed)}"
             : "未发现 OST DLL 文件。";
 
         return (true, msg);

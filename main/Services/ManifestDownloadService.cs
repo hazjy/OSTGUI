@@ -66,7 +66,7 @@ public class ManifestDownloadService
                 return new AddGameResult { Success = false, Message = "未配置 ManifestHub API Key" };
 
             // 1. 从 Steam 官方 API 获取 depot + manifest gid（不依赖 GitHub）
-            Log("正在从 Steam API 获取 depot/manifest 信息...");
+            Log("正在从 Steam API 获取 depot/manifest 信息…");
             var gameDetails = await _gameInfoService.GetGameDetailsFromSteamAsync(appId, ct);
             if (gameDetails == null || gameDetails.Depots.Count == 0)
                 return new AddGameResult { Success = false, Message = "无法获取游戏 Depot 信息" };
@@ -81,7 +81,7 @@ public class ManifestDownloadService
             if (manifestFiles.Count == 0)
                 return new AddGameResult { Success = false, Message = "Steam API 未返回任何 manifest 信息，无法下载清单" };
 
-            Log($"找到 {manifestFiles.Count} 个清单文件, 开始下载...");
+            Log($"找到 {manifestFiles.Count} 个清单文件，开始下载…");
 
             // 2. 下载每个 manifest
             Directory.CreateDirectory(tempDir);
@@ -100,7 +100,7 @@ public class ManifestDownloadService
                 var url = !string.IsNullOrEmpty(mhubUrlTemplate)
                     ? mhubSource!.BuildUrl(null, depotId, manifestGid)
                     : $"https://api.manifesthub2.filegear-sg.me/manifest?apikey={apiKey}&depotid={depotId}&manifestid={manifestGid}";
-                Log($"下载 Depot {depotId} 的清单...");
+                Log($"下载 Depot {depotId} 的清单…");
 
                 try
                 {
@@ -134,7 +134,7 @@ public class ManifestDownloadService
                     else
                     {
                         failedDepots.Add(depotId);
-                        Log($"下载失败 ({(int)response.StatusCode}): Depot {depotId}");
+                        Log($"下载失败 ({(int)response.StatusCode})：Depot {depotId}");
                     }
                 }
                 catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -146,7 +146,7 @@ public class ManifestDownloadService
                 catch (Exception ex)
                 {
                     failedDepots.Add(depotId);
-                    Log($"下载异常: Depot {depotId} - {ex.Message}");
+                    Log($"下载异常：Depot {depotId} - {ex.Message}");
                 }
             }
 
@@ -154,7 +154,7 @@ public class ManifestDownloadService
             // 壳型/共享 depot（无 GID）本就不预下载，属正常，不提示。
             if (failedDepots.Count > 0)
             {
-                Log($"警告: 以下实际 depot 的清单未能下载，未预下载，将由内核运行时获取: {string.Join(", ", failedDepots)}");
+                Log($"警告：以下实际 depot 的清单未能下载，未预下载，将由内核运行时获取：{string.Join(", ", failedDepots)}");
             }
 
             if (downloaded.Count == 0)
@@ -191,7 +191,7 @@ public class ManifestDownloadService
         }
         catch (Exception ex)
         {
-            return new AddGameResult { Success = false, Message = $"ManifestHub 入库失败: {ex.Message}" };
+            return new AddGameResult { Success = false, Message = $"ManifestHub 入库失败：{ex.Message}" };
         }
         finally
         {
@@ -215,7 +215,7 @@ public class ManifestDownloadService
         try
         {
             // 1. 获取 depot 信息（含 manifest gid）
-            Log("正在获取 Depot 信息...");
+            Log("正在获取 Depot 信息…");
             var gameDetails = await _gameInfoService.GetGameDetailsFromSteamAsync(appId, ct);
             if (gameDetails == null || gameDetails.Depots.Count == 0)
                 return new AddGameResult { Success = false, Message = "无法获取游戏 Depot 信息" };
@@ -243,7 +243,7 @@ public class ManifestDownloadService
             return new AddGameResult
             {
                 Success = true,
-                Message = $"成功入库 AppID {appId} (Sudama 密钥源模式)（未下载到清单文件，清单需由清单源获取）Lua {(luaOk ? "已生成" : "生成失败")}",
+                Message = $"成功入库 AppID {appId}（Sudama 密钥源模式）（未下载到清单文件，清单需由清单源获取）Lua {(luaOk ? "已生成" : "生成失败")}",
                 MissingKeys = missingKeys,
                 MissingManifests = missingManifests,
                 ManifestCount = 0,
@@ -257,7 +257,7 @@ public class ManifestDownloadService
         }
         catch (Exception ex)
         {
-            return new AddGameResult { Success = false, Message = $"Sudama 入库失败: {ex.Message}" };
+            return new AddGameResult { Success = false, Message = $"Sudama 入库失败：{ex.Message}" };
         }
     }
 

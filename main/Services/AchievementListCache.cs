@@ -60,7 +60,7 @@ public class AchievementListCache
         }
         catch (Exception ex)
         {
-            LogService.Diag($"成就列表缓存读取失败（当没有处理）: {ex.Message}");
+            LogService.Diag($"成就列表缓存读取失败（视为未处理）：{ex.Message}");
             return null;
         }
     }
@@ -77,7 +77,7 @@ public class AchievementListCache
         }
         catch (Exception ex)
         {
-            LogService.Diag($"成就列表缓存写入失败: {ex.Message}");
+            LogService.Diag($"成就列表缓存写入失败：{ex.Message}");
         }
     }
 

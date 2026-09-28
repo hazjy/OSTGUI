@@ -238,7 +238,7 @@ public partial class TrainerViewModel : ObservableObject
             catch (Exception ex)
             {
                 // 抓取失败（站点/网络不可用）不能让异常冒出去：这里是 fire-and-forget 调用
-                LogService.Diag($"trainer 列表加载失败: {ex.Message}");
+                LogService.Diag($"trainer 列表加载失败：{ex.Message}");
                 Items.Clear();
                 StatusText = SearchStatusText();
                 return;
@@ -263,8 +263,8 @@ public partial class TrainerViewModel : ObservableObject
     /// <summary>搜索视图的状态栏文案（含"没找到"——页面真结果 0 条时的正常情况，不是故障）</summary>
     private string SearchStatusText()
     {
-        if (_loadedQuery.Length == 0) return "使用搜索框搜索...";
-        if (Items.Count == 0) return $"未找到[{_loadedQuery}]的结果；详情请看日志";
+        if (_loadedQuery.Length == 0) return "使用搜索框搜索…";
+        if (Items.Count == 0) return $"未找到「{_loadedQuery}」的结果；详情请查看日志";
         return $"搜索「{_loadedQuery}」{Items.Count} 条";
     }
 
@@ -330,7 +330,7 @@ public partial class TrainerViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            LogService.Diag($"trainer 启动失败 {exe}: {ex.Message}");
+            LogService.Diag($"trainer 启动失败 {exe}：{ex.Message}");
             ToastService.ShowError("启动失败", ex.Message);
         }
     }
@@ -360,7 +360,7 @@ public partial class TrainerViewModel : ObservableObject
                 page = await FindPageUrlAsync(trainer.GameName);
                 if (string.IsNullOrEmpty(page))
                 {
-                    StatusText = "更新失败：修改器未找到";
+                    StatusText = "更新失败：未找到修改器";
                     return;
                 }
             }
@@ -368,7 +368,7 @@ public partial class TrainerViewModel : ObservableObject
             var latest = await _catalog.GetDownloadAsync(page);
             if (latest == null)
             {
-                StatusText = "更新失败：修改器未找到";
+                StatusText = "更新失败：未找到修改器";
                 return;
             }
 
@@ -540,7 +540,7 @@ public partial class TrainerViewModel : ObservableObject
             }
             catch (Exception ex)
             {
-                LogService.Diag($"trainer 监控启动失败: {ex.Message}");
+                LogService.Diag($"trainer 监控启动失败：{ex.Message}");
             }
 
             // 子进程写 pid 文件要一点时间，等一下再报状态（否则会误报"未运行"）。
@@ -592,7 +592,7 @@ public partial class TrainerViewModel : ObservableObject
         var monitor = pid == null
             ? (_config.Config.TrainerMonitorEnabled ? "监控未运行" : "监控已关闭")
             : "监控已运行";
-        MonitorStatus = $"共{Bindings.Count}条，启用{enabled}条 · {monitor}" + (pid == null ? "" : $"（pid {pid}）");
+        MonitorStatus = $"共 {Bindings.Count} 条，启用 {enabled} 条 · {monitor}" + (pid == null ? "" : $"（pid {pid}）");
 
         // 跑着时只能点「停止」，停着时只能点「运行」
         CanStopMonitor = pid != null;
