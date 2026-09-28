@@ -124,11 +124,11 @@ public class OnlineFixService
             // 半秒内就退出必然是它根本没起来 —— 典型情况是发布漏了 OnlineHost.dll，只剩一个空壳
             // apphost。以前这里是即发即忘，界面照报成功，故障完全隐形（2026-09-28 实测踩到）。
             if (hostProc is null)
-                return (false, "OnlineHost 启动失败（Process.Start 返回空）");
+                return (false, "联机宿主启动失败（进程创建失败）");
 
             if (hostProc.WaitForExit(500))
-                return (false, $"OnlineHost 启动后立即退出：{DescribeHostExit(hostProc.ExitCode)}" +
-                               $"（详情见 {OnlineHostLogPath}）");
+                return (false, $"联机宿主启动后立即退出：{DescribeHostExit(hostProc.ExitCode)}。" +
+                               $"详情见日志 {OnlineHostLogPath}");
 
             if (!viaAppIdFile)
                 return (true, $"已以 {sessionAppId} 身份启动 {Path.GetFileName(gameExe)}");
@@ -142,7 +142,7 @@ public class OnlineFixService
                     return (true, $"已写入 AppID {sessionAppId} 并启动 {Path.GetFileName(gameExe)}（退出后自动还原）");
                 Thread.Sleep(250);
             }
-            return (false, $"写不进 {target}（目录只读或被占用），游戏未启动");
+            return (false, $"无法写入 {target}（目录只读或被占用），游戏未启动");
         }
         catch (Exception ex)
         {
@@ -164,9 +164,9 @@ public class OnlineFixService
     private static string DescribeHostExit(int code) => code switch
     {
         2 => "参数无效",
-        3 => "找不到游戏 exe",
+        3 => "未找到游戏 exe",
         4 => "游戏进程启动失败",
-        _ => "宿主异常退出（退出码 " + code + "，常见原因是发布没带上 OnlineHost.dll，宿主成了空壳）"
+        _ => "联机宿主异常退出（退出码 " + code + "）。常见原因：发布缺少 OnlineHost.dll"
     };
 
     /// <summary>
@@ -237,18 +237,92 @@ public class OnlineFixService
         return null;
     }
 
-    /// <summary>主程序：优先与目录同名的 exe，否则取目录里最大的（排除崩溃处理器/卸载器等）。</summary>
+    private const int MaxScanDepth = 4;     // 主程序最多下探几层（bin64\ 这类一层就够，留点余量）
+    private const int MaxScanDirs = 2000;   // 最多访问多少个目录（游戏目录动辄上万文件，不能全遍历）
+
+    /// <summary>
+    /// 找主程序。按可信度分三档，而不是只看顶层 —— 目录结构千奇百怪：
+    /// 红色沙漠（3321460）顶层只有 0000..0025 资源目录，主程序在 bin64\CrimsonDesert.exe，
+    /// 而且目录名（Crimson Desert，带空格）与程序名（CrimsonDesert）也对不上，
+    /// 旧的"顶层同名 exe → 顶层最大 exe"必然落空（2026-09-28 用户实测）。
+    /// 第 2 档保留旧行为：像 wallpaper_engine → wallpaper64.exe 这种程序名跟目录名无关的，
+    /// 顶层最大依然是对的（曾试过用"steam_api64.dll 同目录"当第 2 档，在那里选错成了 wallpaperui.exe）。
+    /// </summary>
     private static string? MainExeIn(string dir)
     {
-        var named = Path.Combine(dir, Path.GetFileName(dir) + ".exe");
-        if (File.Exists(named)) return named;
+        var candidates = ExesWithin(dir, MaxScanDepth).Where(IsGameExe).ToList();
+        if (candidates.Count == 0) return null;
 
-        return new DirectoryInfo(dir).GetFiles("*.exe")
-            .Where(f => !f.Name.Contains("CrashHandler", StringComparison.OrdinalIgnoreCase)
-                     && !f.Name.Contains("vcredist", StringComparison.OrdinalIgnoreCase)
-                     && !f.Name.StartsWith("unins", StringComparison.OrdinalIgnoreCase))
+        // 1) 与游戏目录同名（忽略大小写与空格/下划线等分隔符差异）—— 主程序在子目录里也照样命中
+        var wanted = NormalizeName(Path.GetFileName(dir));
+        var named = candidates
+            .Where(f => NormalizeName(Path.GetFileNameWithoutExtension(f.Name)) == wanted)
             .OrderByDescending(f => f.Length)
-            .FirstOrDefault()?.FullName;
+            .FirstOrDefault();
+        if (named is not null) return named.FullName;
+
+        // 2) 游戏目录顶层最大的那个
+        var top = Path.TrimEndingDirectorySeparator(dir);
+        var atTop = candidates
+            .Where(f => string.Equals(f.DirectoryName, top, StringComparison.OrdinalIgnoreCase))
+            .OrderByDescending(f => f.Length)
+            .FirstOrDefault();
+        if (atTop is not null) return atTop.FullName;
+
+        // 3) 兜底：下层里最大的（红色沙漠是这一档）
+        return candidates.OrderByDescending(f => f.Length).First().FullName;
+    }
+
+    /// <summary>只抹平大小写与分隔符差异，不做缩写/拼音之类的猜测</summary>
+    private static string NormalizeName(string name)
+        => new(name.Where(char.IsLetterOrDigit).Select(char.ToLowerInvariant).ToArray());
+
+    /// <summary>
+    /// 排除崩溃处理器 / 卸载器 / 运行库安装器。路径里的 redist 也要排除
+    /// （Steamworks Shared 这种目录里全是 _CommonRedist 安装器），但"crash"只在文件名上判，
+    /// 免得误伤名字里就带 crash 的游戏本体。
+    /// </summary>
+    private static bool IsGameExe(FileInfo f)
+    {
+        var n = f.Name;
+        if (n.Contains("crash", StringComparison.OrdinalIgnoreCase)
+            || n.Contains("vcredist", StringComparison.OrdinalIgnoreCase)
+            || n.Contains("redist", StringComparison.OrdinalIgnoreCase)
+            || n.StartsWith("unins", StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        return !(f.DirectoryName ?? "").Contains("redist", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>广度优先收集 exe，既限层数也限目录总数（宿主的 shim 查找用的是同一套路）</summary>
+    private static List<FileInfo> ExesWithin(string root, int maxDepth)
+    {
+        var found = new List<FileInfo>();
+        var queue = new Queue<(string Path, int Depth)>();
+        queue.Enqueue((root, 0));
+        var visited = 0;
+        while (queue.Count > 0 && visited < MaxScanDirs)
+        {
+            var (path, depth) = queue.Dequeue();
+            visited++;
+
+            DirectoryInfo d;
+            try
+            {
+                d = new DirectoryInfo(path);
+                if (!d.Exists) continue;
+                found.AddRange(d.GetFiles("*.exe"));
+            }
+            catch { continue; }   // 权限不足 / 目录消失：跳过这一支，不影响其它分支
+
+            if (depth >= maxDepth) continue;
+            try
+            {
+                foreach (var sub in d.GetDirectories()) queue.Enqueue((sub.FullName, depth + 1));
+            }
+            catch { }
+        }
+        return found;
     }
 
     /// <summary>是否有 DLL 注入（宿主 480）联机游戏在运行</summary>

@@ -174,7 +174,7 @@ public sealed partial class TrainerPage : Page
         // 修改器：输入名称 + 「查询」（名称从「已下载」里用「复制名称」拿，比在下拉里翻找省事）
         var trainerBox = new TextBox
         {
-            PlaceholderText = "请在更多（三个点）里复制",
+            PlaceholderText = "请从「更多」（三个点）中复制",
             HorizontalAlignment = HorizontalAlignment.Stretch,
             MinWidth = 320,
         };
@@ -201,8 +201,8 @@ public sealed partial class TrainerPage : Page
         {
             resolvedPath = VM.FindTrainerPath(trainerBox.Text ?? "") ?? "";
             lookupText.Text = resolvedPath.Length > 0
-                ? $"找到：{resolvedPath}"
-                : "没找到这个名称的修改器（名称要完全一致，可在「已下载」里复制）";
+                ? $"已找到：{resolvedPath}"
+                : "未找到该名称的修改器（名称须完全一致，可在「已下载」中复制）";
         }
 
         lookupButton.Click += (_, _) => Lookup();

@@ -1,4 +1,4 @@
-﻿using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using OSTGUI.Services;
 using OSTGUI.ViewModels;
@@ -22,15 +22,17 @@ public sealed partial class OtherOnlineView : UserControl
 
         // 直接取控件文本：绑定的回写时机不确定，不能依赖 VM 已经是最新值
         VM.DllGameAppId = DllGameAppIdBox.Text.Trim();
+        // 这两处校验针对的是"填的 AppID"，跟当前是哪种模式无关，所以不带模式名
+        // （模式名在本视图里是动态算的 AppID Changer / DLL 注入，写死必错）
         if (VM.DllGameAppId.Length == 0)
         {
-            (App.MainWindow as MainWindow)?.Notify("DLL 注入", "请先填游戏 AppID", InfoBarSeverity.Warning);
+            (App.MainWindow as MainWindow)?.Notify("", "请先填写游戏 AppID", InfoBarSeverity.Warning);
             return;
         }
 
         // 成功不打扰（路径直接显示在下面一行），只有失败才提示
         if (VM.ResolveDllGameExe() is null)
-            (App.MainWindow as MainWindow)?.Notify("DLL 注入", "没找到该 AppID 的已安装游戏", InfoBarSeverity.Warning);
+            (App.MainWindow as MainWindow)?.Notify("", "未找到该AppID的已安装游戏", InfoBarSeverity.Warning);
     }
 
     /// <summary>启动：按当前方式分派（DLL 注入 / AppID Changer）</summary>
