@@ -112,13 +112,23 @@ public class OnlineFixService
 
         try
         {
-            Process.Start(new ProcessStartInfo(host)
+            using var hostProc = Process.Start(new ProcessStartInfo(host)
             {
                 Arguments = viaAppIdFile
                     ? $"--appid-txt \"{gameExe}\" {sessionAppId}"
                     : $"\"{gameExe}\" {sessionAppId}",
                 UseShellExecute = false
             });
+
+            // 宿主是"陪到游戏退出"的长命进程（OnlineHost/Program.cs 里 game.WaitForExit()），
+            // 半秒内就退出必然是它根本没起来 —— 典型情况是发布漏了 OnlineHost.dll，只剩一个空壳
+            // apphost。以前这里是即发即忘，界面照报成功，故障完全隐形（2026-09-28 实测踩到）。
+            if (hostProc is null)
+                return (false, "OnlineHost 启动失败（Process.Start 返回空）");
+
+            if (hostProc.WaitForExit(500))
+                return (false, $"OnlineHost 启动后立即退出：{DescribeHostExit(hostProc.ExitCode)}" +
+                               $"（详情见 {OnlineHostLogPath}）");
 
             if (!viaAppIdFile)
                 return (true, $"已以 {sessionAppId} 身份启动 {Path.GetFileName(gameExe)}");
@@ -144,6 +154,20 @@ public class OnlineFixService
     public static string AppIdJournalPath => Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "OSTGUI", "appid-changer.txt");
+
+    /// <summary>宿主的日志（宿主没有界面，"联机点了没反应"时它是唯一线索）</summary>
+    public static string OnlineHostLogPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "OSTGUI", "logs", "onlinehost.log");
+
+    /// <summary>把宿主的退出码翻译成能看懂的失败原因（取值见 OnlineHost/Program.cs）</summary>
+    private static string DescribeHostExit(int code) => code switch
+    {
+        2 => "参数无效",
+        3 => "找不到游戏 exe",
+        4 => "游戏进程启动失败",
+        _ => "宿主异常退出（退出码 " + code + "，常见原因是发布没带上 OnlineHost.dll，宿主成了空壳）"
+    };
 
     /// <summary>
     /// 补还原：宿主被杀 / 断电会留下台账。宿主还活着说明会话仍在（它会自己还原），跳过。
