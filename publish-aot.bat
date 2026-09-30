@@ -26,10 +26,36 @@ if not exist "%MSB%" (
   exit /b 1
 )
 
+rem ---- 0) restore with the SAME properties -----------------------------
+rem Restore and Publish must be SEPARATE invocations. /t:Restore;Publish in one run
+rem evaluates the project before the restore has written its generated props/targets,
+rem and the WinUI XAML step then does not run at all (~98 CS0103 "InitializeComponent/
+rem name does not exist"). Seen 2026-09-30.
+rem The restore must also carry PublishAot/SelfContained/RuntimeIdentifier: without them
+rem project.assets.json has no AOT runtime pack, MSBuild does not re-restore during
+rem publish, and PublishAot is silently ignored -> a ~190 MB JIT build. Also 2026-09-30.
+"%MSB%" "%PROJ%" /t:Restore /p:Configuration=Release /p:RuntimeIdentifier=win-x64 /p:SelfContained=true /p:PublishAot=true /p:WindowsPackageType=None /p:WindowsAppSDKSelfContained=true /p:PublishSingleFile=false /p:PublishReadyToRun=false /p:CsWinRTAotWarningLevel=2 /nologo /v:m
+set "CODE=%ERRORLEVEL%"
+if not "%CODE%"=="0" goto fail
+
 rem ---- 1) the GUI ----------------------------------------------------
 "%MSB%" "%PROJ%" /t:Publish /p:Configuration=Release /p:RuntimeIdentifier=win-x64 /p:SelfContained=true /p:PublishAot=true /p:WindowsPackageType=None /p:WindowsAppSDKSelfContained=true /p:PublishSingleFile=false /p:PublishReadyToRun=false /p:CsWinRTAotWarningLevel=2 /p:PublishDir="%OUT%" /nologo /v:m
 set "CODE=%ERRORLEVEL%"
 if not "%CODE%"=="0" goto fail
+
+rem ---- 1b) fail loudly if AOT was skipped -----------------------------
+rem If the AOT runtime pack is missing from the restore, the publish silently produces a
+rem JIT build (coreclr.dll + OSTGUI.dll present, ~190 MB, OnlineHost back to a stub).
+rem Catch that here instead of shipping it.
+rem NOTE: no parenthesised if-block here on purpose - an unescaped ")" inside the block
+rem aborts cmd with ". was unexpected at this time." (hit 2026-09-30).
+if not exist "%OUT%\coreclr.dll" goto aotok
+echo [FAIL] AOT was skipped: coreclr.dll is present, so this is a JIT build.
+echo        Check that project.assets.json carries the NativeAOT runtime pack;
+echo        restore must run with PublishAot=true and SelfContained=true.
+exit /b 1
+
+:aotok
 
 rem ---- 2) the host ---------------------------------------------------
 rem OnlineHost.exe is a SEPARATE process (Process.Start from the GUI),
@@ -37,6 +63,10 @@ rem so it must be published on its own. Publishing only the GUI leaves
 rem the apphost stub without OnlineHost.dll: the host dies on start, the
 rem caller is fire-and-forget, and the whole online feature (DLL inject +
 rem AppID Changer) fails silently. See OSTGUI.csproj's ProjectReference.
+rem Same two-step rule as the GUI above: restore with AOT properties, then publish.
+"%MSB%" "%HOSTPROJ%" /t:Restore /p:Configuration=Release /p:RuntimeIdentifier=win-x64 /p:SelfContained=true /p:PublishAot=true /nologo /v:m
+set "CODE=%ERRORLEVEL%"
+if not "%CODE%"=="0" goto fail
 "%MSB%" "%HOSTPROJ%" /t:Publish /p:Configuration=Release /p:RuntimeIdentifier=win-x64 /p:SelfContained=true /p:PublishAot=true /p:PublishDir="%OUT%" /nologo /v:m
 set "CODE=%ERRORLEVEL%"
 if not "%CODE%"=="0" goto fail
