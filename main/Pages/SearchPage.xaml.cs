@@ -67,7 +67,9 @@ public sealed partial class SearchPage : Page
     /// 兜底：给控件一份 <c>List&lt;T&gt;</c>。
     /// AOT 下 <c>ObservableCollection&lt;T&gt;</c> 的 CollectionChanged 传不到控件（绑定时集合还是空的
     /// → `Items` 恒 0 ✗，与实测一致）；<c>List&lt;T&gt;</c> 有内建映射且控件会**立刻读完**（不依赖通知 ✓）。
-    /// 每次搜索都重新赋一次（每次都是新 List 实例 ⇒ `ItemsSource` 的 DP 值真的变了 ⇒ 控件重新枚举 ✓）。
+    /// **每次搜索结束都必须跑**：赋的永远是全新的 <c>List</c> 实例（空结果就给空 List），
+    /// DP 值才真的变化、控件才会重新枚举 —— 超时/无结果时若跳过，旧卡片会留在屏幕上，
+    /// 与同时变真的「无结果」提示叠在一起（2026-09-30 用户报的就是这个）。
     /// ⚠️ 绝不置 null：实测 `ItemsSource = null` 会让进程崩在 CoreMessagingXP / 0xc000027b（stowed）✗；
     ///    整段包 try/catch，抛了也只落盘不崩 ✓
     /// </summary>
@@ -75,10 +77,9 @@ public sealed partial class SearchPage : Page
     {
         try
         {
-            if (VM.SearchResults.Count == 0) return;   // 没结果就不动控件（也不清掉上一次的显示）
-
-            ResultGrid.ItemsSource = VM.SearchResults.ToList();
-            ResultList.ItemsSource = VM.SearchResults.ToList();
+            var snapshot = VM.SearchResults.ToList();
+            ResultGrid.ItemsSource = snapshot;
+            ResultList.ItemsSource = snapshot;
         }
         catch (Exception ex)
         {
