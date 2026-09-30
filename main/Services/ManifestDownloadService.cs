@@ -85,7 +85,6 @@ public class ManifestDownloadService
 
             // 2. 下载每个 manifest
             Directory.CreateDirectory(tempDir);
-            var mhubUrlTemplate = !string.IsNullOrEmpty(mhubSource?.BaseUrl) ? mhubSource.BaseUrl : "";
             var downloaded = new List<(string depotId, string manifestGid, long size)>();
             var failedDepots = new List<string>();
 
@@ -97,57 +96,15 @@ public class ManifestDownloadService
             foreach (var (depotId, manifestGid) in manifestFiles)
             {
                 ct.ThrowIfCancellationRequested();   // 取消点①：开始下一个 depot 之前
-                var url = !string.IsNullOrEmpty(mhubUrlTemplate)
-                    ? mhubSource!.BuildUrl(null, depotId, manifestGid)
-                    : $"https://api.manifesthub2.filegear-sg.me/manifest?apikey={apiKey}&depotid={depotId}&manifestid={manifestGid}";
                 Log($"下载 Depot {depotId} 的清单…");
-
-                try
+                var file = await DownloadOneManifestAsync(dlClient, depotId, manifestGid, tempDir, ct);
+                if (file == null)
                 {
-                    // 流式落盘（不再 ReadAsByteArrayAsync）：单份清单不再整块进内存，
-                    // 顺带让"取消"不必等整份读完才响应。先写 .part，成功才改名（沿用临时名 + Move 的纪律）
-                    var response = await dlClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
-                    if (response.IsSuccessStatusCode)
-                    {
-                        var fileName = $"{depotId}_{manifestGid}.manifest";
-                        var filePath = Path.Combine(tempDir, fileName);
-                        var partPath = filePath + ".part";
-                        try
-                        {
-                            long size;
-                            await using (var fs = File.Create(partPath))
-                            {
-                                await using (var src = await response.Content.ReadAsStreamAsync(ct))
-                                    await src.CopyToAsync(fs, ct);
-                                size = fs.Length;
-                            }
-                            File.Move(partPath, filePath, true);
-                            downloaded.Add((depotId, manifestGid, size));
-                            Log($"已下载 {fileName}");
-                        }
-                        catch
-                        {
-                            try { if (File.Exists(partPath)) File.Delete(partPath); } catch { }
-                            throw;
-                        }
-                    }
-                    else
-                    {
-                        failedDepots.Add(depotId);
-                        Log($"下载失败 ({(int)response.StatusCode})：Depot {depotId}");
-                    }
+                    failedDepots.Add(depotId);   // 状态码 / 异常细节已由方法写进日志
+                    continue;
                 }
-                catch (OperationCanceledException) when (ct.IsCancellationRequested)
-                {
-                    // 只有"用户取消"才透传。⚠️ HttpClient 的**超时也是 OCE**（TaskCanceledException），
-                    // 那种必须留给下面的 catch 记成"这个 depot 下载失败"，否则一次超时会把整场入库判成"已取消"
-                    throw;
-                }
-                catch (Exception ex)
-                {
-                    failedDepots.Add(depotId);
-                    Log($"下载异常：Depot {depotId} - {ex.Message}");
-                }
+                downloaded.Add((depotId, manifestGid, new FileInfo(file).Length));
+                Log($"已下载 {Path.GetFileName(file)}");
             }
 
             // 仅在实际内容 depot（appinfo 中有 manifest GID）的清单未下载（HTTP 失败/异常）时才警告；
@@ -258,6 +215,65 @@ public class ManifestDownloadService
         catch (Exception ex)
         {
             return new AddGameResult { Success = false, Message = $"Sudama 入库失败：{ex.Message}" };
+        }
+    }
+
+    /// <summary>
+    /// 抓单份清单并落到 <paramref name="destDir"/>（流式 + `.part` + Move）。
+    /// 入库的逐 depot 循环与「清单按需投喂」共用这一条路径。
+    /// 成功返回落盘文件路径；HTTP 非 2xx 或异常返回 null——失败细节（状态码 / 异常）在方法内写日志，
+    /// 调用方只负责汇总，避免两个调用点各写一份措辞。
+    /// 用户取消照原样透传：⚠️ HttpClient 的**超时也是 OCE**（TaskCanceledException），那种必须算
+    /// "这份没拿到"而不是"整场取消"，否则一次超时会被判成已取消。
+    /// </summary>
+    public async Task<string?> DownloadOneManifestAsync(
+        HttpClient client,
+        string depotId,
+        string manifestGid,
+        string destDir,
+        CancellationToken ct = default)
+    {
+        var mhubSource = GetSource("mhub");
+        var apiKey = !string.IsNullOrEmpty(mhubSource?.ApiKey)
+            ? mhubSource.ApiKey
+            : _configService.Config.ManifestHubApiKey;
+        var url = !string.IsNullOrEmpty(mhubSource?.BaseUrl)
+            ? mhubSource!.BuildUrl(null, depotId, manifestGid)
+            : $"https://api.manifesthub2.filegear-sg.me/manifest?apikey={apiKey}&depotid={depotId}&manifestid={manifestGid}";
+
+        var fileName = $"{depotId}_{manifestGid}.manifest";
+        var filePath = Path.Combine(destDir, fileName);
+        var partPath = filePath + ".part";
+
+        try
+        {
+            Directory.CreateDirectory(destDir);
+            var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+            if (!response.IsSuccessStatusCode)
+            {
+                var code = (int)response.StatusCode;
+                Log($"清单下载失败（HTTP {code}）：Depot {depotId} 的清单 {manifestGid}");
+                return null;
+            }
+
+            await using (var fs = File.Create(partPath))
+            {
+                await using var src = await response.Content.ReadAsStreamAsync(ct);
+                await src.CopyToAsync(fs, ct);
+            }
+            File.Move(partPath, filePath, true);   // 原子落地：要么没有，要么完整
+            return filePath;
+        }
+        catch (OperationCanceledException) when (ct.IsCancellationRequested)
+        {
+            try { if (File.Exists(partPath)) File.Delete(partPath); } catch { }
+            throw;
+        }
+        catch (Exception ex)
+        {
+            try { if (File.Exists(partPath)) File.Delete(partPath); } catch { }
+            Log($"清单下载异常（Depot {depotId} 的清单 {manifestGid}）：{ex.Message}");
+            return null;
         }
     }
 
