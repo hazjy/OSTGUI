@@ -85,6 +85,7 @@ public partial class MainViewModel : ObservableObject
         SteamGameInfoService steamGameInfoService,
         SteamDllService steamDllService,
         SudamaKeyCache sudamaCache,
+        ManifestLogWatcher manifestWatcher,
         CoverImageService coverImageService)
     {
         ConfigService = configService;
@@ -100,7 +101,7 @@ public partial class MainViewModel : ObservableObject
         DenuvoVM = new DenuvoViewModel(
             ticketService, luaService, ostFileService,
             steamGameInfoService, steamService);
-        SettingsVM = new SettingsViewModel(configService, steamService, _steamDllService, sudamaCache);
+        SettingsVM = new SettingsViewModel(configService, steamService, _steamDllService, sudamaCache, manifestWatcher);
         OnlineVM = new OnlineViewModel(onlineFixService, searchService, gameInfoService, configService);
     }
 

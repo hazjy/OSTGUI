@@ -17,6 +17,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly SteamService _steamService;
     private readonly SteamDllService _steamDllService;
     private readonly SudamaKeyCache _sudamaCache;
+    private readonly ManifestLogWatcher _manifestWatcher;
     private bool _isLoading;
 
     // 命令手写在 VM 上：Native AOT 下 CsWinRT 绑定提供器看不到源生成成员，XAML {Binding} 会失效
@@ -201,6 +202,23 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     // === 清单源设置 ===
+    // === 清单按需投喂（开关落在设置页「清单源」卡片里）===
+    private bool _manifestFeedEnabled;
+
+    /// <summary>
+    /// 清单监听开关。切换即时启停（不必等保存），持久化由 PropertyChanged → SaveAllToConfig 负责。
+    /// </summary>
+    public bool ManifestFeedEnabled
+    {
+        get => _manifestFeedEnabled;
+        set
+        {
+            if (!SetProperty(ref _manifestFeedEnabled, value)) return;
+            if (value) _manifestWatcher.Start();
+            else _manifestWatcher.Stop();
+        }
+    }
+
     public ObservableCollection<ManifestSource> Sources { get; } = new();
     // 设置页只显示已接入的有效源，Sources 保留全部用于持久化
     // 声明类型用 IList<T>：WinRT 内建映射（IVector<T>），Native AOT 下无需在
@@ -331,12 +349,13 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     public SettingsViewModel(ConfigService configService, SteamService steamService,
-        SteamDllService steamDllService, SudamaKeyCache sudamaCache)
+        SteamDllService steamDllService, SudamaKeyCache sudamaCache, ManifestLogWatcher manifestWatcher)
     {
         _configService = configService;
         _steamService = steamService;
         _steamDllService = steamDllService;
         _sudamaCache = sudamaCache;
+        _manifestWatcher = manifestWatcher;
 
         ApplyNavigationPaneWidthCommand = new RelayCommand(ApplyNavigationPaneWidth);
         RefreshSudamaCacheCommand = new AsyncRelayCommand(RefreshSudamaCache);
@@ -474,6 +493,7 @@ public partial class SettingsViewModel : ObservableObject
             ShowSystemNotifications = c.ShowSystemNotifications;
             ShowVersionChangeNotifications = c.ShowVersionChangeNotifications;
             LogMaxLines = c.LogMaxLines;
+            ManifestFeedEnabled = c.ManifestFeedEnabled;
 
             LoadSourcesFromConfig(c);
 
@@ -615,6 +635,7 @@ public partial class SettingsViewModel : ObservableObject
                 c.ManifestSources = Sources.ToList();
                 foreach (var source in Sources)
                     c.ManifestSourceEnabled[source.Id] = source.IsEnabled;
+                c.ManifestFeedEnabled = ManifestFeedEnabled;
             });
         }
         catch (Exception ex) { LogService.Diag($"[SaveAllToConfig] 失败：{ex.Message}"); }

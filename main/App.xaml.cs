@@ -99,6 +99,7 @@ public partial class App : Application
         services.AddSingleton<LuaBuilder>();
         services.AddSingleton<ManifestFileService>();
         services.AddSingleton<ManifestDownloadService>();
+        services.AddSingleton<ManifestLogWatcher>();
         services.AddSingleton<TicketService>();
         services.AddSingleton<OstFileService>();
         services.AddSingleton<OnlineFixService>();
@@ -129,6 +130,10 @@ public partial class App : Application
         await configService.LoadAsync();
         Log("Config loaded");
         LogService.SetMaxLines(configService.Config.LogMaxLines);
+
+        // 清单按需投喂：上次开着就继续跟（开关在设置页「清单源」区域）
+        if (configService.Config.ManifestFeedEnabled)
+            Services.GetRequiredService<ManifestLogWatcher>().Start();
 
         _window = new MainWindow();
         Log("MainWindow created");

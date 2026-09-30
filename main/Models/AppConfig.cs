@@ -77,6 +77,10 @@ public class AppConfig
     // === 自定义清单源 ===
     public Dictionary<string, bool> ManifestSourceEnabled { get; set; } = new();
 
+    // 清单按需投喂：尾随内核 manifest.log，Steam 请求一份本地没有的清单时立刻抓一份写进 depotcache。
+    // 默认关——开了就会有后台网络活动（见 ManifestLogWatcher）。
+    public bool ManifestFeedEnabled { get; set; }
+
     // === 完整清单源配置（内置 + 自定义，通用格式） ===
     public List<ManifestSource> ManifestSources { get; set; } = new();
 

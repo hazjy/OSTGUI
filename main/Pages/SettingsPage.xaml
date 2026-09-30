@@ -120,6 +120,15 @@
                                        TextWrapping="Wrap" />
                         </StackPanel>
 
+                        <!-- 清单按需投喂：尾随内核 manifest.log，Steam 要一份本地没有的清单就立刻抓一份写进 depotcache -->
+                        <StackPanel Spacing="4">
+                            <ToggleSwitch Header="清单按需投喂" OnContent="已开启" OffContent="已关闭"
+                                          IsOn="{Binding ManifestFeedEnabled, Mode=TwoWay}" />
+                            <TextBlock Text="开启后实时监听 Steam 的清单请求：要哪份而本地没有，就立刻从下面的源抓一份写进 depotcache。仅在 OSTGUI 运行期间生效。"
+                                       FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap" />
+                        </StackPanel>
+
                         <!-- 源列表（内置 + 自定义，通用格式） -->
                         <ScrollViewer MaxHeight="440" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                             <ItemsControl ItemsSource="{Binding VisibleSources}">
