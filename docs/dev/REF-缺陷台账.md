@@ -8,5 +8,6 @@
   而该缓存的键既有 7 位以上的 appid、也有 5–6 位的 packageid，命中率低（非零）。要改得先定性主键语义。
 - **两条 lua 写入路径行为不一致**：`LuaConfigService` 写单个游戏 lua 时会顺带把 `addappid(<appId>)` 追加进 `steamtools.lua`，
   `LuaBuilder` 不会——同一件事走不同入口，结果不同。
-- **免 Steam 部署的 EXE 备份无条件覆盖**：`NoSteamLauncher/Services/NoSteamLaunchOrchestrator.cs` 每次部署都以
-  `overwrite: true` 覆盖 `.bak`，重复部署会把已脱壳的 exe 当成"原始备份"。同工程的 DLL 备份有"已存在则跳过"的保护，EXE 这条没有。
+- **Steamless 插件目录会误删游戏自带的 `Plugins`**：`NoSteamLauncher/Services/SteamlessService.cs` 脱壳前先递归删掉
+  `<游戏目录>\Plugins` 再拷入自己的插件（`CopyPluginsDirectory`），脱壳结束在 `finally` 里又 `Directory.Delete(targetPluginsDir, true)`
+  删掉整个目录——根目录带 `Plugins` 的游戏（部分 Unity / 自研引擎）会连游戏文件一起删。

@@ -57,11 +57,18 @@ namespace NoSteamLauncher.Services;
             var originalExe = options.GameExePath;
             var backupExe = options.BackupOriginalExe ? originalExe + ".bak" : null;
 
-            // 1. 备份原 EXE (always overwrite existing backup)
+            // 1. 备份原 EXE（已存在则保留，不覆盖：二次部署时当前 EXE 已是脱壳版，覆盖会毁掉唯一原件）
             if (!options.DryRun && options.BackupOriginalExe && backupExe != null)
             {
-                File.Copy(originalExe, backupExe, true);
-                Report(progress, $"Backed up original EXE to {backupExe}");
+                if (File.Exists(backupExe))
+                {
+                    Report(progress, $"Original EXE backup already exists, keeping it: {backupExe} (delete it first to re-capture the current EXE)");
+                }
+                else
+                {
+                    File.Copy(originalExe, backupExe);
+                    Report(progress, $"Backed up original EXE to {backupExe}");
+                }
             }
 
             SteamlessResult steamlessResult;

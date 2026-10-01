@@ -7,6 +7,7 @@
 
 - 流程：选游戏 EXE + AppID →（有壳时）Steamless 脱壳替换 EXE → GSE(Goldberg) 模拟器部署进游戏目录
   → 可选 SteamAPICheckBypass（winmm 劫持隐藏模拟器痕迹）。原文件备份为 `.bak`，删 `steam_settings` 并改回 `.bak` 即还原
+- **备份不覆盖**：EXE 与 DLL 一致——`.bak` 已存在就保留（跳过备份），重复部署不会用脱壳后的 EXE 覆盖唯一原件（对齐 SAC 的判定）
 - 对齐 SAC（SteamAutoCrack）的部署逻辑与 ini 配置格式；无壳游戏自动跳过脱壳不中断；
   2016 前 SDK 的老游戏会额外生成 `steam_settings/steam_interfaces.txt`（gbe_fork 需要）
 - **资源嵌入**：所有二进制（Steamless CLI/插件、GSE 模板、Bypass）以 EmbeddedResource 打进 `NoSteamLauncher.dll`，
