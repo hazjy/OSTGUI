@@ -1,0 +1,193 @@
+<UserControl
+    x:Class="OSTGUI.Views.AboutView"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    KeyboardAcceleratorPlacementMode="Hidden">
+
+    <!-- 「关于」弹窗内容。排版对应样张 _mockups/about-dialog/about.html：
+         内容宽 358 px（外框 ≈360）、技术栈三枚官方 mark（30px、间距 14）。
+         ⚠️ 本视图刻意不用 {Binding}：AOT 下绑定提供器看不到源生成成员（见 docs/dev/REF-AOT适配.md §1），
+         版本号与图标一律在 code-behind 里直接赋值。
+         ⚠️ KeyboardAcceleratorPlacementMode="Hidden" 必需：默认（Auto）会把按键名拼进各处 tooltip，
+         表现为"鼠标划到很多东西上都弹一个 Esc"（2026-10-02 用户实测）。 -->
+
+    <UserControl.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <!-- 技术栈 mark 的品牌色：浅色用官方原色，深色用同色系提亮，保证暗底可读 -->
+                <ResourceDictionary x:Key="Default">
+                    <SolidColorBrush x:Key="AboutBrandWinUiBrush" Color="#4CC2FF" />
+                    <SolidColorBrush x:Key="AboutBrandDotNetBrush" Color="#A78BFA" />
+                    <SolidColorBrush x:Key="AboutBrandCppBrush" Color="#6BA9E8" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="AboutBrandWinUiBrush" Color="#4CC2FF" />
+                    <SolidColorBrush x:Key="AboutBrandDotNetBrush" Color="#A78BFA" />
+                    <SolidColorBrush x:Key="AboutBrandCppBrush" Color="#6BA9E8" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Light">
+                    <SolidColorBrush x:Key="AboutBrandWinUiBrush" Color="#0078D4" />
+                    <SolidColorBrush x:Key="AboutBrandDotNetBrush" Color="#512BD4" />
+                    <SolidColorBrush x:Key="AboutBrandCppBrush" Color="#00599C" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
+        </ResourceDictionary>
+    </UserControl.Resources>
+
+    <UserControl.KeyboardAccelerators>
+        <!-- 弹窗外壳没有默认按钮，Esc 由这里兜住 -->
+        <KeyboardAccelerator Key="Escape" Invoked="Escape_Invoked" />
+    </UserControl.KeyboardAccelerators>
+
+    <Grid Width="358">
+        <StackPanel Padding="17,15,17,11">
+
+            <Image x:Name="LogoImage" Width="76" Height="76" Margin="0,4,0,0"
+                   HorizontalAlignment="Center"
+                   AutomationProperties.Name="OSTGUI 图标" />
+
+            <TextBlock Text="OSTGUI" FontSize="26" FontWeight="Bold"
+                       Margin="0,10,0,13" HorizontalAlignment="Center" />
+
+            <!-- 版本行 ×2：标签 — 值 — 复制 -->
+            <StackPanel Spacing="7">
+                <Border CornerRadius="9" BorderThickness="1"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        Padding="11,9">
+                    <Grid ColumnSpacing="9">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="OSTGUI 版本" FontSize="13" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="2" x:Name="GuiVersionText" FontSize="13" FontWeight="SemiBold"
+                                   VerticalAlignment="Center" />
+                        <Button Grid.Column="3" x:Name="CopyGuiButton" Width="26" Height="26" MinHeight="0"
+                                Padding="0" CornerRadius="6" VerticalAlignment="Center"
+                                Background="Transparent" BorderThickness="0"
+                                ToolTipService.ToolTip="复制版本号"
+                                AutomationProperties.Name="复制 OSTGUI 版本号"
+                                Click="CopyGuiVersion_Click">
+                            <FontIcon Glyph="&#xE8C8;" FontSize="14"
+                                      Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </Button>
+                    </Grid>
+                </Border>
+
+                <Border CornerRadius="9" BorderThickness="1"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        Padding="11,9">
+                    <Grid ColumnSpacing="9">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Grid.Column="0" Text="内核版本" FontSize="13" VerticalAlignment="Center" />
+                        <TextBlock Grid.Column="2" x:Name="KernelVersionText" FontSize="13" FontWeight="SemiBold"
+                                   VerticalAlignment="Center" />
+                        <Button Grid.Column="3" x:Name="CopyKernelButton" Width="26" Height="26" MinHeight="0"
+                                Padding="0" CornerRadius="6" VerticalAlignment="Center"
+                                Background="Transparent" BorderThickness="0"
+                                ToolTipService.ToolTip="复制版本号"
+                                AutomationProperties.Name="复制内核版本号"
+                                Click="CopyKernelVersion_Click">
+                            <FontIcon Glyph="&#xE8C8;" FontSize="14"
+                                      Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </Button>
+                    </Grid>
+                </Border>
+            </StackPanel>
+
+            <TextBlock Text="Steam 本地入库与解锁的桌面客户端" FontSize="12.5"
+                       Margin="0,14,0,12" HorizontalAlignment="Center"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+
+            <TextBlock Text="技术栈" FontSize="12" Margin="0,0,0,10"
+                       HorizontalAlignment="Center"
+                       Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+
+            <!-- 三枚官方 mark：24×24 单路径原样作 Path.Data（Windows / .NET / C++） -->
+            <StackPanel Orientation="Horizontal" Spacing="14" HorizontalAlignment="Center">
+                <Path Width="30" Height="30" Stretch="Uniform"
+                      Fill="{ThemeResource AboutBrandWinUiBrush}"
+                      ToolTipService.ToolTip="WinUI 3"
+                      Data="M0,0H11.377V11.372H0ZM12.623,0H24V11.372H12.623ZM0,12.623H11.377V24H0Z M12.623,12.623 H24 V24 H12.623" />
+                <Path Width="30" Height="30" Stretch="Uniform"
+                      Fill="{ThemeResource AboutBrandDotNetBrush}"
+                      ToolTipService.ToolTip=".NET 10"
+                      Data="M24 8.77h-2.468v7.565h-1.425V8.77h-2.462V7.53H24z M17.148,16.335 h-4.821V7.53h4.63v1.24h-3.205v2.494h2.953v1.234h-2.953v2.604h3.396z M10.44,16.335 H8.882L4.78 9.863a2.896 2.896 0 0 1-.258-.51h-.036c.032.189.048.592.048 1.21v5.772H3.157V7.53h1.659l3.965 6.32c.167.261.275.442.323.54h.024c-.04-.233-.06-.629-.06-1.185V7.529h1.372z M1.737,15.642 a.868.829 0 0 1-.869.829.868.829 0 0 1-.868-.83.868.829 0 0 1 .868-.828.868.829 0 0 1 .869.829Z" />
+                <Path Width="30" Height="30" Stretch="Uniform"
+                      Fill="{ThemeResource AboutBrandCppBrush}"
+                      ToolTipService.ToolTip="C++ 内核"
+                      Data="M22.394 6c-.167-.29-.398-.543-.652-.69L12.926.22c-.509-.294-1.34-.294-1.848 0L2.26 5.31c-.508.293-.923 1.013-.923 1.6v10.18c0 .294.104.62.271.91.167.29.398.543.652.69l8.816 5.09c.508.293 1.34.293 1.848 0l8.816-5.09c.254-.147.485-.4.652-.69.167-.29.27-.616.27-.91V6.91c.003-.294-.1-.62-.268-.91zM12 19.11c-3.92 0-7.109-3.19-7.109-7.11 0-3.92 3.19-7.11 7.11-7.11a7.133 7.133 0 016.156 3.553l-3.076 1.78a3.567 3.567 0 00-3.08-1.78A3.56 3.56 0 008.444 12 3.56 3.56 0 0012 15.555a3.57 3.57 0 003.08-1.778l3.078 1.78A7.135 7.135 0 0112 19.11z M19.11,12.395 h-.79v.79h-.79v-.79h-.79v-.79h.79v-.79h.79v.79h.79z M22.072,12.395 h-.79v.79h-.79v-.79h-.79v-.79h.79v-.79h.79v.79h.79z" />
+            </StackPanel>
+
+            <!-- 两枚按钮（等宽并排）：检查更新 / GitHub -->
+            <Grid Margin="0,14,0,10" ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Button Grid.Column="0" HorizontalAlignment="Stretch" Padding="10" CornerRadius="9"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        Click="CheckUpdate_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="7" HorizontalAlignment="Center">
+                        <FontIcon Glyph="&#xE72C;" FontSize="15" />
+                        <TextBlock Text="检查更新" FontSize="13" />
+                    </StackPanel>
+                </Button>
+
+                <Button Grid.Column="1" HorizontalAlignment="Stretch" Padding="10" CornerRadius="9"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        AutomationProperties.Name="在 GitHub 上打开项目"
+                        Click="GitHub_Click">
+                    <StackPanel Orientation="Horizontal" Spacing="7" HorizontalAlignment="Center">
+                        <Path Width="15" Height="15" Stretch="Uniform"
+                              Fill="{ThemeResource TextFillColorPrimaryBrush}"
+                              Data="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
+                        <TextBlock Text="GitHub" FontSize="13" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+
+            <StackPanel Spacing="2" HorizontalAlignment="Center">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="2">
+                    <TextBlock Text="由" FontSize="12" VerticalAlignment="Center"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <HyperlinkButton Content="ZJY" FontSize="12" Padding="0"
+                                     AutomationProperties.Name="ZJY 的 GitHub"
+                                     Click="DevName_Click" />
+                    <TextBlock Text="开发" FontSize="12" VerticalAlignment="Center"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="8">
+                    <TextBlock Text="© 2026 OSTGUI" FontSize="12" VerticalAlignment="Center"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <HyperlinkButton Content="开源许可" FontSize="12" Padding="0"
+                                     AutomationProperties.Name="查看开源许可"
+                                     Click="License_Click" />
+                </StackPanel>
+            </StackPanel>
+
+        </StackPanel>
+
+        <!-- 右上角关闭（自绘：外壳没有标题栏与按钮行）；按用户要求再贴角：外边距 3 px -->
+        <Button x:Name="CloseButton" Width="26" Height="26" Padding="0" CornerRadius="6"
+                HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,3,3,0"
+                Background="Transparent" BorderThickness="0"
+                ToolTipService.ToolTip="关闭" AutomationProperties.Name="关闭"
+                Click="Close_Click">
+            <FontIcon Glyph="&#xE711;" FontSize="14"
+                      Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        </Button>
+    </Grid>
+</UserControl>

@@ -107,9 +107,10 @@
                     <NavigationViewItem.Icon><FontIcon x:Name="SettingsGlyphIcon" Glyph="&#xE713;" /></NavigationViewItem.Icon>
                     <NavigationViewItem.Content>设置</NavigationViewItem.Content>
                 </NavigationViewItem>
-                <NavigationViewItem x:Name="NavInfo" Tag="info">
+                <!-- 「关于」不切页：点开弹窗（写法同上面的 NavRestartSteam） -->
+                <NavigationViewItem x:Name="NavAbout" SelectsOnInvoked="False" Tapped="NavAbout_Tapped">
                     <NavigationViewItem.Icon><FontIcon Glyph="&#xE946;" /></NavigationViewItem.Icon>
-                    <NavigationViewItem.Content>信息</NavigationViewItem.Content>
+                    <NavigationViewItem.Content>关于</NavigationViewItem.Content>
                 </NavigationViewItem>
             </NavigationView.FooterMenuItems>
 

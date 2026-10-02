@@ -41,6 +41,10 @@
 
   <ItemGroup>
     <Content Include="Assets\important.html" CopyToOutputDirectory="PreserveNewest" />
+    <!-- 关于弹窗的应用图标（ZSteamTool\docs\logo\logo-512.png 的原件副本，RGBA 透明底） -->
+    <Content Include="Assets\logo-512.png" CopyToOutputDirectory="PreserveNewest" />
+    <!-- 关于弹窗「开源许可」要打开的随包许可文本（源文件在仓库根） -->
+    <None Include="..\LICENSE" Link="LICENSE" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>

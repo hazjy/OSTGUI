@@ -19,6 +19,9 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
 
     private Microsoft.UI.Dispatching.DispatcherQueueTimer? _noticeTimer;
 
+    /// <summary>「关于」弹窗是否已打开（防连点叠加；关闭后复位）</summary>
+    private bool _aboutOpen;
+
     /// <summary>
     /// 应用内通知：窗口顶部弹一条 InfoBar，几秒后自动收起（区别于走系统通知中心的 Toast）。
     /// 任何页面都能调：<c>(App.MainWindow as MainWindow)?.Notify("已复制", 文件名)</c>
@@ -547,6 +550,48 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
     }
 
     /// <summary>
+    /// 「关于」：不切页，开一个自绘外壳的弹窗（内容在 <see cref="Views.AboutView"/>）。
+    /// 窄弹窗（外框 ≈360）靠 <c>Padding=0</c> + 内容固定宽（AboutView 里 358）实现。
+    /// </summary>
+    private async void NavAbout_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
+    {
+        if (_aboutOpen) return;
+        _aboutOpen = true;
+        try
+        {
+            var view = new Views.AboutView();
+            var dialog = new ContentDialog
+            {
+                XamlRoot = RootGrid.XamlRoot,
+                Content = view,
+                Padding = new Thickness(0),
+                // 2026-10-02 实测两条：
+                // ① 给 ContentDialog 设 MinWidth/MaxWidth 会把模板根（含遮罩层）一起夹窄 → 弹窗被顶到
+                //    窗口左边、遮罩也不铺满；改成只约束内容宽度，并显式居中。
+                // ② ContentDialog 元素本身在弹层里是**铺满窗口**的（实测 ActualWidth ≈ 窗口宽），
+                //    所以"量弹窗宽度"只能量内容，量它自己没意义——那行日志已撤掉。
+                HorizontalAlignment = HorizontalAlignment.Center,
+                VerticalAlignment = VerticalAlignment.Center
+                // 不设 RequestedTheme / CloseButtonText：前者走框架默认跟随应用主题（见账号弹窗注释），
+                // 后者空着才能塌掉默认按钮行，关闭由内容里的 ✕ 与 Esc 负责。
+            };
+            view.RequestClose += (_, _) => dialog.Hide();
+
+            Helpers.PopupTheme.Apply(dialog);
+            await dialog.ShowAsync();
+        }
+        catch (Exception ex)
+        {
+            LogService.Fatal("打开「关于」弹窗失败", ex);
+            Notify("关于", "弹窗打开失败，详见日志", InfoBarSeverity.Error);
+        }
+        finally
+        {
+            _aboutOpen = false;
+        }
+    }
+
+    /// <summary>
     /// 图标点击旋转动效（Composition 动画，0 → 360 度）
     /// </summary>
     private void RotateIcon(Microsoft.UI.Xaml.Controls.FontIcon icon)
@@ -743,7 +788,6 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
             "denuvo" => typeof(Pages.DenuvoPage),
             "nosteam" => typeof(Pages.NoSteamPage),
             "settings" => typeof(Pages.SettingsPage),
-            "info" => typeof(Pages.InfoPage),
             _ => typeof(Pages.HomePage),
         };
 
