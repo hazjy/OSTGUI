@@ -61,10 +61,30 @@ public sealed class SteamlessService
 
         var workDir = Path.GetDirectoryName(Path.GetFullPath(exePath))!;
 
-        // Copy Plugins folder to game directory so Steamless can find its dependencies
+        // 插件要拷到 <游戏目录>\Plugins（Steamless 按目标目录找插件），但**游戏自己也可能有这个目录**
+        // （部分 Unity / 自研引擎）：旧实现无条件 Directory.Delete 再拷，游戏文件就这么被删了。
+        // 现在的规矩：不是我们的目录 → 就地改名暂存（同卷原子），脱壳结束原名还原；只有确认是"我们留下的"才允许删。
         var targetPluginsDir = Path.Combine(workDir, "Plugins");
+        string? displacedPluginsDir;
+        bool targetPluginsIsOurs;
+        try
+        {
+            displacedPluginsDir = DisplacePluginsDirIfNotOurs(targetPluginsDir, out targetPluginsIsOurs);
+        }
+        catch (Exception ex)
+        {
+            // 暂存失败（被占用 / 权限不足）→ 宁可中止脱壳，也不能把我们的文件混进游戏目录之后整目录删
+            _logger.LogError(ex, "无法暂存游戏自带的 Plugins 目录，已中止脱壳：{Dir}", targetPluginsDir);
+            return new SteamlessResult
+            {
+                Success = false,
+                ErrorMessage = $"游戏目录下已存在 Plugins 且无法暂存（{ex.Message}）。已中止脱壳，未改动该目录。",
+                ExitCode = -1
+            };
+        }
+
         progress?.Report("Copying Steamless plugins...");
-        CopyPluginsDirectory(_pluginsDir, targetPluginsDir);
+        CopyPluginsDirectory(_pluginsDir, targetPluginsDir, targetPluginsIsOurs);
         progress?.Report("Plugins copied, starting unpack...");
 
         try
@@ -184,25 +204,67 @@ public sealed class SteamlessService
         }
         finally
         {
-            // Clean up Plugins folder copied to game directory
-            if (Directory.Exists(targetPluginsDir))
+            // 走到这里 targetPluginsDir 只可能是"我们刚建的"或"确认是我们留下的"（否则上面已中止），
+            // 所以整目录删是安全的；被暂存的游戏自带目录随后改名还原。
+            try
             {
-                try
+                if (Directory.Exists(targetPluginsDir))
                 {
                     Directory.Delete(targetPluginsDir, true);
                     _logger.LogDebug("Cleaned up Plugins directory: {Dir}", targetPluginsDir);
                 }
-                catch (Exception ex)
+
+                if (displacedPluginsDir != null)
                 {
-                    _logger.LogWarning(ex, "Failed to clean up Plugins directory: {Dir}", targetPluginsDir);
+                    Directory.Move(displacedPluginsDir, targetPluginsDir);
+                    // 这条与下面的失败告警都走 _logger：并进 progress 通道后日志栏里能看到（顺序与进度一致）
+                    _logger.LogInformation("Detected game's own Plugins; restored it to {Dir}", targetPluginsDir);
                 }
+            }
+            catch (Exception ex)
+            {
+                // 还原失败必须让用户看见：备份还在原处，可手工改名回去
+                _logger.LogWarning(ex, "Plugins 清理/还原未完成，备份仍在：{Dir}", displacedPluginsDir ?? targetPluginsDir);
             }
         }
     }
 
-    private static void CopyPluginsDirectory(string sourceDir, string targetDir)
+    /// <summary>
+    /// 目标目录是不是"我们的插件目录"：标记文件齐（Steamless.API.dll + 至少一个 Unpacker）。
+    /// 用来区分"上次脱壳留下的"与"游戏自带的"——只有前者允许整目录删。
+    /// </summary>
+    private static bool LooksLikeOurPluginsDir(string dir) =>
+        File.Exists(Path.Combine(dir, "Steamless.API.dll")) &&
+        Directory.EnumerateFiles(dir, "Steamless.Unpacker.Variant*.dll").Any();
+
+    /// <summary>
+    /// 目标 <c>Plugins</c> 不是我们的就改名暂存，返回暂存路径（不存在 / 是我们的都返回 null）。
+    /// 同卷 <c>Directory.Move</c> 原子；抛异常＝暂存失败，由调用方中止脱壳（绝不硬删别人的目录）。
+    ///
+    /// 暂存这条走 <c>_logger</c>：经 GUI 侧的 <c>ProgressLogger</c> 并进部署的 progress 通道，
+    /// 最终写进日志（免 Steam 页的日志栏与日志文件都能看到）。
+    /// </summary>
+    private string? DisplacePluginsDirIfNotOurs(string targetDir, out bool isOurs)
     {
-        if (Directory.Exists(targetDir))
+        isOurs = false;
+        if (!Directory.Exists(targetDir)) return null;
+        if (LooksLikeOurPluginsDir(targetDir))
+        {
+            isOurs = true;
+            return null;
+        }
+
+        var aside = targetDir + ".ostgui-bak";
+        if (Directory.Exists(aside)) aside = $"{targetDir}.ostgui-bak-{DateTime.Now:yyyyMMddHHmmss}";
+        Directory.Move(targetDir, aside);
+        _logger.LogInformation("Detected game's own Plugins; staged it as {Aside} (restored after unpack)", aside);
+        return aside;
+    }
+
+    private static void CopyPluginsDirectory(string sourceDir, string targetDir, bool targetIsOurs)
+    {
+        // 只清"我们自己的"目录；游戏自带的已被暂存（此刻不存在），绝不能在这里删
+        if (targetIsOurs && Directory.Exists(targetDir))
         {
             Directory.Delete(targetDir, true);
         }

@@ -147,19 +147,9 @@ public class LuaConfigService
             var filePath = Path.Combine(luaDir, $"{appId}.lua");
             await WriteFileAtomicallyAsync(filePath, content);
 
-            // 同时更新 steamtools.lua 主配置（如果有的话）
-            var stLuaPath = Path.Combine(luaDir, "steamtools.lua");
-            if (File.Exists(stLuaPath))
-            {
-                var stContent = await File.ReadAllTextAsync(stLuaPath);
-                var addLine = $"addappid({appId})";
-                if (!stContent.Contains(addLine))
-                {
-                    stContent += $"\n{addLine}\n";
-                    await WriteFileAtomicallyAsync(stLuaPath, stContent);
-                }
-            }
-
+            // 这里以前还会往 steamtools.lua 追一行 addappid(appId)：同一个"入库"动作，走本方法会改第三方配置、
+            // 走 LuaBuilder（主入库链路）不会 → 两个入口结果不同。现统一为**不维护 steamtools.lua**：
+            // 那个文件由 SteamTools 自己管，本程序只在删除入库时清理旧版留下的引用（见 DeleteLibraryItemAsync）。
             return (true, $"配置文件已写入：{filePath}", filePath);
         }
         catch (Exception ex)
