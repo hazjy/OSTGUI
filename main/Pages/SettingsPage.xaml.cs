@@ -50,7 +50,7 @@ public sealed partial class SettingsPage : Page
             LogService.Logs.CollectionChanged += OnLogsChanged;
 
             // 每次进入页面同步一次当前日志：仅在无新日志事件时，日志栏不依赖事件也有内容
-            VM.LogsText = LogService.GetText(PanelLines);
+            VM.LogsText = LogService.GetText();
             VM.RefreshSudamaCacheAge();
             VM.RefreshPaths();
             VM.RefreshDenuvoModeFromKernel();
@@ -66,12 +66,8 @@ public sealed partial class SettingsPage : Page
     }
 
     /// <summary>
-    /// 日志栏最多显示多少行。只影响面板显示：集合里仍是全量，"复制全部"也走全量。
-    /// 面板本身只有 400px 高，显示尾部足够看当下；要看更早的翻日志文件。
+    /// 日志栏刷新表（见构造里的说明）
     /// </summary>
-    private const int PanelLines = 2000;
-
-    /// <summary>日志栏刷新表（见构造里的说明）</summary>
     private readonly Microsoft.UI.Dispatching.DispatcherQueueTimer _logRefreshTimer;
 
     /// <summary>有未刷新的日志变更（跨线程只写这个 bool ✓ 有意的良性竞态：最差多排一次 UI 回调）</summary>
@@ -81,7 +77,7 @@ public sealed partial class SettingsPage : Page
     /// 日志变更（可能在**任意线程**）：只置脏 + 叫醒节流表，真正重算交给 <see cref="FlushLogsText"/>。
     /// 原来这里每来一行就 `string.Join` 全量重拼（几千行就是几十万字符 ✗ 每次都进 LOH ✗）
     /// 再刷 TextBox + Select 到底 → 日志一多就疯狂分配（2026-09-27 修成最多 10 次/秒；
-    /// 2026-09-28 再加面板尾部上限 PanelLines，重算量不再随总量增长）
+    /// 2026-09-28 再加面板尾部上限（2026-10-04 按用户要求已去掉，面板改为全量））
     /// </summary>
     private void OnLogsChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
     {
@@ -106,7 +102,9 @@ public sealed partial class SettingsPage : Page
 
         try
         {
-            VM.LogsText = LogService.GetText(PanelLines);
+            // 面板显示**全量**（2026-10-04 按用户要求去掉 2000 行上限）：
+            // ⚠️ 代价是每次重算要拼全部行，行数一多这步明显变重（原截尾就是为避这个，见上面 OnLogsChanged 注释）
+            VM.LogsText = LogService.GetText();
         }
         catch { }
 

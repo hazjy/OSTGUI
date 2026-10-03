@@ -19,6 +19,10 @@ public sealed partial class NoSteamPage : Page
         this.InitializeComponent();
         VM = vm;
         DataContext = VM;
+
+        // 本页日志栏镜像全局日志里的 [NoSteam] 行（成对订阅，先 -= 再 +=；VM 是单例，所以必须解订阅）
+        Loaded += (_, _) => VM.AttachLogMirror();
+        Unloaded += (_, _) => VM.DetachLogMirror();
     }
 
     private void NoSteamSegmented_SelectionChanged(object sender, SelectionChangedEventArgs e)

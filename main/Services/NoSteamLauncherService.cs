@@ -170,14 +170,45 @@ public sealed partial class NoSteamLauncherService : IDisposable
         CancellationToken ct = default)
     {
         var (resourcesDir, pluginsDir) = EnsureExtracted();
-        var orchestrator = CreateOrchestrator(resourcesDir, pluginsDir, orchestratorLogger, steamlessLogger, gbeLogger);
 
-        var progress = new Progress<string>(msg =>
-        {
-            LogService.Event($"[NoSteam] {msg}");
-        });
+        // 同步 IProgress：进度与日志**共用一条通道**、且都在这条部署线程上按真实顺序写进 LogService。
+        // 不能用 Progress<string>——它会 Post 到 UI 线程（异步、晚到），与 _logger 那条同步写混起来
+        // 就是"后发生的先出现在日志里"（2026-10-04 实测）。LogService 自己会把集合更新封送回 UI 线程，
+        // 所以这里在后台线程直接调它是安全的。
+        var progress = new SynchronousProgress(msg => LogService.Event($"[NoSteam] {msg}"));
+
+        // 三个 logger 都包一层：输出既进调试器，也进同一条 progress 通道（顺序才正确）
+        var orchestrator = CreateOrchestrator(
+            resourcesDir, pluginsDir,
+            new ProgressLogger<NoSteamLaunchOrchestrator>(orchestratorLogger, progress),
+            new ProgressLogger<SteamlessService>(steamlessLogger, progress),
+            new ProgressLogger<GBEDeploymentService>(gbeLogger, progress));
 
         return await orchestrator.ExecuteAsync(options, progress, ct);
+    }
+
+    /// <summary>
+    /// 直接在当前线程回调的 <see cref="IProgress{T}"/>。
+    /// 框架自带的 <c>Progress&lt;T&gt;</c> 会把回调 <c>Post</c> 到构造时捕获的同步上下文（部署时＝UI 线程），
+    /// 于是"日志（同步写）"和"进度（排队才写）"两股交错、时间顺序错乱；这里不排队，谁调谁写。
+    /// </summary>
+    private sealed class SynchronousProgress : IProgress<string>
+    {
+        private readonly Action<string> _handler;
+
+        public SynchronousProgress(Action<string> handler) => _handler = handler;
+
+        public void Report(string value)
+        {
+            try
+            {
+                _handler(value);
+            }
+            catch
+            {
+                // 进度回调失败不能影响部署
+            }
+        }
     }
 
     /// <summary>

@@ -129,6 +129,43 @@ public partial class NoSteamViewModel : ObservableObject
         set => SetProperty(ref _progressLog, value);
     }
 
+    /// <summary>
+    /// 把全局日志里带 <c>[NoSteam]</c> 的行镜像到本页日志栏。
+    ///
+    /// 为什么需要：launcher 的 <c>progress</c> 与 <c>ILogger</c> 都写进 <see cref="LogService"/>，
+    /// 而本页原来只看得到自己写的那几行（<c>[INFO]</c> / <c>[ERROR]</c>…）——"日志栏看不到部署细节"。
+    /// 镜像之后：Steamless 命令行、GBE 部署、备份还原、Plugins 暂存/还原等每一行都出现在这里
+    /// （launcher 的 <c>_logger</c> 由 <see cref="ProgressLogger{T}"/> 并进同一条 progress 通道再写进 LogService）。
+    ///
+    /// 订阅成对挂在 Loaded / Unloaded（先 <c>-=</c> 再 <c>+=</c>）：事件源是静态集合，构造函数里订阅
+    /// 会让页面被永久钉住（同 <c>doc/开发踩坑-UI.md</c> 里日志栏那条）。
+    /// </summary>
+    public void AttachLogMirror()
+    {
+        LogService.Logs.CollectionChanged -= OnGlobalLogChanged;
+        LogService.Logs.CollectionChanged += OnGlobalLogChanged;
+    }
+
+    public void DetachLogMirror() => LogService.Logs.CollectionChanged -= OnGlobalLogChanged;
+
+    private const string NoSteamLogPrefix = "[NoSteam]";
+
+    private void OnGlobalLogChanged(object? sender, System.Collections.Specialized.NotifyCollectionChangedEventArgs e)
+    {
+        if (e.NewItems == null) return;
+
+        foreach (var item in e.NewItems)
+        {
+            if (item is not string line) continue;
+
+            // 全局行形如 "[2026-10-04 06:07:03.123] [p21348] [D] [NoSteam] 正文"，这里只取正文
+            var idx = line.IndexOf(NoSteamLogPrefix, StringComparison.Ordinal);
+            if (idx < 0) continue;
+
+            ProgressLog += line[(idx + NoSteamLogPrefix.Length)..].TrimStart() + "\n";
+        }
+    }
+
     private bool _isRunning;
 
     public bool IsRunning
