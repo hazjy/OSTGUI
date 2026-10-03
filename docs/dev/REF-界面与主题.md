@@ -34,4 +34,4 @@
 
 - **「关于」弹窗**（侧边栏 → 弹窗，不切页）：实现事实在 `main/Views/AboutView.xaml` 的头注释与
   `MainWindow.NavAbout_Tapped`（外壳、宽度口径、图标与许可落点、技术栈三枚官方 mark 与两套主题色）；
-  WinUI 侧的两个坑（`ContentDialog` 别设 MinWidth/MaxWidth、`KeyboardAccelerator` 要 Hidden）见 `doc/开发踩坑-UI.md` §二。
+  WinUI 侧的两个坑（`ContentDialog` 别设 MinWidth/MaxWidth、`KeyboardAccelerator` 要 Hidden）见 `doc/开发踩坑-UI.md`。

@@ -77,6 +77,26 @@
 - 委托约束：`where TDelegate : Delegate` 必须补（否则返回类型转不回 `Delegate`）；
   57 个调用点都是具体委托类型，无需改调用点。
 
+## 八、内存基线与已试过的压法（OSTGUI，2026-09-22 实测，225% DPI）
+
+> 这批量的是 **AOT 之前**的 JIT 包（AOT 于 09-27 才落地）；AOT 后的启动值见本文末尾「实测收益」。
+
+- **基线**：空窗启动 ~128 MB 私有提交 / ~186 MB 工作集；进库页 156 MB（列表）/ 161 MB（网格，差的就是 450px 位图）；
+  **两档视图都切过再 +46 MB**（各留一份容器），此后每轮切换只再涨 ~1 MB —— 是平台期不是泄漏。
+  ⚠️ **别把基线当泄漏查**：自包含 WinUI 3 空窗工作集本就 100~200 MB，且任务管理器那列是"活动私有工作集"、
+  与 .NET 私有提交不是一个口径 —— 要查的是**峰值来源**（整份 JSON 物化、大文件读成 `byte[]`）。
+- **已压过的四刀**：① Sudama 整份字典 → DOM → **流式扫描取键**（单次入库内存增量 ~110 MB → 中间态 DOM +41.1 MB → **+6.1 MB**）
+  ② manifest 下载改**流式落盘**（`.part` → `Move`）③ **删掉 5 秒一次的全库扫描**（静置 2 分钟一直 128.0~128.6 MB，纹丝不动）
+  ④ 峰值后 `OstMemory.CompactAfterLargeBuffers()`（**治标**：GC 默认不移动大对象，不压的话峰值过去空洞仍占着已提交内存，
+  任务管理器上像泄漏）。
+- **怎么查**：分阶段读 `Get-Process OSTGUI | Select PrivateMemorySize64, WorkingSet64`；分解用 `dotnet-counters`
+  （`gc-heap-size`、`loh-size`）/ 抓堆 `dotnet-gcdump`；GC 档位**免重建**快测：启动前 `$env:DOTNET_GCConserveMemory=5`；
+  算"静置值"取**峰值之后**的最小值（"最后 30s 最小"会混进入库前的低值 → 假回落）。
+- **实测无效、别再试**：`GCConserveMemory` 用 `DOTNET_GCConserveMemory` 环境变量跑 0 / 5 / 9 三档，**绝对峰值一致**
+  （156.9 / 152.0 / 152.7 MB），静置回落也没区别 → 对该项目无收益；也不做进 UI（要"写 exe 旁 runtimeconfig + 重启 +
+  权限失败分支"，代价远大于 0 收益）。**不建议动的**：`HeapHardLimit*`（逼近上限会 OOM）、`InvariantGlobalization`
+  （可能影响中文文化格式化）、`ConcurrentGarbageCollection=false`（UI 会卡）。**结论：代码层面压不动了，2026-09-22 决定到此为止。**
+
 ## 实测收益（本机，2026-09-27）
 
 - 启动工作集：AOT **49 MB** vs JIT **109 MB**；切页 20 次后：**254 MB** vs **273 MB**；

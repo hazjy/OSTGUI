@@ -25,7 +25,7 @@ namespace OSTGUI.Helpers;
 /// 要用 Composition 做动画就整套都用 Composition（阴影也得换成 composition DropShadow），两边不能混。
 ///
 /// 数值（缩放 / 时长 / 阴影 Z）见 `_archive/20260927-细节与偏好.md`（UI 偏好已归档）；
-/// 机制与量测手法见 `doc/开发踩坑-UI.md`。
+/// 机制见 `doc/开发踩坑-窗口与主题.md`（主题画刷那条），量测手法见 `doc/验证手法-UI.md`。
 /// </summary>
 public static class CardHover
 {

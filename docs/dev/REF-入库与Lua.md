@@ -56,7 +56,7 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
 - **入库取键走流式扫描**（`SudamaKeyCache.ScanWantedAsync`）：64KB 分块喂 `Utf8JsonReader`、
   跨块靠 `CurrentState` 续读，只收 `wantedIds` 命中的键值对；调用方（`LuaBuilder`）**先算出要哪些 id**
   （appId + 各 depot + 各 DLC），所以 DLC 列表的获取被提到写行之前。
-  三种做法的实测内存对比与"峰值后压大对象堆"见 `doc/开发踩坑-环境.md`
+  三种做法的实测内存对比与"峰值后压大对象堆"见 `docs/dev/REF-AOT适配.md` §八
 - ⚠️ **截断保护**：流式读不完整 JSON 时 `Read()` 可能只是返回 false（不抛），会把截断缓存静默当成"少了那些键"
   → 入库静默少密钥。做法：先校验**尾部最后一个非空白字节必须是 `}`**，不合格就抛 `JsonException` 让调用方降级（重下 / 旧缓存 / 空）
 - **缓存文件形状兼容两种**：本程序写的是 `{"Data":{…}}`，读侧也认原始明文 `{…}`
