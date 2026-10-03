@@ -130,11 +130,8 @@ public partial class MainViewModel : ObservableObject
         // Lua 目录：以内核配置（opensteamtool.toml 的 [lua] paths）为准，没配就用默认 <Steam>\config\lua
         SteamService.SetLuaPath(_steamDllService.GetLuaPath());
 
-        // 检查状态
-        IsOstInjected = _steamDllService.IsOSTDllInjected();
-        IsSteamRunning = SteamService.IsSteamRunning();
-
-        StatusMessage = "就绪";
+        // 检查状态（注入状态 + Steam 运行中 + 主页状态文案一起算好）
+        RefreshOstStatus();
 
         // 启动 Steam 状态轮询
         StartSteamStatusPolling(dispatcherQueue);
@@ -167,19 +164,37 @@ public partial class MainViewModel : ObservableObject
 
     private void OnSteamStatusTimerTick(Microsoft.UI.Dispatching.DispatcherQueueTimer sender, object args)
     {
-        var isRunning = SteamService.IsSteamRunning();
-        if (IsSteamRunning != isRunning)
-        {
-            IsSteamRunning = isRunning;
-        }
+        // 轮询里连注入状态与状态文案一起刷：注入 / 卸载可能在设置页完成，
+        // 停在本页不动时也要能反映出来（三个 File.Exists + 一次进程查询，代价可忽略）
+        RefreshOstStatus();
     }
 
     /// <summary>
-    /// 刷新 OST 注入状态
+    /// 刷新 OST 注入状态、Steam 运行状态与主页状态文案。
+    /// 主页 <c>Loaded</c> 与 3 秒轮询都会调它。
     /// </summary>
     public void RefreshOstStatus()
     {
         IsOstInjected = _steamDllService.IsOSTDllInjected();
         IsSteamRunning = SteamService.IsSteamRunning();
+        RefreshStatusMessage();
+    }
+
+    /// <summary>
+    /// 主页状态文案：**只有 Steam 目录找到、且三个内核 DLL 都在**时才显示「就绪」；
+    /// 否则分别是「未发现Steam」（没路径 / 路径已失效）与「缺少关键DLL」（有目录但没注入全）。
+    /// 判据与设置页的注入状态同源：<see cref="SteamService.GetSteamPath"/> +
+    /// <see cref="SteamDllService.IsOSTDllInjected"/>（dwmapi / xinput1_4 / OpenSteamTool 三个必须齐）。
+    /// </summary>
+    public void RefreshStatusMessage()
+    {
+        var steamPath = SteamService.GetSteamPath();
+        if (string.IsNullOrEmpty(steamPath) || !Directory.Exists(steamPath))
+        {
+            StatusMessage = "未发现Steam";
+            return;
+        }
+
+        StatusMessage = _steamDllService.IsOSTDllInjected() ? "就绪" : "缺少关键DLL";
     }
 }
