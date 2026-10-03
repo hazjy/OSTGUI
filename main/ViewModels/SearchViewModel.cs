@@ -535,9 +535,9 @@ public partial class SearchViewModel : ObservableObject
                 {
                     var abnormalMsg = $"入库异常：{string.Join("；", warnings)}";
                     LogService.Event(abnormalMsg);
-                    if (_configService.Config.ShowSystemNotifications)
-                        Services.ToastService.ShowWarning("入库异常",
-                            $"{target.Name} (AppID {appId}) {string.Join("；", warnings)}");
+                    // 入库结果通知已改为"始终发送"（设置页那个勾选项已删）
+                    Services.ToastService.ShowWarning("入库异常",
+                        $"{target.Name} (AppID {appId}) {string.Join("；", warnings)}");
                     SetStatus(abnormalMsg, "Warning");
                 }
                 else
@@ -548,17 +548,16 @@ public partial class SearchViewModel : ObservableObject
                     if (res.KeyCount > 0) parts.Add($"{res.KeyCount} 个密钥");
                     var detail = parts.Count > 0 ? string.Join("，", parts) : "（无清单/密钥）";
                     var successMsg = $"{target.Name}（AppID {appId}）已入库，添加了 {detail}";
-                    if (_configService.Config.ShowSystemNotifications)
-                        Services.ToastService.ShowSuccess("入库成功", successMsg);
+                    // 入库结果通知已改为"始终发送"（设置页那个勾选项已删）
+                    Services.ToastService.ShowSuccess("入库成功", successMsg);
                     SetStatus(successMsg, "Success");
                 }
                 SaveOptionsToConfig();
             }
             else
             {
-                // 入库失败：用户发起的操作未完成，保留错误提示，避免静默失败
-                if (_configService.Config.ShowSystemNotifications)
-                    Services.ToastService.ShowError("入库失败", res.Message);
+                // 入库失败：用户发起的操作未完成，保留错误提示，避免静默失败（通知同样"始终发送"）
+                Services.ToastService.ShowError("入库失败", res.Message);
                 SetStatus(res.Message, "Error");
             }
         }

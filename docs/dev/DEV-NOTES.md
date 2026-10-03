@@ -28,7 +28,8 @@
 - **封面图**：`CoverImageService` 只返回文件路径（不碰 WinUI 类型），位图由 VM 在 UI 线程构造；入库封面落盘 `%LOCALAPPDATA%\OSTGUI\covers\`（缺失标记 `.miss2`），**搜索页缩略图刻意只走内存不落盘**；列表 / 网格共用同一份位图，切档只切宿主可见性。出处：`docs/dev/REF-资产与封面.md`（机制）；尺寸与放置规则见 `_archive/20260927-细节与偏好.md`（UI 偏好已归档）
 - **显示效果（无 / 云母 / 亚克力）**：设置页下拉 → `config.json` 的 `BackdropMode` → `MainWindow.ApplyBackdrop()` 改 `Window.SystemBackdrop`；「无」档由 `SolidBackdrop` 自己铺底。出处与落地顺序：`docs/dev/REF-界面与主题.md`、`doc/开发踩坑-UI.md`
 - **日志**：**单一日志流**（2026-09-28 合并，旧的"诊断 / 流水账两条通道"作废）——`LogService.Diag()` 与 `Event()` 行为完全一致，留两个名字只为让调用处读得出语义（异常 / 失败 vs 流水）。文件 `%LOCALAPPDATA%\OSTGUI\logs\ostgui.log`：`[yyyy-MM-dd HH:mm:ss.fff] [p<pid>] [D] msg`，追加写 + `FileShare.ReadWrite`（GUI / 监控 / stats 子进程共用同一份）；**按行数裁剪**——设置里的 `LogMaxLines` 就是硬上限，超出即重写为最后若干行，不留 `.1` / `.2` 备份。崩溃走 `LogService.Fatal()`（文件留 `ToString()` 全栈）。日志栏是会话内全量，面板只渲染尾部若干行；子进程没有视图、只能写文件。联机宿主另写 `onlinehost.log`。跨线程写法见 `doc/开发踩坑-UI.md`
-- **配置与状态**：`ConfigService` → `%LOCALAPPDATA%\OSTGUI\config.json`（**改动只写内存，退出时统一落盘**）；视图档位 `LibraryViewMode` / `SearchViewMode`、联机「其他」下拉 `OnlineOtherMode`、成就页来源勾选 `AchievementShowLua/Owned`、`BackdropMode`、清单按需投喂 `ManifestFeedEnabled` 等偏好都落在这一份里
+- **检查更新**：`UpdateService` **直接读 GitHub Releases，不需要上传或维护任何清单文件** —— 主源是 `releases/latest` 的 302 `Location`（关掉自动重定向，只读响应头、连 body 都不读），备源是 `api.github.com` 同名端点的 `tag_name`，每源 5 秒硬超时。版本比较在 `VersionCompare`（纯逻辑、零依赖，可单独拉出去跑）：按小数点逐位比，远端某位更大才算有更新、更小即停、相等继续，缺位按 0。提示统一是**带两个按钮的系统通知**（前往发布页 / 暂不更新，按钮参数由 `Program` 的 `NotificationInvoked` 转给 `UpdateService.HandleNotificationArgument`）；自动检查在启动 5 秒后、受设置页「接收更新推送」控制，**同一版本只提示一次**（`config.json` 的 `NotifiedUpdateVersion`），手动检查（「关于」弹窗）不受限、结果就地显示在弹窗里。出处：`main/Services/UpdateService.cs`、`VersionCompare.cs` 头注释
+- **配置与状态**：`ConfigService` → `%LOCALAPPDATA%\OSTGUI\config.json`（**改动只写内存，退出时统一落盘**）；视图档位 `LibraryViewMode` / `SearchViewMode`、联机「其他」下拉 `OnlineOtherMode`、成就页来源勾选 `AchievementShowLua/Owned`、`BackdropMode`、清单按需投喂 `ManifestFeedEnabled`、检查更新 `UpdateCheckEnabled` 等偏好都落在这一份里
 - **成就编辑（成就页）**：左侧 = `LibraryScanner` 扫出的入库游戏（重开走 `AchievementListCache`，正版候选池由 `AppInfoVdf` 读 `appcache\appinfo.vdf`）；成就定义读本地 `<Steam>\appcache\stats\UserGameStatsSchema_<appid>.bin`（二进制 KV，`SteamStatsSchema`）。勾选**只写本地留底** `%LOCALAPPDATA%\OSTGUI\achievements\<appid>.json`；点「保存到 Steam」才 spawn `OSTGUI.exe --stats-apply`（`SteamStatsChild`，短命子进程 + 结果 JSON 文件，理由与 `SteamTicketExtractor` 相同）用 SAM 封装（`main/SteamApi/`，zlib）→ `ISteamUserStats013` 写回。**写入会进 Valve（重启 Steam 后仍在）**，但内核会对 addappid 游戏清空 819 里的成就数据 → 成就页可能显示不出来（显示层问题，不是没写进去）；证据与边界见 `docs/dev/REF-成就.md`
 
 ## 3. 交付形态：Native AOT（跨模块）
@@ -60,6 +61,7 @@
 | `TrainerCatalogService` / `TrainerDownloadService` | 修改器目录：**搜索走站点官方 RSS**（`?s=&feed=rss2`，XDocument；HTML 结果区正则已删）+ 详情页正则取附件直链；下载需浏览器 UA + Referer + 自己跟 302，内容嗅探 zip → 解压 → `.part` 原子落盘；已下载只认 `%LOCALAPPDATA%\OSTGUI\trainers.json` 索引（不扫目录） |
 | `TrainerBindingService` / `TrainerMonitor` | 进程绑定：`bindings.json`（GUI 唯一写者、监控按 mtime 热重载）+ 监控子进程 `OSTGUI.exe --trainer-monitor`（每 2s：游戏在→起修改器；游戏退→只结束自己启动过的那个；无启用绑定自退；`Global\OSTGUI_TrainerMonitor` 单实例） |
 | `OstMemory` | 大缓冲用完手动压一次 LOH（治标：让已提交内存还回去；调用点都选在"用户刚干完一件事"） |
+| `UpdateService` / `VersionCompare` | 检查更新：读 GitHub Releases（302 `Location` 主源 + API 备源，各 5 秒硬超时）/ 版本比较与 tag 解析（纯逻辑、零依赖，可单独验） |
 
 ## 5. 已知限制（仍然有效的）
 

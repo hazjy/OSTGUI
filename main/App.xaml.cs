@@ -147,6 +147,13 @@ public partial class App : Application
             mainWindow.EnsureInitialized();
         }
 
+        // 检查更新：启动后延迟 5 秒再查（别跟启动抢网络与 CPU），开关在设置页「基本设置」。
+        // fire-and-forget：绝不能在启动路径上 await —— 结果由 UpdateService 自己弹通知 / 写日志。
+        // 注意：这里不能用 "Services.UpdateService"（Services 是本类的 ServiceProvider 属性），
+        // UpdateService 是静态类，靠 using OSTGUI.Services 解析。
+        if (configService.Config.UpdateCheckEnabled)
+            _ = UpdateService.CheckOnStartupAsync();
+
         Log("MainWindow activated");
     }
 

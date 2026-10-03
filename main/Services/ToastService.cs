@@ -71,4 +71,28 @@ public static class ToastService
     public static void ShowError(string title, string content) => Show(title, content, ToastType.Error);
     public static void ShowWarning(string title, string content) => Show(title, content, ToastType.Warning);
     public static void ShowInfo(string title, string content) => Show(title, content, ToastType.Info);
+
+    /// <summary>
+    /// 更新提示：**带两个按钮**的系统通知（手动检查与自动检查共用同一个）。
+    /// 按钮回调走通知参数而不是委托：App 在运行中时 <c>Program</c> 的 NotificationInvoked 能直接收到，
+    /// 由 <see cref="UpdateService.HandleNotificationArgument"/> 按 <c>action</c> 分发。
+    /// 不进队列：这是"用户可能要立刻点"的通知，排队延迟反而不合适。
+    /// </summary>
+    public static void ShowUpdateAvailable(string currentVersion, string latestVersion)
+    {
+        try
+        {
+            var builder = new AppNotificationBuilder()
+                .AddText("发现新版本")
+                .AddText($"当前版本 v{currentVersion}，最新 v{latestVersion}")
+                .AddButton(new AppNotificationButton("前往发布页").AddArgument("action", "update-open"))
+                .AddButton(new AppNotificationButton("暂不更新").AddArgument("action", "update-skip"));
+            AppNotificationManager.Default.Show(builder.BuildNotification());
+        }
+        catch (Exception ex)
+        {
+            // 提权运行时系统通知必抛（系统限制）→ 手动查的反馈还有「关于」弹窗里那行小字兜着
+            LogService.Diag($"更新通知发送失败（提权运行的进程不能收发通知）：{ex.GetType().Name}：{ex.Message}");
+        }
+    }
 }

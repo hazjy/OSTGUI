@@ -48,7 +48,7 @@
                             </Grid>
                         </StackPanel>
                         <StackPanel Orientation="Horizontal" Spacing="24">
-                            <CheckBox Content="入库结果通知" IsChecked="{Binding ShowSystemNotifications, Mode=TwoWay}"
+                            <CheckBox Content="接收更新推送" IsChecked="{Binding UpdateCheckEnabled, Mode=TwoWay}"
                                       Checked="OnSettingChanged" Unchecked="OnSettingChanged" />
                             <CheckBox Content="版本状态更改通知" IsChecked="{Binding ShowVersionChangeNotifications, Mode=TwoWay}"
                                       Checked="OnSettingChanged" Unchecked="OnSettingChanged" />

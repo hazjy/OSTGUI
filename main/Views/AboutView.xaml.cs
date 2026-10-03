@@ -91,9 +91,39 @@ public sealed partial class AboutView : UserControl
         }
     }
 
-    // ponytail: 更新检查尚未接入，沿用原 InfoPage 的占位提示；接上真实检查后替换
-    private void CheckUpdate_Click(object sender, RoutedEventArgs e)
-        => (App.MainWindow as MainWindow)?.Notify("检查更新", "更新检查尚未接入");
+    /// <summary>
+    /// 手动检查更新：与启动时的自动检查共用同一个服务与同一个系统通知（有新版时弹两个按钮）。
+    /// 区别在"没有新版 / 失败"时手动必须有反馈 → 就地显示在按钮下方那行小字里。
+    /// </summary>
+    private async void CheckUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        var button = sender as Button;
+        if (button != null) button.IsEnabled = false;
+
+        UpdateStatusText.Visibility = Visibility.Visible;
+        UpdateStatusText.Text = "正在检查更新…";
+
+        try
+        {
+            var result = await UpdateService.CheckAsync(manual: true);
+            UpdateStatusText.Text = result.Status switch
+            {
+                UpdateCheckStatus.UpdateAvailable => $"发现新版本 v{result.LatestVersion}（见系统通知）",
+                UpdateCheckStatus.UpToDate => $"已是最新 v{result.CurrentVersion}",
+                UpdateCheckStatus.Busy => "另一次检查正在进行…",
+                _ => $"无法检查更新：{result.Message}"
+            };
+        }
+        catch (Exception ex)
+        {
+            LogService.Diag($"关于弹窗：检查更新异常 {ex.GetType().Name}：{ex.Message}");
+            UpdateStatusText.Text = $"无法检查更新：{ex.GetType().Name}";
+        }
+        finally
+        {
+            if (button != null) button.IsEnabled = true;
+        }
+    }
 
     private void DevName_Click(object sender, RoutedEventArgs e) => OpenUrl(DeveloperUrl);
 

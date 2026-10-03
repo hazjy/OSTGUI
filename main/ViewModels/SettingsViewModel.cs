@@ -40,12 +40,13 @@ public partial class SettingsViewModel : ObservableObject
         set => SetProperty(ref _luaPath, value);
     }
 
-    private bool _showSystemNotifications = true;
+    private bool _updateCheckEnabled = true;
 
-    public bool ShowSystemNotifications
+    /// <summary>「接收更新推送」：开了才在启动 5 秒后自动检查更新（手动检查不受影响）</summary>
+    public bool UpdateCheckEnabled
     {
-        get => _showSystemNotifications;
-        set => SetProperty(ref _showSystemNotifications, value);
+        get => _updateCheckEnabled;
+        set => SetProperty(ref _updateCheckEnabled, value);
     }
 
     private bool _showVersionChangeNotifications = true;
@@ -490,7 +491,7 @@ public partial class SettingsViewModel : ObservableObject
             NavigationPaneWidthInput = ((int)c.NavigationPaneWidth).ToString();
             ThemeMode = c.ThemeMode;
             BackdropIndex = c.BackdropMode switch { "none" => 0, "acrylic" => 2, _ => 1 };
-            ShowSystemNotifications = c.ShowSystemNotifications;
+            UpdateCheckEnabled = c.UpdateCheckEnabled;
             ShowVersionChangeNotifications = c.ShowVersionChangeNotifications;
             LogMaxLines = c.LogMaxLines;
             ManifestFeedEnabled = c.ManifestFeedEnabled;
@@ -626,7 +627,7 @@ public partial class SettingsViewModel : ObservableObject
                 c.StFixedVersionDefault = StFixedVersionDefault;
                 c.ThemeMode = ThemeMode;
                 c.BackdropMode = BackdropMode;
-                c.ShowSystemNotifications = ShowSystemNotifications;
+                c.UpdateCheckEnabled = UpdateCheckEnabled;
                 c.ShowVersionChangeNotifications = ShowVersionChangeNotifications;
                 c.LogMaxLines = (int)LogMaxLines;
                 LogService.SetMaxLines((int)LogMaxLines);

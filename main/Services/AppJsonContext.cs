@@ -81,5 +81,6 @@ internal partial class AppJsonIndentedContext : JsonSerializerContext { }
 [JsonSerializable(typeof(IReadOnlyList<AchievementRecord>))]
 [JsonSerializable(typeof(StatsChildResult))]
 [JsonSerializable(typeof(SteamTicketExtractor.ExtractResult))]
+[JsonSerializable(typeof(ReleaseInfo))]
 [JsonSerializable(typeof(JsonElement))]
 internal partial class AppJsonCompactContext : JsonSerializerContext { }

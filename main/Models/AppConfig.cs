@@ -11,8 +11,11 @@ public class AppConfig
     // （曾经把检测结果也写进来，steam 一挪位置就变成读到失效路径，检测形同虚设。）
     public string SteamPath { get; set; } = string.Empty;
     public string ManifestHubApiKey { get; set; } = string.Empty;
-    public bool ShowSystemNotifications { get; set; } = true;
     public bool ShowVersionChangeNotifications { get; set; } = true;
+    // 检查更新：「接收更新推送」开关（设置页 基本设置），关掉就不做启动自动检查（手动检查不受影响）
+    public bool UpdateCheckEnabled { get; set; } = true;
+    // 自动检查"同一版本只提示一次"的记账（弹过就写，手动弹也算）
+    public string NotifiedUpdateVersion { get; set; } = string.Empty;
     public string DefaultManifestSource { get; set; } = "auto";
 
     // === 入库设置 ===
@@ -94,6 +97,8 @@ public class AppConfig
     {
         SteamPath = string.Empty,
         DefaultManifestSource = "auto",
+        UpdateCheckEnabled = true,
+        NotifiedUpdateVersion = string.Empty,
         DefaultAddAllDlc = true,
         DownloadTimeout = 120,
         StFixedVersionDefault = true,

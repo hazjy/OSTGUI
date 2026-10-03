@@ -140,6 +140,8 @@
                         BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                         Click="CheckUpdate_Click">
                     <StackPanel Orientation="Horizontal" Spacing="7" HorizontalAlignment="Center">
+                        <!-- 普通循环图标：官方 Segoe Fluent Icons 的 E72C（Refresh），**不带图标底**。
+                             同类字形可选：E117 Sync（双向）、E777 UpdateRestore（反向）。 -->
                         <FontIcon Glyph="&#xE72C;" FontSize="15" />
                         <TextBlock Text="检查更新" FontSize="13" />
                     </StackPanel>
@@ -158,6 +160,11 @@
                     </StackPanel>
                 </Button>
             </Grid>
+
+            <!-- 手动检查更新的结果（自动检查只进日志；发现新版本一律走系统通知的两个按钮） -->
+            <TextBlock x:Name="UpdateStatusText" FontSize="12" Margin="0,0,0,8"
+                       HorizontalAlignment="Center" TextWrapping="Wrap" Visibility="Collapsed"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
 
             <StackPanel Spacing="2" HorizontalAlignment="Center">
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Spacing="2">
