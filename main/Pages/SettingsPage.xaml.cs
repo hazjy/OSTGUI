@@ -142,11 +142,13 @@ public sealed partial class SettingsPage : Page
     private void ApplyNavigationPaneWidth_Click(object sender, RoutedEventArgs e)
     {
         VM.ApplyNavigationPaneWidthCommand.Execute(null);
+
+        // 焦点移出输入框后**不清空**它：应用成功后输入值就等于配置值，按钮会随属性通知自动回灰
+        //（回灰本身就是"已生效"的反馈）；框里留着刚填的数字比清空有用 —— 用户还要对照、微调。
         if (App.MainWindow is MainWindow mw && int.TryParse(VM.NavigationPaneWidthInput.Trim(), out var w))
         {
             mw.ApplyNavigationPaneWidth(w);
-            VM.NavigationPaneWidthInput = "";                    // 清空输入框
-            (sender as Button)?.Focus(FocusState.Programmatic);  // 焦点移出输入框（按钮状态随属性通知自动回灰）
+            (sender as Button)?.Focus(FocusState.Programmatic);
         }
     }
 
@@ -157,34 +159,34 @@ public sealed partial class SettingsPage : Page
     }
 
     /// <summary>
-    /// API Key / Token 密码框：仅在实际值变化时记录"上次更新"（聚焦记旧值，失焦比对）
+    /// API Key / Token 密码框：**失焦时与"上次已保存的内容"比对，有区别才刷新"上次更新"时间**。
+    ///
+    /// 旧实现是"聚焦时记一份旧值、失焦时比对"，只靠 <c>GotFocus</c> 那一次快照 —— 任何让快照错位的时序
+    /// （页面重建 / 程序化聚焦 / 绑定晚于聚焦才写进框里 / 焦点落到模板回收后的新实例）都会算错，
+    /// 而且是两个方向都错：**没改也会刷新时间**（切页、走人时顺手补一次），改了也可能不刷新。
+    /// 现在改成两条硬条件：① 这次聚焦期间用户在框里真的动过内容（<c>PasswordChanged</c> + 框有焦点，
+    /// 绑定回写发生在未聚焦时，不会被算进来）；② 内容与"已保存内容"不同。
     /// </summary>
-    private ManifestSource? _tokenFocusSource;
-    private string? _tokenFocusOldValue;
+    private readonly HashSet<string> _editedTokenSourceIds = new();
 
-    private void OnTokenGotFocus(object sender, RoutedEventArgs e)
+    private void OnTokenPasswordChanged(object sender, RoutedEventArgs e)
     {
-        if (sender is PasswordBox { DataContext: ManifestSource ms } && ms.RequiresToken)
+        // 键入 / 粘贴 / 清除都算"动过"；绑定把配置里的值写进框时框没有焦点，不会记
+        if (sender is PasswordBox { DataContext: ManifestSource ms } pb
+            && pb.FocusState != FocusState.Unfocused)
         {
-            _tokenFocusSource = ms;
-            _tokenFocusOldValue = ms.ApiKey;
+            _editedTokenSourceIds.Add(ms.Id);
         }
     }
 
     private void OnTokenLostFocus(object sender, RoutedEventArgs e)
     {
-        if (sender is PasswordBox pb && _tokenFocusSource != null && ReferenceEquals(pb.DataContext, _tokenFocusSource))
-        {
-            var newValue = pb.Password;
-            if (newValue != _tokenFocusOldValue)
-            {
-                _tokenFocusSource.ApiKey = newValue;
-                VM.MarkManifestKeyUpdated(_tokenFocusSource);
-                VM.SaveAllToConfig();
-            }
-        }
-        _tokenFocusSource = null;
-        _tokenFocusOldValue = null;
+        if (sender is not PasswordBox { DataContext: ManifestSource ms } pb) return;
+
+        // 这一轮聚焦里没动过内容 → 什么都不做（连带避免"空框把 key 抹掉"）
+        if (!_editedTokenSourceIds.Remove(ms.Id)) return;
+
+        VM.MarkManifestKeyUpdatedIfChanged(ms, pb.Password);
     }
 
     /// <summary>Lua 路径：失焦时把输入框里的目录写进内核配置</summary>

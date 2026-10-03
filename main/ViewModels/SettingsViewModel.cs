@@ -435,7 +435,8 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 记录某需 token 源的 API Key 上次设置时间，并触发该行重绑定显示（仅变化才重建）
+    /// 记录某需 token 源的 API Key 上次设置时间，并触发该行重绑定显示（仅变化才重建）。
+    /// 调用时机由 <see cref="MarkManifestKeyUpdatedIfChanged"/> 决定 —— 只有内容真的变了才走这里。
     /// </summary>
     public void MarkManifestKeyUpdated(ManifestSource source)
     {
@@ -445,6 +446,34 @@ public partial class SettingsViewModel : ObservableObject
         source.ApiKeyUpdatedAtText = text;
         var i = VisibleSources.IndexOf(source);
         if (i >= 0) VisibleSources[i] = VisibleSources[i];
+    }
+
+    /// <summary>
+    /// 各源 API Key 的"上次已保存内容"快照（键 = 源 Id）。失焦时拿它比对，**只在实际变化时才**刷新时间。
+    /// 为什么不直接比 <c>source.ApiKey</c>：密码框是 TwoWay 绑定，键入时 ApiKey 早被改写，比它永远相等。
+    /// 为什么不靠"聚焦时记旧值"：那要把 GotFocus 的时序赌对（见 SettingsPage 里那段注释），
+    /// 实测出现过"没改也刷新时间"。快照只跟"已经落盘的内容"走，与焦点时序无关。
+    /// </summary>
+    private readonly Dictionary<string, string> _savedApiKeys = new();
+
+    /// <summary>
+    /// 失焦时调用：与"已保存内容"比对，**有区别才**写回、刷新"上次更新"时间并落盘。
+    /// </summary>
+    /// <returns>是否发生了更新</returns>
+    public bool MarkManifestKeyUpdatedIfChanged(ManifestSource source, string newValue)
+    {
+        if (!source.RequiresToken) return false;
+
+        var value = newValue ?? string.Empty;
+        if (_savedApiKeys.TryGetValue(source.Id, out var saved) && string.Equals(saved, value, StringComparison.Ordinal))
+            return false;
+
+        source.ApiKey = value;
+        _savedApiKeys[source.Id] = value;
+        MarkManifestKeyUpdated(source);
+        SaveAllToConfig();
+        LogService.Event($"清单源「{source.Name}」的 API Key / Token 已更新");
+        return true;
     }
 
     /// <summary>
@@ -569,6 +598,11 @@ public partial class SettingsViewModel : ObservableObject
             if (ManifestSource.IsImplementedSource(s.Id))
                 VisibleSources.Add(s);
         }
+
+        // 记下"已保存内容"：失焦比对用的基准就是它（配置里的值，不是界面上的实时值）
+        _savedApiKeys.Clear();
+        foreach (var s in sources)
+            _savedApiKeys[s.Id] = s.ApiKey ?? string.Empty;
     }
 
     /// <summary>
