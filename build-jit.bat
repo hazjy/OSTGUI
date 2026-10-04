@@ -2,7 +2,8 @@
 setlocal
 cd /d "%~dp0"
 
-REM Usage: build.bat [/r]    (/r = launch app after successful build)
+REM OSTGUI daily dev build (Debug / JIT). Release build -> build-aot.bat
+REM Usage: build-jit.bat [/r]    (/r = launch the app after a successful build)
 REM Output: quiet console; full log at %LOGFILE%; errors auto-printed on failure.
 REM Note: ALL build outputs live under the repo-level .build\ directory
 REM (see Directory.Build.props), outside the project source trees.
@@ -34,6 +35,8 @@ echo        full log: %LOGFILE%
 REM Pass an ABSOLUTE project path: 相对路径下 MSBuild 可能把自定义 BaseOutputPath
 REM 重新解析到当前目录、产物落到 <项目>\.build\（根因已在 Directory.Build.props
 REM 改成绝对路径，这里保持绝对以免再触发；兜底见文件末尾的嵌套目录清理）。
+REM /restore 这个开关（不是 /t:Restore;Build）会先做一次独立还原再重新评估后构建，
+REM 换成目标形式会让 WinUI 的 XAML 步骤不跑、报成片 CS0103。
 "%MSBUILD%" "%~dp0main\OSTGUI.csproj" /t:Build /restore /p:Configuration=Debug /m /nologo ^
   /v:q ^
   /flp:"LogFile=%LOGFILE%;Verbosity=normal" ^
@@ -46,6 +49,7 @@ if not "%EC%"=="0" (
     echo ---------- errors ----------
     type "%ERRFILE%" 2>nul
     echo ----------------------------
+    echo no error lines above - see the full log below.
     echo full log: %LOGFILE%
     exit /b %EC%
 )
@@ -56,6 +60,7 @@ REM 嵌套副本可能比 canonical 还新，所以先同步回去再删。idemp
 set "CANON=%~dp0%OUTDIR%"
 for /d %%P in ("%~dp0*") do (
     if exist "%%P\.build" if /i not "%%~nxP"==".build" (
+        echo [WARN] nested output dir found: %%P\.build ^(syncing back to .build\ then removing^)
         robocopy "%%P\.build" "%~dp0.build" /E /XO /NFL /NDL /NJH /NJS >nul
         if errorlevel 8 (
             echo [BUILD ERROR] robocopy sync failed: %%P\.build

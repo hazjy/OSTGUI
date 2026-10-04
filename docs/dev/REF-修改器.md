@@ -21,10 +21,10 @@
 - **不引第三方 HTML 解析库**：本机 nuget 不通，加不了 HtmlAgilityPack（Fluent-Steam-Lua 用的是它）
   → 只用 `Regex` 锚定上面那几个固定标记。
 - **进程绑定语义**（与 FSL 的 `SvcMonitor` 对齐，但不单独建工程/装服务）：
-  - 绑定 = `{AppId, GameName, GameExePath, TrainerFilePath, IsEnabled}`，落 `%LOCALAPPDATA%\OSTGUI\trainers\bindings.json`；
+  - 绑定 = `{AppId, GameName, GameExePath, TrainerFilePath, IsEnabled}`，落 `%LOCALAPPDATA%\OSTGUI\bindings.json`（与 `trainers.json` 同目录，**不在** `trainers\` 里，见 `TrainerBindingService.BindingsPath`）；
   - 监控 = **同 exe 子进程** `OSTGUI.exe --trainer-monitor`（与 `--stats-*` 并列的早退分支）：每 2 秒轮询，
     游戏进程在 → 启动修改器；游戏退出 → **只结束自己启动过的那个**；没有启用的绑定就自退；
-  - 单实例靠 `Global\OSTGUI_TrainerMonitor` 互斥体；pid 写 `monitor.pid`，GUI 关闭开关时据此主动结束它；
+  - 单实例靠 `Global\OSTGUI_TrainerMonitor` 互斥体；pid 写 `%LOCALAPPDATA%\OSTGUI\trainers\monitor.pid`，GUI 关闭开关时据此主动结束它；
   - 下载完**不自动执行**：只有用户点「启动」或（绑定启用 + 监控开启）时才运行。
 - **实测**：`--trainer-monitor` 手动跑过 —— 无绑定时自退 `exit 0`，日志有"没有启用的绑定，退出"。
 - **未做（有意）**：封面图、自动按键（FSL 的 AutoKeys）、解析修改器 exe 取功能列表、多源（只 FLiNG）、开机自启/服务安装。

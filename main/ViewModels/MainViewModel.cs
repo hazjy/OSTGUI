@@ -124,7 +124,8 @@ public partial class MainViewModel : ObservableObject
         }
         else
         {
-            SteamPathDisplay = "未检测到 Steam，请在设置中手动配置";
+            // 路径只从注册表读（不提供手动指定），所以这里不给"去设置里填"这类提示（2026-10-04 修正）
+            SteamPathDisplay = "未检测到 Steam，请确认已安装客户端";
         }
 
         // Lua 目录：以内核配置（opensteamtool.toml 的 [lua] paths）为准，没配就用默认 <Steam>\config\lua

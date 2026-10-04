@@ -1,31 +1,42 @@
 @echo off
 rem ============================================================
-rem  Native AOT publish (self-contained + unpackaged), plus the
-rem  companion OnlineHost.exe.
-rem  Output: .build\OSTGUI\publish-aot\
+rem  OSTGUI release build: Native AOT publish (self-contained +
+rem  unpackaged) plus the companion OnlineHost.exe.
+rem  Output: .build\OSTGUI\publish-aot\  -- zip that folder to ship.
+rem  Daily dev build: build-jit.bat
 rem
 rem  Flags validated on this machine:
 rem    - PublishAot=true          real AOT (no coreclr.dll, no OSTGUI.dll)
 rem    - PublishSingleFile=false  WinUI 3 does not support single-file
 rem    - PublishTrimmed must NOT be set: AOT implies trimming and
 rem      passing PublishTrimmed=false makes MSBuild fail
-rem  See docs\dev\REF-AOT适配.md for the six pitfalls we hit.
+rem  See docs\dev\REF-AOT适配.md for the pitfalls we hit.
 rem
 rem  NOTE: OUT deliberately has NO trailing backslash. With one, the
 rem  closing quote in /p:PublishDir="%OUT%\" gets escaped and MSBuild
 rem  fails with MSB4184 "illegal characters in path".
 rem ============================================================
 setlocal
-set "MSB=C:\Program Files\Microsoft Visual Studio\18\Community\MSBuild\Current\Bin\MSBuild.exe"
 set "PROJ=%~dp0main\OSTGUI.csproj"
 set "HOSTPROJ=%~dp0OnlineHost\OnlineHost.csproj"
 set "OUT=%~dp0.build\OSTGUI\publish-aot"
+set "MSB="
 
-if not exist "%MSB%" (
-  echo [ERROR] MSBuild not found: %MSB%
+for %%V in (18 17) do (
+    if not defined MSB if exist "C:\Program Files\Microsoft Visual Studio\%%V\Community\MSBuild\Current\Bin\MSBuild.exe" set "MSB=C:\Program Files\Microsoft Visual Studio\%%V\Community\MSBuild\Current\Bin\MSBuild.exe"
+    if not defined MSB if exist "C:\Program Files\Microsoft Visual Studio\%%V\Professional\MSBuild\Current\Bin\MSBuild.exe" set "MSB=C:\Program Files\Microsoft Visual Studio\%%V\Professional\MSBuild\Current\Bin\MSBuild.exe"
+    if not defined MSB if exist "C:\Program Files\Microsoft Visual Studio\%%V\Enterprise\MSBuild\Current\Bin\MSBuild.exe" set "MSB=C:\Program Files\Microsoft Visual Studio\%%V\Enterprise\MSBuild\Current\Bin\MSBuild.exe"
+    if not defined MSB if exist "C:\Program Files (x86)\Microsoft Visual Studio\%%V\Community\MSBuild\Current\Bin\MSBuild.exe" set "MSB=C:\Program Files (x86)\Microsoft Visual Studio\%%V\Community\MSBuild\Current\Bin\MSBuild.exe"
+    if not defined MSB if exist "C:\Program Files (x86)\Microsoft Visual Studio\%%V\Professional\MSBuild\Current\Bin\MSBuild.exe" set "MSB=C:\Program Files (x86)\Microsoft Visual Studio\%%V\Professional\MSBuild\Current\Bin\MSBuild.exe"
+    if not defined MSB if exist "C:\Program Files (x86)\Microsoft Visual Studio\%%V\Enterprise\MSBuild\Current\Bin\MSBuild.exe" set "MSB=C:\Program Files (x86)\Microsoft Visual Studio\%%V\Enterprise\MSBuild\Current\Bin\MSBuild.exe"
+)
+
+if not defined MSB (
+  echo [ERROR] Visual Studio MSBuild not found. Install VS2022+ with WinUI workload.
   exit /b 1
 )
 
+echo [1/4] Restoring OSTGUI with AOT properties...
 rem ---- 0) restore with the SAME properties -----------------------------
 rem Restore and Publish must be SEPARATE invocations. /t:Restore;Publish in one run
 rem evaluates the project before the restore has written its generated props/targets,
@@ -39,6 +50,7 @@ set "CODE=%ERRORLEVEL%"
 if not "%CODE%"=="0" goto fail
 
 rem ---- 1) the GUI ----------------------------------------------------
+echo [2/4] Publishing OSTGUI (Native AOT)...
 "%MSB%" "%PROJ%" /t:Publish /p:Configuration=Release /p:RuntimeIdentifier=win-x64 /p:SelfContained=true /p:PublishAot=true /p:WindowsPackageType=None /p:WindowsAppSDKSelfContained=true /p:PublishSingleFile=false /p:PublishReadyToRun=false /p:CsWinRTAotWarningLevel=2 /p:PublishDir="%OUT%" /nologo /v:m
 set "CODE=%ERRORLEVEL%"
 if not "%CODE%"=="0" goto fail
@@ -64,6 +76,7 @@ rem the apphost stub without OnlineHost.dll: the host dies on start, the
 rem caller is fire-and-forget, and the whole online feature (DLL inject +
 rem AppID Changer) fails silently. See OSTGUI.csproj's ProjectReference.
 rem Same two-step rule as the GUI above: restore with AOT properties, then publish.
+echo [3/4] Publishing OnlineHost (Native AOT)...
 "%MSB%" "%HOSTPROJ%" /t:Restore /p:Configuration=Release /p:RuntimeIdentifier=win-x64 /p:SelfContained=true /p:PublishAot=true /nologo /v:m
 set "CODE=%ERRORLEVEL%"
 if not "%CODE%"=="0" goto fail
@@ -74,15 +87,21 @@ if not "%CODE%"=="0" goto fail
 rem ---- 3) publish-only leftovers -------------------------------------
 if exist "%OUT%\OSTGUI.pdb" del /q "%OUT%\OSTGUI.pdb"
 if exist "%OUT%\OnlineHost.pdb" del /q "%OUT%\OnlineHost.pdb"
+if exist "%OUT%\NoSteamLauncher.pdb" del /q "%OUT%\NoSteamLauncher.pdb"
+if exist "%OUT%\NoSteamLauncher.xml" del /q "%OUT%\NoSteamLauncher.xml"
 rem Framework-dependent config from the GUI publish. A native host ignores it,
 rem but leaving it around makes people think the host is still JIT.
 if exist "%OUT%\OnlineHost.runtimeconfig.json" del /q "%OUT%\OnlineHost.runtimeconfig.json"
 if exist "%OUT%\OnlineHost.deps.json" del /q "%OUT%\OnlineHost.deps.json"
 if exist "%OUT%\OnlineHost.dll" del /q "%OUT%\OnlineHost.dll"
+rem 嵌套副本：递归拷 .xbf 时若把 <TargetDir>publish\ 也捞进来，会多出一份本目录的
+rem 冗余拷贝（v1.7.7 包里就有过）。csproj 的 Exclude 已修，这里再兜一层。
+if exist "%OUT%\publish" rd /s /q "%OUT%\publish"
 
 rem ---- 4) self check -------------------------------------------------
 rem With no arguments the host validates its args and exits with 2. Anything
 rem else means the host is broken again (e.g. a stub got copied over it).
+echo [4/4] Self-checking the host...
 start /wait "" "%OUT%\OnlineHost.exe"
 set "HC=%ERRORLEVEL%"
 if not "%HC%"=="2" goto hostbroken

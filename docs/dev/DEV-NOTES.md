@@ -34,8 +34,8 @@
 
 ## 3. 交付形态：Native AOT（跨模块）
 
-- **打包**：`publish-aot.bat`（Release + `PublishAot=true`，**restore 与 publish 必须分两次调用且都带 AOT 属性**，否则静默产出 JIT 包）→ `.build\OSTGUI\publish-aot\`。csproj 里**故意不写** `PublishAot`，一律命令行传参；脚本自带两道自检（产物里有 `coreclr.dll` 即判 AOT 被跳过；`OnlineHost.exe` 无参自检须 exit=2）。
-- **产物事实**：无 `coreclr.dll` / `OSTGUI.dll` / `OSTGUI.runtimeconfig.json`；约 97 MB / 267 个文件（`OSTGUI.exe` 单文件约 41 MB）。内存收益与实测数值见 `docs/dev/REF-AOT适配.md`
+- **打包**：`build-aot.bat`（Release + `PublishAot=true`，**restore 与 publish 必须分两次调用且都带 AOT 属性**，否则静默产出 JIT 包）→ `.build\OSTGUI\publish-aot\`（日常 Debug 构建用 `build-jit.bat`）。csproj 里**故意不写** `PublishAot`，一律命令行传参；脚本自带两道自检（产物里有 `coreclr.dll` 即判 AOT 被跳过；`OnlineHost.exe` 无参自检须 exit=2）。
+- **产物事实**：无 `coreclr.dll` / `OSTGUI.dll` / `OSTGUI.runtimeconfig.json`；约 97 MB / 250 余个文件（`OSTGUI.exe` 单文件约 41 MB）。文件数随 WinUI 语言资源与 SDK 版本浮动，这里只记大致量级。内存收益与实测数值见 `docs/dev/REF-AOT适配.md`
 - **六类硬约束**（被 XAML 绑定的成员要手写 / 集合属性声明 `IList<T>` / XAML→CLR 投影用 `As<T>()` / JSON 必须源生成 / 绑定集合显式赋 `List<T>` / 日志面板 LOH 节流）：落脚与证据全在 `docs/dev/REF-AOT适配.md`——**动绑定与序列化之前先读它**。
 
 ## 4. 服务索引（当前）

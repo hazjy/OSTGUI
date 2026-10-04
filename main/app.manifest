@@ -18,7 +18,7 @@
     </application>
   </compatibility>
 
-  <!-- 请求管理员权限（用于注册表操作和 DLL 注入） -->
+  <!-- 以当前用户权限运行（asInvoker）；程序不主动提权，个别需要管理员的操作由用户自行提权 -->
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
