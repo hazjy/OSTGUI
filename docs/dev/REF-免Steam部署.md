@@ -22,8 +22,8 @@
   ③ 递归把**所有** `*.bak` 换回原名（这里用覆盖式 `File.Move`，SAC 是先删再改名，结果一致且失败不丢备份）；
   ④ 递归删所有 `steam_settings` 目录。③ 是通配，游戏自带的 `*.bak` 也会被换回原名
   ——这是照抄 SAC 的既定代价（曾试过白名单版，被要求改掉）
-- 还原**只动游戏目录、不解压资源**（不走 `EnsureExtracted()`）；逐项日志 + 还原后复查残留：
-  被占用（游戏在跑）时逐条报失败并输出"还原未完成"，不报假成功；`%APPDATA%\GSE Saves\<appid>` 只提示路径不删；
+- **部署根 = 游戏根，不是 exe 所在目录**：UE 布局的 `steam_api64.dll` 在 `<根>\Engine\Binaries\ThirdParty\Steamworks\Steamv<NNN>\Win64\`，与 exe（`<根>\<项目>\Binaries\Win64\`）**不同枝**——`GameRootResolver` 向上最多找 3 层、命中「含 `Engine\Binaries\ThirdParty\Steamworks`」的那层即为根（绝不上溯到盘根或 `steamapps\common`），找不到就仍用 exe 目录（普通游戏行为不变）。**部署与还原走同一套根解析**，否则 UE 布局会「部署到 Engine、还原只扫 exe 目录」留残留
+- 还原**只动游戏目录、不解压资源**（不走 `EnsureExtracted()`）；逐项日志 + 还原后复查残留：被占用（游戏在跑）时逐条报失败并输出"还原未完成"，不报假成功；每个文件操作先按 **4×250 ms 重试**——刚写下去的 11 MB 模拟器 DLL 常被杀软 / 索引器短暂映射住，此时覆盖式 `File.Move` 报 `Access denied`，重试即可自愈（2026-10-05 合成 UE 目录树实测：无重试必失败、有重试 571 ms 后成功）；`%APPDATA%\GSE Saves\<appid>` 只提示路径不删；
   `steam_appid.txt` 归 AppID Changer 台账管，还原不碰；幂等（无残留时输出"未发现模拟器残留（可能已还原）"）
 
 ## 归档：免 Steam 部署夹具实测

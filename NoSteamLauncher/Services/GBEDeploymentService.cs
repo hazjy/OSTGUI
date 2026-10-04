@@ -75,7 +75,8 @@ public sealed class GBEDeploymentService
         CancellationToken ct = default)
     {
         var deployedFiles = new List<string>();
-        var gameDir = Path.GetDirectoryName(gameExePath)!;
+        // 部署根 = 游戏根（UE 布局下要往上找，否则 Engine\...\Steamworks 里那份 DLL 扫不到）——对齐 SAC「给目录就整棵递归」
+        var gameDir = GameRootResolver.ResolveFromExe(gameExePath);
 
         if (!Directory.Exists(_goldbergRoot))
         {
@@ -607,7 +608,8 @@ public sealed class GBEDeploymentService
         var actions = new List<string>();
         var failures = new List<string>();
 
-        var gameDir = Path.GetDirectoryName(Path.GetFullPath(gameExePath));
+        // 与部署同一套根解析，否则 UE 布局会出现"部署到 Engine、还原只扫 exe 目录"的残留
+        var gameDir = GameRootResolver.ResolveFromExe(gameExePath);
         if (string.IsNullOrEmpty(gameDir) || !Directory.Exists(gameDir))
         {
             return new NoSteamRestoreResult
@@ -686,11 +688,33 @@ public sealed class GBEDeploymentService
         };
     }
 
+    /// <summary>
+    /// 还原时的有界重试。刚部署下去的大文件（11 MB 的模拟器 DLL）可能被杀软 / 索引器短暂映射住，
+    /// 此时覆盖式 <c>File.Move</c> 会失败在 <c>ERROR_ACCESS_DENIED</c>（2026-10-05 实测：合成 UE 目录树里
+    /// 连续三次报 "Access to the path is denied"，单独重跑同一操作却成功 → 典型瞬时占用）。
+    /// 重试几次即可自愈；仍失败就照旧报「还原未完成」，不假报成功。
+    /// </summary>
+    private static void WithRetry(Action action, int attempts = 4, int delayMs = 250)
+    {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                action();
+                return;
+            }
+            catch (Exception) when (attempt < attempts)
+            {
+                Thread.Sleep(delayMs);
+            }
+        }
+    }
+
     private void TryStep(List<string> actions, List<string> failures, string description, Action action)
     {
         try
         {
-            action();
+            WithRetry(action);
             actions.Add(description);
             _logger.LogInformation("Restore: {Action}", description);
         }

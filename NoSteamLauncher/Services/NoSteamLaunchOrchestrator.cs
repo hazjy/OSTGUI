@@ -52,9 +52,14 @@ namespace NoSteamLauncher.Services;
 
         try
         {
-            // 0. 确定目录
-            var gameDir = Path.GetDirectoryName(options.GameExePath)!;
+            // 0. 确定目录：部署根 = 游戏根。UE 布局（<根>\<项目>\Binaries\Win64\Game.exe +
+            //    <根>\Engine\Binaries\ThirdParty\Steamworks\Steamv<NNN>\Win64\steam_api64.dll）必须回到 <根>，
+            //    否则只换 exe 旁边那份、Engine 里那份照旧连真 Steam（对齐 SAC「给目录就整棵递归」的规则）。
             var originalExe = options.GameExePath;
+            var exeDir = Path.GetDirectoryName(originalExe)!;
+            var gameDir = GameRootResolver.ResolveFromExe(originalExe);
+            if (!string.Equals(gameDir, exeDir, StringComparison.OrdinalIgnoreCase))
+                Report(progress, $"Detected engine layout: deploying from game root {gameDir} (Steamworks DLL sits outside the exe folder)");
             var backupExe = options.BackupOriginalExe ? originalExe + ".bak" : null;
 
             // 1. 备份原 EXE（已存在则保留，不覆盖：二次部署时当前 EXE 已是脱壳版，覆盖会毁掉唯一原件）
