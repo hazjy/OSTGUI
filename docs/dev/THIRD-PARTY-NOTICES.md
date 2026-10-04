@@ -10,17 +10,21 @@
 | 上游 | https://github.com/Detanup01/gbe_fork |
 | 许可证 | GNU LGPL-3.0 |
 | 用途 | 部署到游戏目录以替代官方 Steam API，提供本地模拟的 Steamworks 接口 |
+| 取件 | release **release-2026_09_27**，资产 `emu-win-release-vs26.7z`（2026-10-05 取）——与 SAC 硬编码的资产名一致；vs26/vs22 两版均为**静态链接 CRT**（导入表里没有 VCRUNTIME/MSVCP/ucrt），因此不需要用户机装 VC 运行库 |
 
-## 2. Steamless 脱壳工具
+## 2. Steamless 脱壳工具（K0oRui/Steamless-KR 4.3.0，自编译）
 
 | 项目 | 内容 |
 |---|---|
-| 文件 | `Resources/Steamless.CLI.exe`、`Resources/Steamless.API.dll`、`Resources/SharpDisasm.dll`、`Resources/Plugins/*.dll`（Variant 1.0–3.1 解壳插件） |
-| 上游 | https://github.com/atom0s/Steamless |
-| 许可证 | CC BY-NC-ND 4.0（署名-非商业性使用-禁止演绎） |
+| 文件 | `Resources/Steamless.CLI.exe`（+`.exe.config`）、`Resources/Steamless.API.dll`、net48 运行时垫片（`System.Memory.dll` / `System.Buffers.dll` / `System.Runtime.CompilerServices.Unsafe.dll` / `System.Threading.Tasks.Extensions.dll` / `System.Numerics.Vectors.dll` / `Microsoft.Bcl.AsyncInterfaces.dll` / `System.ComponentModel.Annotations.dll` / `CommunityToolkit.Mvvm.dll`）、`Resources/Plugins/*.dll`（Variant 1.0–3.1 解壳插件 + `Steamless.API.dll` + `Iced.dll`） |
+| 上游 | https://github.com/K0oRui/Steamless-KR （原版 https://github.com/atom0s/Steamless ） |
+| 许可证 | CC BY-NC-ND 4.0（原版许可，本仓库跟随上游 fork 编译，仅供非商业学习研究） |
 | 用途 | 移除游戏 EXE 的 SteamStub 壳，使模拟器部署成为可能 |
+| 取件 | tag **v4.3.0**（`bb5d0ef`，2026-09-19），2026-10-05 编译 |
 
-> ⚠️ 特别说明：Steamless 采用 **CC BY-NC-ND** 许可。本项目以其**未修改的原始形态**集成本组件，仅供非商业的学习与研究用途。如需商业使用，请自行前往上游获取并遵守其许可条款。
+> **为什么要自己编**：上游 release 的 Windows 包是 `net9.0` **框架依赖**——用户机没装 .NET 9 运行时就会启动失败，与"发布包解压即用、不依赖 .NET 运行时"冲突。因此本仓库按 **net48** 重新编译同一份源码（Windows 自带 .NET Framework 4.8）。
+> 相对上游源码只有两处 net9-API 兼容补丁：`Steamless.API/Crypto/AesHelper.cs` 的 `List.AddRange(Span)` → `ArraySegment<byte>`；`Steamless.CLI/Program.cs` 的 `Stream.ReadExactly` → 手写读取循环。`Directory.Build.props` 的 `TargetFramework` 由 `net9.0` 改为 `net48`。
+> 反汇编器随上游由 SharpDisasm 换成 **Iced 1.21.0**（`Resources/Plugins/Iced.dll`）。
 
 ## 3. SteamAPICheckBypass
 
@@ -29,6 +33,7 @@
 | 文件 | `Resources/SteamAPICheckBypass/SteamAPICheckBypass.dll`、`SteamAPICheckBypass_x32.dll` |
 | 上游 | https://github.com/SteamAutoCracks/Steam-auto-crack （MIT License） |
 | 用途 | 可选部署的 winmm.dll 劫持层，向游戏自身的完整性检查隐藏模拟器痕迹 |
+| 取件 | tag **2.3**，资产 `Release_dlls.rar`（2026-10-05 取） |
 
 ## 4. 仅作参考、未随仓库分发的项目
 

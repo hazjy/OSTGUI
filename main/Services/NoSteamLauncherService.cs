@@ -48,6 +48,7 @@ public sealed partial class NoSteamLauncherService : IDisposable
             Path.Combine("emu", "game_goldberg", "steam_settings", "steam_appid.txt"),
             // 插件标记：缺失说明是旧版布局的解压残留，必须重新解压
             Path.Combine("Plugins", "Steamless.API.dll"),
+            Path.Combine("Plugins", "Iced.dll"),
             Path.Combine("Plugins", "Steamless.Unpacker.Variant31.x64.dll"),
             Path.Combine("Plugins", "Steamless.Unpacker.Variant10.x86.dll"),
         };
