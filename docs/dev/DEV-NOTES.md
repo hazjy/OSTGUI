@@ -21,7 +21,7 @@
 
 - **搜索 → 入库链路**：搜索（Steam 官方 API 主源）→ 取 depot / manifest gid / DLC（`SteamGameInfoService`）→ 清单下载并**双写** `config\depotcache` 与 Steam 根 `depotcache`（`ManifestDownloadService` + `ManifestFileService`）→ 密钥 / 令牌（`SudamaKeyCache`）→ 生成 Lua（`LuaBuilder` → `LuaConfigService`）；**入库可取消**（`ct` 贯穿全链，两处原子写不可打断）。出处：`docs/dev/REF-入库与Lua.md`；各源（含内核侧请求码源）状态见 `docs/dev/SOURCES.md`
 - **清单按需投喂**：尾随 **Steam 自己的** `<Steam>\logs\content_log.txt`（内核那份日志只在 Debug 编入，Release 连文件都没有 → 监听会静默失效），看到"取不到请求码"才补：持久层 `config\depotcache` 命中就就地拷进根 depotcache，否则下载一份并双写。串行 1 份/秒（MHub 2 并发即 429）、失败不记入已处理、下次随 Steam 再试；设置页开关控制，关闭时什么都不做。出处：`main/Services/ManifestLogWatcher.cs` 类注释
-- **请求码源（内核运行时）**：设置页「清单源 → 请求码源」勾选 → `ManifestLuaService` 渲染成 `<lua 目录>\manifest.lua`（勾选顺序即级联顺序，**全关 = 短路版**），内核 Lua 钩子在每次 `GetManifestRequestCode` 时逐源取码（每源可带自己的 UA）。⚠️ **Lua 优先级高于内核 `[manifest] url`**，这份文件一旦存在就会旁路内核那三个内置 provider；既有非本程序生成的文件**不覆盖**，需在设置页点「接管」（先备份 `.ostgui-bak`）。每源「测活」做在 GUI 侧——manifest.lua 的失败是静默的。出处：`main/Services/ManifestLuaService.cs` 类注释 + `docs/dev/SOURCES.md`
+- **请求码源（内核运行时）**：设置页「清单源 → 请求码源」勾选 → `ManifestLuaService` 渲染成 `<lua 目录>\manifest.lua`（勾选顺序即级联顺序，**全关 = 短路版**），内核 Lua 钩子在每次 `GetManifestRequestCode` 时逐源取码（每源可带自己的 UA）。⚠️ **Lua 优先级高于内核 `[manifest] url`**，这份文件一旦存在就会旁路内核那三个内置 provider；勾选一变就**直接覆盖**（无二次确认、不留备份，设置页用黄字提醒自己备份）。每源「测活」做在 GUI 侧——manifest.lua 的失败是静默的。出处：`main/Services/ManifestLuaService.cs` 类注释 + `docs/dev/SOURCES.md`
 - **固定版本体系**：GUI 只写 Lua（注释形式 `--setManifestid(...)` = 固定版本配置），实际锁版本由内核 hook 完成；库页切锁定模式（`LuaConfigService.ToggleVersionModeAsync`，要求 depot 全覆盖）与「补齐版本配置」（`RepairVersionConfigAsync`）。出处：`docs/dev/REF-清单与版本.md` + 内核 DEV-NOTES
 - **免 Steam 部署（NoSteamLauncher）**：Steamless 脱壳 + GSE(Goldberg) 部署 + 可选 Bypass，另有「一键还原」；三层 = 宿主类库 / GBE 部署服务 / 编排器。**两道锁独立**：Steamless 解的是 exe 上的 SteamStub（启动锁），Goldberg 顶的是 `steam_api*.dll` 的 Steamworks 调用（功能锁，成就 / DLC / 联机 / 云存档）——只脱壳对"能容忍无 Steam 初始化"的游戏已可运行，但没有功能层。出处：`docs/dev/REF-免Steam部署.md`
 - **免育碧（实验性，挂起）**：`UbisoftDeploymentService` —— 探测 `upc_r2` / `uplay_r2` / `uplaypc_r2` 系 loader（Unity 游戏还要扫 `*_Data\Plugins\x86_64\`）→ 备份 → 换 Goldberg R2 → 写 `uplay_r2.ini`，支持还原。只解"免 UC 客户端"这一层；D 密世代与多组件 Unity 游戏的覆盖边界见 `docs/dev/UBISOFT-NOTES.md`
@@ -47,7 +47,7 @@
 | `SteamGameInfoService` | 统一查询：depot + manifest gid + DLC 列表与名称（优先社区非官方 API `api.steamcmd.net`——并非 Valve 官方；失败回退官方 `store.steampowered.com/api/appdetails`，大陆网络下通常不可达）|
 | `ManifestDownloadService` | 多源清单下载 + 生成 Lua（门面已移除）|
 | `ManifestLogWatcher` | 清单按需投喂：尾随 Steam `content_log.txt`，命中持久层就搬、否则下载并双写；串行 1 份/秒，失败下次随 Steam 重试 |
-| `ManifestLuaService` | 请求码源 → 渲染并写入 `<lua 目录>\manifest.lua`（级联版；全关写短路版）；外来文件不覆盖、需接管；渲染与顺序有 `--trainer-selftest` 自检 |
+| `ManifestLuaService` | 请求码源 → 渲染并写入 `<lua 目录>\manifest.lua`（级联版；全关写短路版）；勾选一变就覆盖、不留备份；渲染与顺序有 `--trainer-selftest` 自检 |
 | `LuaBuilder` / `LuaConfigService` | Lua 生成（补全 depot/key/token/DLC/固定版本）；Lua 读写与版本模式切换 |
 | `SudamaKeyCache` | 密钥 / 令牌缓存（存在即用不自动过期、并行下载、手动刷新与本地导入）；入库取键走**流式扫描** |
 | `CoverImageService` | 入库卡片封面：静态 CDN 链 → 官方 appdetails 兜底 → 缺失标记 `.miss2`，落盘 `covers\` |
