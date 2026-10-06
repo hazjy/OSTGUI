@@ -193,9 +193,8 @@
                         <!-- 请求码源：GUI 生成 <Steam>\config\lua\manifest.lua，内核运行时按顺序级联取码 -->
                         <StackPanel Spacing="6">
                             <TextBlock Text="请求码源" FontSize="14" FontWeight="SemiBold" />
-                            <TextBlock Text="内核运行时用它回答 Steam 要的清单请求码：按顺序逐个试，第一个取到有效码即用。上面的清单源是入库时下载清单文件用的，两者互不相干。全部关闭则写入短路版（不注入任何第三方码）。"
-                                       FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                       TextWrapping="Wrap" />
+                            <TextBlock FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap"><Run Text="直接通过注入清单请求码获取清单，更方便灵活，是默认行为。内核会按顺序逐级尝试直到获取。当所有源全部关闭时，则会在 manifest.lua 里写入短路配置禁用请求码。更改实时生效，无需重启 Steam；" /><Run Text="更改会覆盖原有 manifest.lua，请记得备份" Foreground="{ThemeResource SystemFillColorCautionBrush}" /></TextBlock>
                             <TextBlock Text="{Binding ManifestLuaStateText}" FontSize="12"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                        TextWrapping="Wrap" />
@@ -203,37 +202,38 @@
                             <ItemsControl ItemsSource="{Binding RequestCodeSources}">
                                 <ItemsControl.ItemTemplate>
                                     <DataTemplate x:DataType="models:RequestCodeSource">
-                                        <Grid ColumnSpacing="10" Margin="0,4">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="Auto" />
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <!-- 刻意 OneWay：模型由 Toggled 处理器单写，双向绑定会让"值是否变过"判不准 -->
-                                            <ToggleSwitch Grid.Column="0" MinWidth="0" VerticalAlignment="Center"
-                                                          IsOn="{Binding IsEnabled, Mode=OneWay}"
-                                                          Toggled="OnRequestCodeToggled" />
-                                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <TextBlock Text="{Binding Name}" FontSize="13" FontWeight="SemiBold" />
-                                                    <TextBlock Text="|" FontSize="11" Margin="6,0" VerticalAlignment="Center"
+                                        <!-- 卡片样式对齐「清单源」：名称在左（竖线后是连通性），开关与测活在右 -->
+                                        <Border Padding="12" CornerRadius="8" Margin="0,4"
+                                                Background="{ThemeResource LayerFillColorDefaultBrush}"
+                                                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                                            <Grid ColumnSpacing="8">
+                                                <Grid.ColumnDefinitions>
+                                                    <ColumnDefinition Width="*" />
+                                                    <ColumnDefinition Width="Auto" />
+                                                </Grid.ColumnDefinitions>
+                                                <StackPanel Grid.Column="0" Orientation="Horizontal"
+                                                            VerticalAlignment="Center">
+                                                    <TextBlock Text="{Binding Name}" FontSize="14" FontWeight="SemiBold" />
+                                                    <TextBlock Text="|" FontSize="12" VerticalAlignment="Center"
                                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                                    <TextBlock Text="{Binding Description}" FontSize="11" VerticalAlignment="Center"
+                                                    <TextBlock Text="连通性：" FontSize="11" VerticalAlignment="Center"
+                                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                    <TextBlock Text="{Binding ConnectivityText}" FontSize="11" VerticalAlignment="Center"
                                                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                                 </StackPanel>
-                                                <TextBlock Text="{Binding TestResultText}" FontSize="11"
-                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                           TextWrapping="Wrap" />
-                                            </StackPanel>
-                                            <Button Grid.Column="2" Content="测活" Tag="{Binding}"
-                                                    Click="OnRequestCodeTestClick" VerticalAlignment="Center" />
-                                        </Grid>
+                                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8"
+                                                            VerticalAlignment="Center">
+                                                    <!-- 刻意 OneWay：模型由 Toggled 处理器单写，双向绑定会让"值是否变过"判不准 -->
+                                                    <ToggleSwitch MinWidth="0" IsOn="{Binding IsEnabled, Mode=OneWay}"
+                                                                  Toggled="OnRequestCodeToggled" />
+                                                    <Button Content="测活" Tag="{Binding}"
+                                                            Click="OnRequestCodeTestClick" VerticalAlignment="Center" />
+                                                </StackPanel>
+                                            </Grid>
+                                        </Border>
                                     </DataTemplate>
                                 </ItemsControl.ItemTemplate>
                             </ItemsControl>
-
-                            <Button Content="接管 manifest.lua" Click="OnTakeoverManifestLuaClick"
-                                    Visibility="{Binding ShowManifestLuaTakeover, Converter={StaticResource BoolToVis}}" />
                         </StackPanel>
                     </StackPanel>
                 </Border>

@@ -216,10 +216,6 @@ public sealed partial class SettingsPage : Page
         _ = VM.TestRequestCodeSourceAsync(source);
     }
 
-    /// <summary>接管既有 manifest.lua（先备份，再写入我们的级联版）</summary>
-    private void OnTakeoverManifestLuaClick(object sender, RoutedEventArgs e) =>
-        VM.SyncManifestLua(takeover: true);
-
     private async void BrowseLua_Click(object sender, RoutedEventArgs e)
     {
         var picker = new FolderPicker();

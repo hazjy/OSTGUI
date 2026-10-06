@@ -21,18 +21,13 @@ namespace OSTGUI.Services;
 /// <item>内核只等 30 秒（<c>kMaxWaitSeconds</c>），而 Lua 侧没法给 <c>http_get</c> 传超时，
 /// 所以生成的脚本自带 <see cref="BudgetSeconds"/> 秒预算，超了就不再试后面的源。</item>
 /// </list>
-///
-/// <para><b>文件归属</b>：写入前若发现既有 manifest.lua 没有 <see cref="ManagedMarker"/>，
-/// 说明是手写版或别的工具放的（1.4.0 时代的分发方式就是让用户手动放）——此时<b>不写</b>，
-/// 返回 <see cref="WriteOutcome.NeedsTakeover"/> 让用户在设置页确认，符合"用户手改过的文件先问"。</para>
 /// </summary>
 public class ManifestLuaService
 {
-    /// <summary>我们生成的文件的身份标记（第一行开头）；判断"这文件是不是我们的"只看它</summary>
+    /// <summary>我们生成的文件的身份标记（第一行开头）</summary>
     public const string ManagedMarker = "-- OSTGUI-managed";
 
     private const string FileName = "manifest.lua";
-    private const string BackupSuffix = ".ostgui-bak";
 
     /// <summary>级联预算（秒）。内核等 30 秒，这里留足余量</summary>
     public const int BudgetSeconds = 20;
@@ -55,12 +50,10 @@ public class ManifestLuaService
 
     public enum WriteOutcome
     {
-        /// <summary>已写入（或按需覆盖）</summary>
+        /// <summary>已写入（内容有变，覆盖了原文件）</summary>
         Written,
         /// <summary>内容与现有文件一致，没动它</summary>
         Unchanged,
-        /// <summary>既有文件不是本程序生成的，需用户确认接管</summary>
-        NeedsTakeover,
         /// <summary>没有 Steam 路径，无法定位 lua 目录</summary>
         NoLuaDir,
         /// <summary>写盘失败</summary>
@@ -74,75 +67,37 @@ public class ManifestLuaService
         return string.IsNullOrEmpty(dir) ? null : Path.Combine(dir, FileName);
     }
 
-    /// <summary>既有 manifest.lua 存在但不是本程序生成的（设置页据此提示"需接管"）</summary>
-    public bool HasForeignFile()
+    /// <summary>只读检查状态（进设置页时用，<b>不写盘</b>）：<c>manifest.lua：&lt;启用的源 / 全部禁用&gt;</c></summary>
+    public string Inspect(IEnumerable<RequestCodeSource> sources)
     {
-        var path = GetLuaFilePath();
-        if (path == null || !File.Exists(path)) return false;
-        try { return !File.ReadAllText(path).Contains(ManagedMarker); }
-        catch { return false; }
+        if (GetLuaFilePath() == null) return $"{FileName}：未检测到 Steam 路径";
+
+        return Status(Ordered(sources));
     }
 
-    /// <summary>既有文件非本程序生成时的统一说辞（Sync 与 Inspect 共用，别写两份）</summary>
-    private static string ForeignMessage =>
-        $"检测到既有的 {FileName} 不是本程序生成的（手写版或其它工具放的）。为避免覆盖你的改动，不会自动写入——"
-        + $"确认要由 OSTGUI 接管就点「接管 {FileName}」（会先备份一份 {BackupSuffix}）。";
-
-    /// <summary>
-    /// 只读检查当前状态（进设置页时用，<b>不写盘</b>）：要不要接管、状态一句话。
-    /// </summary>
-    public (bool needsTakeover, string message) Inspect(IEnumerable<RequestCodeSource> sources)
+    /// <summary>按当前启用集合同步 manifest.lua（勾选变化即写）</summary>
+    public (WriteOutcome outcome, string message) Sync(IEnumerable<RequestCodeSource> sources)
     {
         var path = GetLuaFilePath();
-        if (path == null) return (false, $"未检测到 Steam 路径，暂时无法生成 {FileName}");
+        if (path == null) return (WriteOutcome.NoLuaDir, $"{FileName}：未检测到 Steam 路径");
 
-        var enabled = Ordered(sources);
-        var names = enabled.Count == 0
-            ? "（全部关闭 → 短路版）"
-            : string.Join(" → ", enabled.Select(s => s.Name));
-
-        if (!File.Exists(path)) return (false, $"尚未生成 {FileName}；勾选有变化就会写入。当前：{names}");
-        if (HasForeignFile()) return (true, ForeignMessage);
-        return (false, $"{FileName} 已就绪。当前：{names}");
-    }
-
-    /// <summary>
-    /// 按当前启用集合同步 manifest.lua。<paramref name="takeover"/> = 用户已在设置页确认接管
-    /// （此时先备份既有文件再覆盖）。
-    /// </summary>
-    public (WriteOutcome outcome, string message) Sync(IEnumerable<RequestCodeSource> sources, bool takeover)
-    {
-        var path = GetLuaFilePath();
-        if (path == null) return (WriteOutcome.NoLuaDir, "未检测到 Steam 路径，无法写入 manifest.lua");
-
-        return SyncTo(path, Ordered(sources), takeover);
+        return SyncTo(path, Ordered(sources));
     }
 
     /// <summary>
     /// 渲染并写到指定路径（从 <see cref="Sync"/> 拆出来，纯粹是为了让自检能直接跑文件语义——
-    /// 覆盖/备份/幂等这段是唯一可能毁用户文件的地方，必须真跑过）。
+    /// 覆盖/幂等这段是唯一可能毁用户文件的地方，必须真跑过）。直接覆盖，不留备份。
     /// </summary>
     public static (WriteOutcome outcome, string message) SyncTo(
-        string path, IReadOnlyList<RequestCodeSource> sources, bool takeover)
+        string path, IReadOnlyList<RequestCodeSource> sources)
     {
         var enabled = Ordered(sources);
         var lua = BuildLua(enabled);
 
         try
         {
-            var exists = File.Exists(path);
-            var existing = exists ? File.ReadAllText(path) : null;
-
-            if (exists && existing!.Contains(ManagedMarker) == false && !takeover)
-                return (WriteOutcome.NeedsTakeover, ForeignMessage);
-
-            if (existing == lua) return (WriteOutcome.Unchanged, Describe(enabled, "无需改动"));
-
-            if (exists && takeover && existing!.Contains(ManagedMarker) == false)
-            {
-                var bak = path + BackupSuffix;
-                if (!File.Exists(bak)) File.Copy(path, bak);   // 只留最早那份，别反复覆盖备份
-            }
+            var existing = File.Exists(path) ? File.ReadAllText(path) : null;
+            if (existing == lua) return (WriteOutcome.Unchanged, Status(enabled));
 
             var dir = Path.GetDirectoryName(path);
             if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
@@ -151,7 +106,7 @@ public class ManifestLuaService
             File.WriteAllText(tmp, lua, new UTF8Encoding(false));
             File.Move(tmp, path, overwrite: true);
 
-            return (WriteOutcome.Written, Describe(enabled, "已写入"));
+            return (WriteOutcome.Written, Status(enabled));
         }
         catch (Exception ex)
         {
@@ -163,10 +118,11 @@ public class ManifestLuaService
     private static List<RequestCodeSource> Ordered(IEnumerable<RequestCodeSource> sources) =>
         sources.Where(s => s.IsEnabled).OrderBy(s => s.Priority).ToList();
 
-    private static string Describe(List<RequestCodeSource> enabled, string prefix) =>
-        enabled.Count == 0
-            ? $"{FileName} {prefix}：请求码源全部关闭 → 短路版（恒返回 \"0\"，不注入任何第三方码）"
-            : $"{FileName} {prefix}：{string.Join(" → ", enabled.Select(s => s.Name))}（内核热重载，无需重启 Steam）";
+    /// <summary>状态行：`manifest.lua：<源 1 → 源 2 …>` / `manifest.lua：全部禁用`</summary>
+    private static string Status(List<RequestCodeSource> enabled) =>
+        $"{FileName}：" + (enabled.Count == 0
+            ? "全部禁用"
+            : string.Join(" → ", enabled.Select(s => s.Name)));
 
     /// <summary>
     /// 渲染 manifest.lua 全文。纯函数（同输入同输出，别塞时间戳——靠内容比较决定是否重写）。
@@ -359,7 +315,7 @@ public class ManifestLuaService
 
     /// <summary>
     /// 自检（<c>OSTGUI.exe --trainer-selftest</c> 一并跑）：渲染产物里那些"错了会静默失效"的点
-    /// （两个钩子都在、标记在、UA 在、顺序在、全关变短路版），外加写盘/备份/接管那段文件语义。
+    /// （两个钩子都在、标记在、UA 在、顺序在、全关变短路版），外加写盘/覆盖/备份那段文件语义。
     /// 返回空串 = 全过。
     /// </summary>
     public static string SelfCheck()
@@ -401,14 +357,13 @@ public class ManifestLuaService
     }
 
     /// <summary>
-    /// 文件语义自检：在临时目录里真跑一遍"首次写入 / 幂等 / 外来文件不覆盖 / 接管备份 / 全关短路"。
-    /// 这段逻辑一旦错就是毁用户文件（备份、覆盖边界），不能只靠读代码。
+    /// 文件语义自检：在临时目录里真跑一遍"首次写入 / 幂等 / 覆盖外来文件 / 全关短路 / 不留 .tmp"。
+    /// 覆盖边界这段一旦错就是毁用户文件，不能只靠读代码。
     /// </summary>
     private static string FileSelfCheck()
     {
         var dir = Path.Combine(Path.GetTempPath(), "ostgui-manifest-selftest-" + Environment.ProcessId);
         var path = Path.Combine(dir, FileName);
-        var bak = path + BackupSuffix;
         var presets = RequestCodeSource.GetPresetSources();
 
         try
@@ -417,7 +372,7 @@ public class ManifestLuaService
             Directory.CreateDirectory(dir);
 
             // 1) 首次写入
-            var r1 = SyncTo(path, presets, takeover: false);
+            var r1 = SyncTo(path, presets);
             if (r1.outcome != WriteOutcome.Written) return $"manifest.lua 自检：首次写入应 Written，实为 {r1.outcome}";
             var written = File.ReadAllText(path);
             if (!written.StartsWith(ManagedMarker, StringComparison.Ordinal)) return "manifest.lua 自检：写出的文件没有标记";
@@ -425,32 +380,23 @@ public class ManifestLuaService
             // 2) 幂等：内容一样不该重写
             var stamp = File.GetLastWriteTimeUtc(path);
             Thread.Sleep(20);
-            var r2 = SyncTo(path, presets, takeover: false);
+            var r2 = SyncTo(path, presets);
             if (r2.outcome != WriteOutcome.Unchanged) return $"manifest.lua 自检：重复写入应 Unchanged，实为 {r2.outcome}";
             if (File.GetLastWriteTimeUtc(path) != stamp) return "manifest.lua 自检：Unchanged 却动了文件";
 
-            // 3) 外来文件（1.4.0 时代用户手放的短路版）：不接管时必须原样保留
-            const string foreign = "function fetch_manifest_code(gid) return \"0\" end\n";
-            File.WriteAllText(path, foreign);
-            var r3 = SyncTo(path, presets, takeover: false);
-            if (r3.outcome != WriteOutcome.NeedsTakeover) return $"manifest.lua 自检：外来文件应 NeedsTakeover，实为 {r3.outcome}";
-            if (File.ReadAllText(path) != foreign) return "manifest.lua 自检：外来文件被改写了";
-            if (File.Exists(bak)) return "manifest.lua 自检：没点接管就生成了备份";
+            // 3) 外来文件（1.4.0 时代用户手放的短路版）：直接覆盖
+            File.WriteAllText(path, "function fetch_manifest_code(gid) return \"0\" end\n");
+            var r3 = SyncTo(path, presets);
+            if (r3.outcome != WriteOutcome.Written) return $"manifest.lua 自检：外来文件应直接 Written，实为 {r3.outcome}";
+            if (!File.ReadAllText(path).Contains("fetch_manifest_code_ex")) return "manifest.lua 自检：覆盖后不是级联版";
 
-            // 4) 接管：备份外来内容 + 覆盖
-            var r4 = SyncTo(path, presets, takeover: true);
-            if (r4.outcome != WriteOutcome.Written) return $"manifest.lua 自检：接管应 Written，实为 {r4.outcome}";
-            if (!File.Exists(bak)) return "manifest.lua 自检：接管没留备份";
-            if (File.ReadAllText(bak) != foreign) return "manifest.lua 自检：备份内容不对";
-            if (!File.ReadAllText(path).Contains("fetch_manifest_code_ex")) return "manifest.lua 自检：接管后不是级联版";
-
-            // 5) 全部关闭 → 短路版（内容变了必须重写，且不再需要接管）
-            var r5 = SyncTo(path, Array.Empty<RequestCodeSource>(), takeover: false);
-            if (r5.outcome != WriteOutcome.Written) return $"manifest.lua 自检：全关应 Written，实为 {r5.outcome}";
+            // 4) 全部关闭 → 短路版
+            var r4 = SyncTo(path, Array.Empty<RequestCodeSource>());
+            if (r4.outcome != WriteOutcome.Written) return $"manifest.lua 自检：全关应 Written，实为 {r4.outcome}";
             var off = File.ReadAllText(path);
             if (!off.Contains("return \"0\"") || off.Contains("http_get")) return "manifest.lua 自检：全关没写成短路版";
 
-            // 6) 临时文件必须被移走，不留 .tmp
+            // 5) 临时文件必须被移走，不留 .tmp
             if (File.Exists(path + ".tmp")) return "manifest.lua 自检：留下了 .tmp";
 
             return "";

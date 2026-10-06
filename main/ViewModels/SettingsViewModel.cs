@@ -238,20 +238,11 @@ public partial class SettingsViewModel : ObservableObject
 
     private string _manifestLuaStateText = "";
 
-    /// <summary>manifest.lua 当前状态一句话（未生成 / 已就绪 / 需接管 / 无 Steam 路径）</summary>
+    /// <summary>manifest.lua 当前状态一句话（未生成 / 现有内容非本程序生成 / 已就绪 + 当前启用的源）</summary>
     public string ManifestLuaStateText
     {
         get => _manifestLuaStateText;
         set => SetProperty(ref _manifestLuaStateText, value);
-    }
-
-    private bool _showManifestLuaTakeover;
-
-    /// <summary>既有 manifest.lua 不是本程序生成时亮出「接管」按钮（不点就不覆盖）</summary>
-    public bool ShowManifestLuaTakeover
-    {
-        get => _showManifestLuaTakeover;
-        set => SetProperty(ref _showManifestLuaTakeover, value);
     }
 
     public bool IsLightTheme
@@ -674,9 +665,7 @@ public partial class SettingsViewModel : ObservableObject
         _syncingLua = true;
         try
         {
-            var (needsTakeover, message) = _luaService.Inspect(RequestCodeSources);
-            ManifestLuaStateText = message;
-            ShowManifestLuaTakeover = needsTakeover;
+            ManifestLuaStateText = _luaService.Inspect(RequestCodeSources);
         }
         catch (Exception ex)
         {
@@ -686,22 +675,20 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 把当前勾选同步进 manifest.lua。<paramref name="takeover"/> = 用户点了「接管」
-    /// （既有外来文件先备份再覆盖；否则一律不覆盖，只提示）。
+    /// 把当前勾选同步进 manifest.lua（勾选变了就写，无二次确认、不留备份）。
     /// </summary>
-    public void SyncManifestLua(bool takeover)
+    public void SyncManifestLua()
     {
         if (_isLoading || !_configService.IsLoaded) return;
 
         _syncingLua = true;
         try
         {
-            var (outcome, message) = _luaService.Sync(RequestCodeSources, takeover);
+            var (outcome, message) = _luaService.Sync(RequestCodeSources);
             ManifestLuaStateText = message;
-            ShowManifestLuaTakeover = outcome == ManifestLuaService.WriteOutcome.NeedsTakeover;
 
             if (outcome == ManifestLuaService.WriteOutcome.Written)
-                LogService.Event($"请求码源：{message}");
+                LogService.Event($"已写入 {message}");
         }
         catch (Exception ex)
         {
@@ -711,18 +698,19 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 单源测活（结果只显示在界面上，不落盘）。这是本功能唯一的诊断窗口：
-    /// manifest.lua 里的失败是静默的，内核日志只会留一句 "returned nil"。
+    /// 单源测活：卡片上只显示「连通性：是 / 否」，明细（状态码 / 拿到的码 / 失败原因）进日志——
+    /// 这是本功能唯一的诊断窗口：manifest.lua 里的失败是静默的，内核日志只会留一句 "returned nil"。
     /// </summary>
     public async Task TestRequestCodeSourceAsync(RequestCodeSource source)
     {
-        source.TestResultText = "测试中…";
+        source.ConnectivityText = "测试中…";
         RefreshSourceItem(source);
 
-        var (_, text) = await _luaService.ProbeAsync(source);
+        var (ok, text) = await _luaService.ProbeAsync(source);
 
-        source.TestResultText = text;
+        source.ConnectivityText = ok ? "是" : "否";
         RefreshSourceItem(source);
+        LogService.Event($"请求码源「{source.Name}」测活：{text}");
     }
 
     /// <summary>
@@ -808,8 +796,8 @@ public partial class SettingsViewModel : ObservableObject
         }
         catch (Exception ex) { LogService.Diag($"[SaveAllToConfig] 失败：{ex.Message}"); }
 
-        // 勾选变化 → manifest.lua（内容一致不重写；既有外来文件不覆盖，只提示接管）
-        if (!_syncingLua) SyncManifestLua(takeover: false);
+        // 勾选变化 → manifest.lua（内容一致不重写）
+        if (!_syncingLua) SyncManifestLua();
     }
 
     /// <summary>

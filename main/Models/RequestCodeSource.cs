@@ -43,9 +43,9 @@ public partial class RequestCodeSource
     /// <summary>级联顺序，小的在前（预置表定序，界面排序即此顺序）</summary>
     public int Priority { get; set; } = 100;
 
-    /// <summary>「测活」结果文案（空 = 未测过）。只是界面状态，不写进 config.json</summary>
+    /// <summary>「测活」结果：是 / 否（未测时是「未测」，「测活」进行中是「测试中…」）。只显示，不落盘</summary>
     [System.Text.Json.Serialization.JsonIgnore]
-    public string TestResultText { get; set; } = string.Empty;
+    public string ConnectivityText { get; set; } = "未测";
 
     /// <summary>
     /// 预置请求码源。顺序即级联顺序，2026-10-06 全部实测可拿 CDN 清单
