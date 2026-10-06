@@ -54,6 +54,7 @@ public sealed partial class SettingsPage : Page
             VM.RefreshSudamaCacheAge();
             VM.RefreshPaths();
             VM.RefreshDenuvoModeFromKernel();
+            VM.RefreshManifestLuaStateQuiet();   // 只读回显 manifest.lua 状态，不写盘
         };
 
         Unloaded += (s, e) =>
@@ -193,6 +194,31 @@ public sealed partial class SettingsPage : Page
         if (sender is TextBox tb) VM.LuaPath = tb.Text ?? string.Empty;
         VM.SyncLuaPathToKernel();
     }
+
+    /// <summary>
+    /// 请求码源开关：勾选即重写 manifest.lua。
+    /// 模型（<see cref="RequestCodeSource"/>）不带 INotifyPropertyChanged，所以在这里回写并触发保存；
+    /// 绑定初始化/整项刷新造成的那次 Toggled 因值相同被跳过（否则进页面就会写一次盘）。
+    /// </summary>
+    private void OnRequestCodeToggled(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleSwitch { DataContext: RequestCodeSource source } toggle) return;
+        if (source.IsEnabled == toggle.IsOn) return;
+
+        source.IsEnabled = toggle.IsOn;
+        VM.SaveAllToConfig();       // 内部同步 manifest.lua
+    }
+
+    /// <summary>请求码源「测活」：拿一组实测可用的 depot+gid 去问这家源</summary>
+    private void OnRequestCodeTestClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: RequestCodeSource source }) return;
+        _ = VM.TestRequestCodeSourceAsync(source);
+    }
+
+    /// <summary>接管既有 manifest.lua（先备份，再写入我们的级联版）</summary>
+    private void OnTakeoverManifestLuaClick(object sender, RoutedEventArgs e) =>
+        VM.SyncManifestLua(takeover: true);
 
     private async void BrowseLua_Click(object sender, RoutedEventArgs e)
     {

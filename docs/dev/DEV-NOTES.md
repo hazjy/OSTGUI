@@ -19,8 +19,9 @@
 
 每块只写"是什么、谁调谁"；机制细节与实测一律看末尾出处。
 
-- **搜索 → 入库链路**：搜索（Steam 官方 API 主源）→ 取 depot / manifest gid / DLC（`SteamGameInfoService`）→ 清单下载并**双写** `config\depotcache` 与 Steam 根 `depotcache`（`ManifestDownloadService` + `ManifestFileService`）→ 密钥 / 令牌（`SudamaKeyCache`）→ 生成 Lua（`LuaBuilder` → `LuaConfigService`）；**入库可取消**（`ct` 贯穿全链，两处原子写不可打断）。出处：`docs/dev/REF-入库与Lua.md`
+- **搜索 → 入库链路**：搜索（Steam 官方 API 主源）→ 取 depot / manifest gid / DLC（`SteamGameInfoService`）→ 清单下载并**双写** `config\depotcache` 与 Steam 根 `depotcache`（`ManifestDownloadService` + `ManifestFileService`）→ 密钥 / 令牌（`SudamaKeyCache`）→ 生成 Lua（`LuaBuilder` → `LuaConfigService`）；**入库可取消**（`ct` 贯穿全链，两处原子写不可打断）。出处：`docs/dev/REF-入库与Lua.md`；各源（含内核侧请求码源）状态见 `docs/dev/SOURCES.md`
 - **清单按需投喂**：尾随 **Steam 自己的** `<Steam>\logs\content_log.txt`（内核那份日志只在 Debug 编入，Release 连文件都没有 → 监听会静默失效），看到"取不到请求码"才补：持久层 `config\depotcache` 命中就就地拷进根 depotcache，否则下载一份并双写。串行 1 份/秒（MHub 2 并发即 429）、失败不记入已处理、下次随 Steam 再试；设置页开关控制，关闭时什么都不做。出处：`main/Services/ManifestLogWatcher.cs` 类注释
+- **请求码源（内核运行时）**：设置页「清单源 → 请求码源」勾选 → `ManifestLuaService` 渲染成 `<lua 目录>\manifest.lua`（勾选顺序即级联顺序，**全关 = 短路版**），内核 Lua 钩子在每次 `GetManifestRequestCode` 时逐源取码（每源可带自己的 UA）。⚠️ **Lua 优先级高于内核 `[manifest] url`**，这份文件一旦存在就会旁路内核那三个内置 provider；既有非本程序生成的文件**不覆盖**，需在设置页点「接管」（先备份 `.ostgui-bak`）。每源「测活」做在 GUI 侧——manifest.lua 的失败是静默的。出处：`main/Services/ManifestLuaService.cs` 类注释 + `docs/dev/SOURCES.md`
 - **固定版本体系**：GUI 只写 Lua（注释形式 `--setManifestid(...)` = 固定版本配置），实际锁版本由内核 hook 完成；库页切锁定模式（`LuaConfigService.ToggleVersionModeAsync`，要求 depot 全覆盖）与「补齐版本配置」（`RepairVersionConfigAsync`）。出处：`docs/dev/REF-清单与版本.md` + 内核 DEV-NOTES
 - **免 Steam 部署（NoSteamLauncher）**：Steamless 脱壳 + GSE(Goldberg) 部署 + 可选 Bypass，另有「一键还原」；三层 = 宿主类库 / GBE 部署服务 / 编排器。**两道锁独立**：Steamless 解的是 exe 上的 SteamStub（启动锁），Goldberg 顶的是 `steam_api*.dll` 的 Steamworks 调用（功能锁，成就 / DLC / 联机 / 云存档）——只脱壳对"能容忍无 Steam 初始化"的游戏已可运行，但没有功能层。出处：`docs/dev/REF-免Steam部署.md`
 - **免育碧（实验性，挂起）**：`UbisoftDeploymentService` —— 探测 `upc_r2` / `uplay_r2` / `uplaypc_r2` 系 loader（Unity 游戏还要扫 `*_Data\Plugins\x86_64\`）→ 备份 → 换 Goldberg R2 → 写 `uplay_r2.ini`，支持还原。只解"免 UC 客户端"这一层；D 密世代与多组件 Unity 游戏的覆盖边界见 `docs/dev/UBISOFT-NOTES.md`
@@ -29,7 +30,7 @@
 - **显示效果（无 / 云母 / 亚克力）**：设置页下拉 → `config.json` 的 `BackdropMode` → `MainWindow.ApplyBackdrop()` 改 `Window.SystemBackdrop`；「无」档由 `SolidBackdrop` 自己铺底。出处与落地顺序：`docs/dev/REF-界面与主题.md`、`doc/开发踩坑-窗口与主题.md`
 - **日志**：**单一日志流**（2026-09-28 合并，旧的"诊断 / 流水账两条通道"作废）——`LogService.Diag()` 与 `Event()` 行为完全一致，留两个名字只为让调用处读得出语义（异常 / 失败 vs 流水）。文件 `%LOCALAPPDATA%\OSTGUI\logs\ostgui.log`：`[yyyy-MM-dd HH:mm:ss.fff] [p<pid>] [D] msg`，追加写 + `FileShare.ReadWrite`（GUI / 监控 / stats 子进程共用同一份）；**按行数裁剪**——设置里的 `LogMaxLines` 就是硬上限，超出即重写为最后若干行，不留 `.1` / `.2` 备份。崩溃走 `LogService.Fatal()`（文件留 `ToString()` 全栈）。日志栏是会话内全量，面板只渲染尾部若干行；子进程没有视图、只能写文件。联机宿主另写 `onlinehost.log`。跨线程写法见 `doc/开发踩坑-UI.md`
 - **检查更新**：`UpdateService` **直接读 GitHub Releases，不需要上传或维护任何清单文件** —— 主源是 `releases/latest` 的 302 `Location`（关掉自动重定向，只读响应头、连 body 都不读），备源是 `api.github.com` 同名端点的 `tag_name`，每源 5 秒硬超时。版本比较在 `VersionCompare`（纯逻辑、零依赖，可单独拉出去跑）：按小数点逐位比，远端某位更大才算有更新、更小即停、相等继续，缺位按 0。提示统一是**带两个按钮的系统通知**（前往发布页 / 暂不更新，按钮参数由 `Program` 的 `NotificationInvoked` 转给 `UpdateService.HandleNotificationArgument`）；自动检查在启动 5 秒后、受设置页「接收更新推送」控制，**同一版本只提示一次**（`config.json` 的 `NotifiedUpdateVersion`），手动检查（「关于」弹窗）不受限、结果就地显示在弹窗里。出处：`main/Services/UpdateService.cs`、`VersionCompare.cs` 头注释
-- **配置与状态**：`ConfigService` → `%LOCALAPPDATA%\OSTGUI\config.json`（**改动只写内存，退出时统一落盘**）；视图档位 `LibraryViewMode` / `SearchViewMode`、联机「其他」下拉 `OnlineOtherMode`、成就页来源勾选 `AchievementShowLua/Owned`、`BackdropMode`、清单按需投喂 `ManifestFeedEnabled`、检查更新 `UpdateCheckEnabled` 等偏好都落在这一份里
+- **配置与状态**：`ConfigService` → `%LOCALAPPDATA%\OSTGUI\config.json`（**改动只写内存，退出时统一落盘**）；视图档位 `LibraryViewMode` / `SearchViewMode`、联机「其他」下拉 `OnlineOtherMode`、成就页来源勾选 `AchievementShowLua/Owned`、`BackdropMode`、清单按需投喂 `ManifestFeedEnabled`、请求码源 `RequestCodeSources`、检查更新 `UpdateCheckEnabled` 等偏好都落在这一份里
 - **成就编辑（成就页）**：左侧 = `LibraryScanner` 扫出的入库游戏（重开走 `AchievementListCache`，正版候选池由 `AppInfoVdf` 读 `appcache\appinfo.vdf`）；成就定义读本地 `<Steam>\appcache\stats\UserGameStatsSchema_<appid>.bin`（二进制 KV，`SteamStatsSchema`）。勾选**只写本地留底** `%LOCALAPPDATA%\OSTGUI\achievements\<appid>.json`；点「保存到 Steam」才 spawn `OSTGUI.exe --stats-apply`（`SteamStatsChild`，短命子进程 + 结果 JSON 文件，理由与 `SteamTicketExtractor` 相同）用 SAM 封装（`main/SteamApi/`，zlib）→ `ISteamUserStats013` 写回。**写入会进 Valve（重启 Steam 后仍在）**，但内核会对 addappid 游戏清空 819 里的成就数据 → 成就页可能显示不出来（显示层问题，不是没写进去）；证据与边界见 `docs/dev/REF-成就.md`
 
 ## 3. 交付形态：Native AOT（跨模块）
@@ -46,6 +47,7 @@
 | `SteamGameInfoService` | 统一查询：depot + manifest gid + DLC 列表与名称（优先社区非官方 API `api.steamcmd.net`——并非 Valve 官方；失败回退官方 `store.steampowered.com/api/appdetails`，大陆网络下通常不可达）|
 | `ManifestDownloadService` | 多源清单下载 + 生成 Lua（门面已移除）|
 | `ManifestLogWatcher` | 清单按需投喂：尾随 Steam `content_log.txt`，命中持久层就搬、否则下载并双写；串行 1 份/秒，失败下次随 Steam 重试 |
+| `ManifestLuaService` | 请求码源 → 渲染并写入 `<lua 目录>\manifest.lua`（级联版；全关写短路版）；外来文件不覆盖、需接管；渲染与顺序有 `--trainer-selftest` 自检 |
 | `LuaBuilder` / `LuaConfigService` | Lua 生成（补全 depot/key/token/DLC/固定版本）；Lua 读写与版本模式切换 |
 | `SudamaKeyCache` | 密钥 / 令牌缓存（存在即用不自动过期、并行下载、手动刷新与本地导入）；入库取键走**流式扫描** |
 | `CoverImageService` | 入库卡片封面：静态 CDN 链 → 官方 appdetails 兜底 → 缺失标记 `.miss2`，落盘 `covers\` |

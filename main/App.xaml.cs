@@ -68,13 +68,27 @@ public partial class App : Application
         // 修改器监控子进程（--trainer-monitor）**不在这里**：它走 main/Program.cs 的入口点，
         // 在 WinUI 初始化之前就返回了（否则一个纯后台进程要背 100 MB 的 UI 栈）
 
-        // 自检：名称比对、成就列表缓存这些"容易悄悄错"的纯逻辑（跑完即退，不建窗口；结果进日志与退出码）
+        // 自检：名称比对、成就列表缓存、manifest.lua 渲染这些"容易悄悄错"的纯逻辑（跑完即退，不建窗口；结果进日志与退出码）
         if (cmdArgs.Length >= 2 && cmdArgs[1].Equals("--trainer-selftest", StringComparison.OrdinalIgnoreCase))
         {
             var failure = TrainerNames.SelfCheck();
             if (failure.Length == 0) failure = AchievementListCache.SelfCheck();
+            if (failure.Length == 0) failure = ManifestLuaService.SelfCheck();
             LogService.Diag(failure.Length == 0 ? "自检通过" : $"自检失败：{failure}");
             Environment.Exit(failure.Length == 0 ? 0 : 1);
+            return;
+        }
+
+        // 开发用：把设置页「请求码源」的渲染产物导出成 manifest.lua，便于拿真 Lua
+        // （且按内核那种逐行加载方式）核验脚本——脚本语法对但内核加载器下失效过一次
+        if (cmdArgs.Length >= 2 && cmdArgs[1].Equals("--dump-manifest-lua", StringComparison.OrdinalIgnoreCase))
+        {
+            var outPath = cmdArgs.Length >= 3
+                ? cmdArgs[2]
+                : Path.Combine(Path.GetTempPath(), "ostgui-manifest.lua");
+            ManifestLuaService.DumpPresetLua(outPath);
+            LogService.Diag($"manifest.lua 已导出：{outPath}");
+            Environment.Exit(0);
             return;
         }
 
@@ -100,6 +114,7 @@ public partial class App : Application
         services.AddSingleton<ManifestFileService>();
         services.AddSingleton<ManifestDownloadService>();
         services.AddSingleton<ManifestLogWatcher>();
+        services.AddSingleton<ManifestLuaService>();   // 生成 <Steam>\config\lua\manifest.lua（请求码源级联）
         services.AddSingleton<TicketService>();
         services.AddSingleton<OstFileService>();
         services.AddSingleton<OnlineFixService>();

@@ -49,6 +49,8 @@ namespace OSTGUI.Services;
 [JsonSerializable(typeof(AppConfig))]
 [JsonSerializable(typeof(ManifestSource))]
 [JsonSerializable(typeof(List<ManifestSource>))]
+[JsonSerializable(typeof(RequestCodeSource))]
+[JsonSerializable(typeof(List<RequestCodeSource>))]
 [JsonSerializable(typeof(Dictionary<string, bool>))]
 [JsonSerializable(typeof(Dictionary<string, object>))]
 internal partial class AppJsonConfigContext : JsonSerializerContext { }

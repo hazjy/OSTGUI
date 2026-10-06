@@ -18,6 +18,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly SteamDllService _steamDllService;
     private readonly SudamaKeyCache _sudamaCache;
     private readonly ManifestLogWatcher _manifestWatcher;
+    private readonly ManifestLuaService _luaService;
     private bool _isLoading;
 
     // 命令手写在 VM 上：Native AOT 下 CsWinRT 绑定提供器看不到源生成成员，XAML {Binding} 会失效
@@ -227,6 +228,32 @@ public partial class SettingsViewModel : ObservableObject
     // 集合变更通知行为不变。
     public IList<ManifestSource> VisibleSources { get; } = new ObservableCollection<ManifestSource>();
 
+    // === 内核请求码源（GUI 渲染成 <Steam>\config\lua\manifest.lua）===
+    // 与上面的清单源是两码事：那些是入库时下载 .manifest 用的，这些是内核运行时逐次要码用的
+    // （见 ManifestLuaService 的类注释）。这里只管勾选与顺序，URL/UA 由预置表维护。
+    private bool _syncingLua;
+
+    /// <summary>预置的请求码源，顺序即级联顺序</summary>
+    public IList<RequestCodeSource> RequestCodeSources { get; } = new ObservableCollection<RequestCodeSource>();
+
+    private string _manifestLuaStateText = "";
+
+    /// <summary>manifest.lua 当前状态一句话（未生成 / 已就绪 / 需接管 / 无 Steam 路径）</summary>
+    public string ManifestLuaStateText
+    {
+        get => _manifestLuaStateText;
+        set => SetProperty(ref _manifestLuaStateText, value);
+    }
+
+    private bool _showManifestLuaTakeover;
+
+    /// <summary>既有 manifest.lua 不是本程序生成时亮出「接管」按钮（不点就不覆盖）</summary>
+    public bool ShowManifestLuaTakeover
+    {
+        get => _showManifestLuaTakeover;
+        set => SetProperty(ref _showManifestLuaTakeover, value);
+    }
+
     public bool IsLightTheme
     {
         get => ThemeMode == "light";
@@ -350,13 +377,15 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     public SettingsViewModel(ConfigService configService, SteamService steamService,
-        SteamDllService steamDllService, SudamaKeyCache sudamaCache, ManifestLogWatcher manifestWatcher)
+        SteamDllService steamDllService, SudamaKeyCache sudamaCache, ManifestLogWatcher manifestWatcher,
+        ManifestLuaService luaService)
     {
         _configService = configService;
         _steamService = steamService;
         _steamDllService = steamDllService;
         _sudamaCache = sudamaCache;
         _manifestWatcher = manifestWatcher;
+        _luaService = luaService;
 
         ApplyNavigationPaneWidthCommand = new RelayCommand(ApplyNavigationPaneWidth);
         RefreshSudamaCacheCommand = new AsyncRelayCommand(RefreshSudamaCache);
@@ -526,9 +555,11 @@ public partial class SettingsViewModel : ObservableObject
             ManifestFeedEnabled = c.ManifestFeedEnabled;
 
             LoadSourcesFromConfig(c);
+            LoadRequestCodeSources(c);
 
             RefreshOstStatus();
             RefreshDenuvoModeFromKernel();
+            RefreshManifestLuaStateQuiet();
         }
         finally
         {
@@ -606,6 +637,105 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 加载请求码源：合并预置表（新增的补进来、已下线的清掉），用户勾选保留。
+    /// URL / UA / 解析方式一律以代码里的预置表为准——上游端点会变，跟着版本走，用户只管开关。
+    /// </summary>
+    private void LoadRequestCodeSources(AppConfig c)
+    {
+        var presets = RequestCodeSource.GetPresetSources();
+        var sources = c.RequestCodeSources ?? new List<RequestCodeSource>();
+
+        sources.RemoveAll(s => presets.All(p => p.Id != s.Id));
+        foreach (var preset in presets)
+        {
+            var existing = sources.FirstOrDefault(s => s.Id == preset.Id);
+            if (existing == null) { sources.Add(preset); continue; }
+
+            existing.Name = preset.Name;
+            existing.Description = preset.Description;
+            existing.UrlTemplate = preset.UrlTemplate;
+            existing.UserAgent = preset.UserAgent;
+            existing.JsonResponse = preset.JsonResponse;
+            existing.Priority = preset.Priority;
+        }
+        c.RequestCodeSources = sources;
+
+        RequestCodeSources.Clear();
+        foreach (var s in sources.OrderBy(s => s.Priority)) RequestCodeSources.Add(s);
+    }
+
+    /// <summary>
+    /// 只读回显 manifest.lua 状态（进设置页时调，**不写盘**）。
+    /// </summary>
+    public void RefreshManifestLuaStateQuiet()
+    {
+        if (!_configService.IsLoaded) return;
+
+        _syncingLua = true;
+        try
+        {
+            var (needsTakeover, message) = _luaService.Inspect(RequestCodeSources);
+            ManifestLuaStateText = message;
+            ShowManifestLuaTakeover = needsTakeover;
+        }
+        catch (Exception ex)
+        {
+            ManifestLuaStateText = $"检查 manifest.lua 失败：{ex.Message}";
+        }
+        finally { _syncingLua = false; }
+    }
+
+    /// <summary>
+    /// 把当前勾选同步进 manifest.lua。<paramref name="takeover"/> = 用户点了「接管」
+    /// （既有外来文件先备份再覆盖；否则一律不覆盖，只提示）。
+    /// </summary>
+    public void SyncManifestLua(bool takeover)
+    {
+        if (_isLoading || !_configService.IsLoaded) return;
+
+        _syncingLua = true;
+        try
+        {
+            var (outcome, message) = _luaService.Sync(RequestCodeSources, takeover);
+            ManifestLuaStateText = message;
+            ShowManifestLuaTakeover = outcome == ManifestLuaService.WriteOutcome.NeedsTakeover;
+
+            if (outcome == ManifestLuaService.WriteOutcome.Written)
+                LogService.Event($"请求码源：{message}");
+        }
+        catch (Exception ex)
+        {
+            ManifestLuaStateText = $"写入 manifest.lua 失败：{ex.Message}";
+        }
+        finally { _syncingLua = false; }
+    }
+
+    /// <summary>
+    /// 单源测活（结果只显示在界面上，不落盘）。这是本功能唯一的诊断窗口：
+    /// manifest.lua 里的失败是静默的，内核日志只会留一句 "returned nil"。
+    /// </summary>
+    public async Task TestRequestCodeSourceAsync(RequestCodeSource source)
+    {
+        source.TestResultText = "测试中…";
+        RefreshSourceItem(source);
+
+        var (_, text) = await _luaService.ProbeAsync(source);
+
+        source.TestResultText = text;
+        RefreshSourceItem(source);
+    }
+
+    /// <summary>
+    /// 让绑定到这一项的控件重建一次（模型不带 INotifyPropertyChanged，
+    /// 与 Sudama 缓存文案同一套办法：整项替换触发 CollectionChanged）
+    /// </summary>
+    private void RefreshSourceItem(RequestCodeSource source)
+    {
+        var index = RequestCodeSources.IndexOf(source);
+        if (index >= 0) RequestCodeSources[index] = source;
+    }
+
+    /// <summary>
     /// 回填 Lua 路径输入框：取内核配置里写的目录，内核没写就留空
     /// （输入框显示「默认路径」，实际用的就是 &lt;Steam&gt;\config\lua）。
     /// ⚠️ 路径框只做"检测 → 回填"，**不加校验、不搞失败回滚**：09-14 给两个路径框加过一整套
@@ -671,9 +801,15 @@ public partial class SettingsViewModel : ObservableObject
                 foreach (var source in Sources)
                     c.ManifestSourceEnabled[source.Id] = source.IsEnabled;
                 c.ManifestFeedEnabled = ManifestFeedEnabled;
+
+                // 内核请求码源（勾选 + 顺序）→ 下面同步进 manifest.lua
+                c.RequestCodeSources = RequestCodeSources.ToList();
             });
         }
         catch (Exception ex) { LogService.Diag($"[SaveAllToConfig] 失败：{ex.Message}"); }
+
+        // 勾选变化 → manifest.lua（内容一致不重写；既有外来文件不覆盖，只提示接管）
+        if (!_syncingLua) SyncManifestLua(takeover: false);
     }
 
     /// <summary>

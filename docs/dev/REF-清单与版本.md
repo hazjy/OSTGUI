@@ -38,6 +38,7 @@
 - 因此投喂清单必须**同时写两处**（OSTGUI `ManifestFileService` 即双写 + 逐份容错），
   否则会出现"config 有、根没有"的静默半成品（表现为下载报 "No connection"）
 - 清单文件名格式：`<depotId>_<gid>.manifest`
+- **从 CDN 直抓的清单是 zip 外层，不能直接投喂**（2026-10-06 实证）：CDN 端点 `depot/<id>/manifest/<gid>/5/<code>` 返回的是 zip（magic `PK`），里面只有一个条目 `z`，**解出来的内层**才是 depotcache 要的格式 —— magic `d0 17 f6 71`（Steam 的 manifest magic `0x71F617D0`），现存 depotcache 里所有清单都是这个 magic。直接把 zip 投进去的后果：Steam 记一行 `WARNING! Deleted corrupt manifest file (parsing_failed)` 并**删掉它**，然后照旧去要请求码 → 看起来像"投喂完全没生效"。MHub / Sudama 给的本来就是内层格式，所以 GUI 的投喂链路不受影响；只有自己走 CDN 抓的时候要解包（例：`2001761_5463549948452951231` zip 1,190,689 B → 内层 1,554,210 B）
 
 ## 固定版本体系对应实现（GUI 侧事实）
 

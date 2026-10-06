@@ -88,6 +88,11 @@ public class AppConfig
     // === 完整清单源配置（内置 + 自定义，通用格式） ===
     public List<ManifestSource> ManifestSources { get; set; } = new();
 
+    // === 内核请求码源（GUI 渲染成 <Steam>\config\lua\manifest.lua，内核运行时级联取码） ===
+    // 与上面的 ManifestSources 不是一回事：那些是入库时下载 .manifest 用的，这份是内核每次
+    // 被 Steam 要请求码时跑一遍的。全部关闭 = 生成短路版 manifest.lua（不注入任何码）。
+    public List<RequestCodeSource> RequestCodeSources { get; set; } = new();
+
     // === 扩展预留 ===
     public Dictionary<string, object> Extensions { get; set; } = new();
 
@@ -122,6 +127,7 @@ public class AppConfig
         ManifestSourceEnabled = ManifestSource.GetPresetSources()
             .ToDictionary(s => s.Id, s => s.IsEnabled),
         ManifestSources = ManifestSource.GetPresetSources(),
+        RequestCodeSources = RequestCodeSource.GetPresetSources(),
         Extensions = new(),
         // NoSteam options
         DefaultBackupOriginalExe = true,
