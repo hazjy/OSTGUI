@@ -92,8 +92,9 @@ public sealed partial class AboutView : UserControl
     }
 
     /// <summary>
-    /// 手动检查更新：与启动时的自动检查共用同一个服务与同一个系统通知（有新版时弹两个按钮）。
-    /// 区别在"没有新版 / 失败"时手动必须有反馈 → 就地显示在按钮下方那行小字里。
+    /// 手动检查更新：与启动时的自动检查共用同一个服务与**同一条**系统通知（GUI 与内核各自的新版本
+    /// 合成一条，最多两个按钮）。区别在"没有新版 / 失败"时手动必须有反馈 → 就地显示在按钮下方那行小字里；
+    /// 那行文案由 <see cref="UpdateService.DescribeForDialog"/> 统一给（纯逻辑，自检里覆盖）。
     /// </summary>
     private async void CheckUpdate_Click(object sender, RoutedEventArgs e)
     {
@@ -105,14 +106,8 @@ public sealed partial class AboutView : UserControl
 
         try
         {
-            var result = await UpdateService.CheckAsync(manual: true);
-            UpdateStatusText.Text = result.Status switch
-            {
-                UpdateCheckStatus.UpdateAvailable => $"发现新版本 v{result.LatestVersion}（见系统通知）",
-                UpdateCheckStatus.UpToDate => $"已是最新 v{result.CurrentVersion}",
-                UpdateCheckStatus.Busy => "另一次检查正在进行…",
-                _ => $"无法检查更新：{result.Message}"
-            };
+            var result = await UpdateService.CheckAllAsync(manual: true);
+            UpdateStatusText.Text = UpdateService.DescribeForDialog(result);
         }
         catch (Exception ex)
         {

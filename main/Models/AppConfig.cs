@@ -16,6 +16,8 @@ public class AppConfig
     public bool UpdateCheckEnabled { get; set; } = true;
     // 自动检查"同一版本只提示一次"的记账（弹过就写，手动弹也算）
     public string NotifiedUpdateVersion { get; set; } = string.Empty;
+    // 同上，但属于"内核（ZSteamTool）"维度：两个维度各自记账，互不影响
+    public string NotifiedKernelUpdateVersion { get; set; } = string.Empty;
     public string DefaultManifestSource { get; set; } = "auto";
 
     // === 入库设置 ===
@@ -105,6 +107,7 @@ public class AppConfig
         DefaultManifestSource = "auto",
         UpdateCheckEnabled = true,
         NotifiedUpdateVersion = string.Empty,
+        NotifiedKernelUpdateVersion = string.Empty,
         DefaultAddAllDlc = true,
         DownloadTimeout = 120,
         StFixedVersionDefault = true,
