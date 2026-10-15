@@ -138,7 +138,7 @@ public partial class NoSteamViewModel : ObservableObject
     /// （launcher 的 <c>_logger</c> 由 <see cref="ProgressLogger{T}"/> 并进同一条 progress 通道再写进 LogService）。
     ///
     /// 订阅成对挂在 Loaded / Unloaded（先 <c>-=</c> 再 <c>+=</c>）：事件源是静态集合，构造函数里订阅
-    /// 会让页面被永久钉住（同 <c>doc/开发踩坑-UI.md</c> 里日志栏那条）。
+    /// 会让页面被永久钉住（日志栏那条同类坑）。
     /// </summary>
     public void AttachLogMirror()
     {

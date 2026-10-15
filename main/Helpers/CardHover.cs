@@ -23,9 +23,6 @@ namespace OSTGUI.Helpers;
 /// `UnauthorizedAccessException: ... the ElementCompositionPreview.GetElementVisual property in use`
 /// ——2026-09-23 就是这么踩的：事件照常触发、每一步都异常、全被 catch 吞掉，表现成"悬浮什么反应都没有"。
 /// 要用 Composition 做动画就整套都用 Composition（阴影也得换成 composition DropShadow），两边不能混。
-///
-/// 数值（缩放 / 时长 / 阴影 Z）见 `_archive/20260927-细节与偏好.md`（UI 偏好已归档）；
-/// 机制见 `doc/开发踩坑-窗口与主题.md`（主题画刷那条），量测手法见 `doc/验证手法-UI.md`。
 /// </summary>
 public static class CardHover
 {

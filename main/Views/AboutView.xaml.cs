@@ -11,7 +11,7 @@ namespace OSTGUI.Views;
 /// <summary>
 /// 「关于」弹窗的内容；外壳（ContentDialog）由 <see cref="MainWindow.NavAbout_Tapped"/> 提供，
 /// 关闭走 <see cref="RequestClose"/>。
-/// 排版对应样张 <c>_mockups/about-dialog/about.html</c>：内容宽 324 px（外框 ≈360）。
+/// 排版：内容宽 324 px（外框 ≈360）。
 /// ⚠️ AOT：本视图不用 <c>{Binding}</c>（源生成成员在 AOT 下绑定提供器看不到，见 REF-AOT适配 §1），
 /// 版本号与图标都在 code-behind 直接赋值。
 /// </summary>

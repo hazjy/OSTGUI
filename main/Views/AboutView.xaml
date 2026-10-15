@@ -4,7 +4,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     KeyboardAcceleratorPlacementMode="Hidden">
 
-    <!-- 「关于」弹窗内容。排版对应样张 _mockups/about-dialog/about.html：
+    <!-- 「关于」弹窗内容。排版：
          内容宽 358 px（外框 ≈360）、技术栈三枚官方 mark（30px、间距 14）。
          ⚠️ 本视图刻意不用 {Binding}：AOT 下绑定提供器看不到源生成成员（见 docs/dev/REF-AOT适配.md §1），
          版本号与图标一律在 code-behind 里直接赋值。
