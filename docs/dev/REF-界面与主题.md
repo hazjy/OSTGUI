@@ -1,22 +1,14 @@
 # REF-界面与主题（GUI 侧）
 
-> 只收 显示效果（无 / 云母 / 亚克力）；分工与文档地图见工作区根 `README.md`。
-> 来源：从 `doc/GUI-事实考证.md` 拆出（2026-09-26，2026-09-26 按领域重划）。
-> 末尾「相关」一节只是**指路**，不在这里展开内容。
+> 只收显示效果（无 / 云母 / 亚克力）；分工与文档地图见工作区根 `README.md`。
 
-## 显示效果（无 / 云母 / 亚克力）实测（2026-09-19）
+## 显示效果（无 / 云母 / 亚克力）实测
 
-- 实现方式：给 `Window.SystemBackdrop` 赋 `null` / `MicaBackdrop` / `DesktopAcrylicBackdrop`（WASDK 1.6）；
-  设置页下拉写 `config.json` 的 `BackdropMode`，默认 `acrylic`。
-- **关键结论：`SystemBackdrop = null` 的窗口底色跟随的是「系统主题」，不是「应用主题」**。
-  修复前在「浅色应用主题 + 深色系统」下采样到 `#808080` / `#D9D9D9`，导航栏处直接露 `#000000`
-  （等于浅色界面压在一层深色底上，观感发灰发脏）。修法 = `RootGrid` 里铺一层
-  `{ThemeResource SolidBackgroundFillColorBaseBrush}` 的 `SolidBackdrop`，只在「无」档显示（浅 `#F3F3F3` / 深 `#202020`）；
-  云母与亚克力则跟随应用主题，无需干预。
-- 亚克力的实测观感：壁纸色块明显透出且重度模糊（深浅两套主题都成立）；云母只是极淡的色调偏移
-  ——两者肉眼可区分，截图文件体积也差一档（同窗口 138 KB / 340 KB / 825 KB）。
+- 实现方式：给 `Window.SystemBackdrop` 赋 `null` / `MicaBackdrop` / `DesktopAcrylicBackdrop`（WASDK 1.6）；设置页下拉写 `config.json` 的 `BackdropMode`，默认 `acrylic`。
+- **关键结论：`SystemBackdrop = null` 的窗口底色跟随的是「系统主题」，不是「应用主题」**。修复前在「浅色应用主题 + 深色系统」下采样到 `#808080` / `#D9D9D9`，导航栏处直接露 `#000000`（浅色界面压在深色底上，观感发灰发脏）。修法 = `RootGrid` 里铺一层 `{ThemeResource SolidBackgroundFillColorBaseBrush}` 的 `SolidBackdrop`，只在「无」档显示（浅 `#F3F3F3` / 深 `#202020`）；云母与亚克力跟随应用主题，无需干预。
+- 亚克力观感：壁纸色块明显透出且重度模糊（深浅两套主题都成立）；云母只是极淡的色调偏移——两者肉眼可区分，截图文件体积也差一档（同窗口 138 KB / 340 KB / 825 KB）。
 - 系统要求：云母 Win11 22000+、亚克力 Win11 22621+；不支持时框架静默回落纯色底（不抛异常）。
-- 三档采样色值表（本机 Windows 11 build 26200 / 25H2，窗口 2398×1695 @2.25x，窗口内三处背景像素）见本文件 §归档：显示效果采样表。
+- 三档采样色值表（本机 Windows 11 build 26200 / 25H2，窗口 2398×1695 @2.25x，窗口内三处背景像素）见本文件 §归档。
 
 ## 归档：显示效果采样表
 
@@ -32,6 +24,4 @@
 
 ## 相关（只是指路，不在此展开）
 
-- **「关于」弹窗**（侧边栏 → 弹窗，不切页）：实现事实在 `main/Views/AboutView.xaml` 的头注释与
-  `MainWindow.NavAbout_Tapped`（外壳、宽度口径、图标与许可落点、技术栈三枚官方 mark 与两套主题色）；
-  WinUI 侧的两个坑（`ContentDialog` 别设 MinWidth/MaxWidth、`KeyboardAccelerator` 要 Hidden）见 `doc/开发踩坑-UI.md`。
+- **「关于」弹窗**（侧边栏 → 弹窗，不切页）：实现事实在 `main/Views/AboutView.xaml` 头注释与 `MainWindow.NavAbout_Tapped`（外壳、宽度口径、图标与许可落点、技术栈三枚官方 mark 与两套主题色）；WinUI 侧的两个坑（`ContentDialog` 别设 MinWidth/MaxWidth、`KeyboardAccelerator` 要 Hidden）见已归档的 UI 踩坑文档。
