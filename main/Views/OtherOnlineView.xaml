@@ -15,8 +15,8 @@
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                 <ComboBox x:Name="OnlineModeCombo" MinWidth="240" HorizontalAlignment="Left"
                           SelectedIndex="{Binding OtherModeIndex, Mode=TwoWay}">
-                    <ComboBoxItem Content="DLL 注入（推荐）" />
-                    <ComboBoxItem Content="AppID Changer（轻量）" />
+                    <ComboBoxItem Content="宿主会话（推荐）" />
+                    <ComboBoxItem Content="文件会话" />
                 </ComboBox>
             </Border>
 
@@ -27,12 +27,12 @@
                 <StackPanel Spacing="12">
                     <StackPanel Spacing="6">
                         <StackPanel Orientation="Horizontal" Spacing="12">
-                            <TextBox x:Name="DllGameAppIdBox" Header="游戏 AppID" Width="180"
-                                     Text="{Binding DllGameAppId, Mode=TwoWay}" />
-                            <Button Content="查询" Click="QueryDllGameExe_Click"
+                            <TextBox x:Name="HostGameAppIdBox" Header="游戏 AppID" Width="180"
+                                     Text="{Binding HostGameAppId, Mode=TwoWay}" />
+                            <Button Content="查询" Click="QueryHostGameExe_Click"
                                     VerticalAlignment="Bottom" />
                         </StackPanel>
-                        <TextBlock Text="{Binding DllGameExePath}" FontSize="13"
+                        <TextBlock Text="{Binding HostGameExePath}" FontSize="13"
                                    TextWrapping="Wrap" IsTextSelectionEnabled="True"
                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>

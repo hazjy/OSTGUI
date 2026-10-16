@@ -96,7 +96,7 @@ public class OnlineFixService
     /// <summary>
     /// 宿主启动（不依赖内核 -onlinefix）：由 OnlineHost.exe 以会话身份初始化 Steam，
     /// 再把游戏作为子进程拉起，游戏自身的 appid / 大厅 / P2P 证书天然一致。
-    /// viaAppIdFile = true 时走文件法（AppID Changer）：宿主写游戏 exe 同目录的
+    /// viaAppIdFile = true 时走文件会话（文件法）：宿主写游戏 exe 同目录的
     /// steam_appid.txt **并**设同一套 Steam 环境变量（SteamAppId/SteamGameId/SteamOverlayGameId）、
     /// 自己也先以该身份注册一次，游戏退出后由宿主还原原文件。
     /// （2026-09-20 对照闭源工具实测修正：只写文件不设环境变量拿不到 480 的叠加层/真大厅身份。）
@@ -192,12 +192,12 @@ public class OnlineFixService
             }
 
             File.Delete(AppIdJournalPath);
-            ToastService.ShowSuccess("AppID Changer", "已恢复上次未还原的 steam_appid.txt");
+            ToastService.ShowSuccess("文件会话", "已恢复上次未还原的 steam_appid.txt");
         }
         catch (Exception ex)
         {
-            LogService.Diag($"[AppID Changer] 补还原失败：{ex.Message}");
-            ToastService.ShowError("AppID Changer", $"上次的 steam_appid.txt 还原失败：{ex.Message}");
+            LogService.Diag($"[文件会话] 补还原失败：{ex.Message}");
+            ToastService.ShowError("文件会话", $"上次的 steam_appid.txt 还原失败：{ex.Message}");
         }
     }
 
@@ -325,17 +325,17 @@ public class OnlineFixService
         return found;
     }
 
-    /// <summary>是否有 DLL 注入（宿主 480）联机游戏在运行</summary>
+    /// <summary>是否有宿主会话（OnlineHost 以会话身份拉起游戏）联机游戏在运行</summary>
     public bool IsHostRunning() => FindHostProcessIds().Count > 0;
 
     /// <summary>
-    /// 停止 DLL 注入联机游戏：先从宿主命令行里取出游戏 exe 结束游戏，再结束宿主。
+    /// 停止宿主会话联机游戏：先从宿主命令行里取出游戏 exe 结束游戏，再结束宿主。
     /// </summary>
     public (bool success, string message) StopViaHost()
     {
         var hosts = FindHostProcessIds();
         if (hosts.Count == 0)
-            return (false, "当前无正在运行的 DLL 注入游戏");
+            return (false, "当前没有宿主会话在运行");
 
         var games = 0;
         var stopped = 0;

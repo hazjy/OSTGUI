@@ -24,7 +24,7 @@
             <controls:Segmented Grid.Row="0" x:Name="OnlineSegmented"
                                 HorizontalAlignment="Stretch"
                                 SelectionChanged="OnlineSegmented_SelectionChanged">
-                <controls:SegmentedItem Content="内核原生" IsSelected="True" Height="40" MinHeight="40" />
+                <controls:SegmentedItem Content="命令行会话" IsSelected="True" Height="40" MinHeight="40" />
                 <controls:SegmentedItem Content="其他" Height="40" MinHeight="40" />
             </controls:Segmented>
 

@@ -62,7 +62,7 @@ public class AppConfig
     public string DefaultPage { get; set; } = "home";
     public bool IsNavigationPaneOpen { get; set; } = true;
     public double NavigationPaneWidth { get; set; } = 200;
-    // 联机页「其他」下拉的选中项：0 = DLL 注入（推荐），1 = AppID Changer（轻量）
+    // 联机页「其他」下拉的选中项：0 = 宿主会话（推荐），1 = 文件会话
     public int OnlineOtherMode { get; set; }
     // 入库管理视图形态：list = 列表卡片（默认），grid = 网格卡片
     public string LibraryViewMode { get; set; } = "list";

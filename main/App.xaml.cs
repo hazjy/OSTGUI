@@ -140,7 +140,7 @@ public partial class App : Application
         services.AddTransient<TrainerViewModel>();
         Services = services.BuildServiceProvider();
 
-        // 上次的文件法联机会话（AppID Changer）若没还原干净，这里补一刀
+        // 上次的文件会话若没还原干净（steam_appid.txt 台账残留），这里补一刀
         Services.GetRequiredService<OnlineFixService>().RestoreAppIdFileLeftover();
 
         var configService = Services.GetRequiredService<ConfigService>();

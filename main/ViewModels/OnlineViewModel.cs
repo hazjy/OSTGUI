@@ -30,7 +30,7 @@ public partial class OnlineViewModel : ObservableObject
         set => SetProperty(ref _gameName, value);
     }
 
-    /// <summary>「其他」下拉的选中项（0 = DLL 注入，1 = AppID Changer）；改内存，退出落盘，重开记住上次选择</summary>
+    /// <summary>「其他」下拉的选中项（0 = 宿主会话，1 = 文件会话）；改内存，退出落盘，重开记住上次选择</summary>
     private int _otherModeIndex;
 
     public int OtherModeIndex
@@ -106,21 +106,23 @@ public partial class OnlineViewModel : ObservableObject
     public string StatusText => IsRunning ? "联机游戏中" : "未运行";
     public bool CanStart => !IsRunning && !IsBusy;
 
-    // 「其他」页 —— DLL 注入：游戏 AppID（查询定位游戏程序）与定位结果
-    private string _dllGameAppId = "";
+    // 「其他」页 —— 宿主会话：游戏 AppID（查询定位游戏程序）与定位结果
+    // （宿主会话 = OnlineHost.exe 以会话身份拉起游戏；不经 Steam 启动，游戏侧因此拿到
+    //  会话身份的 SteamAppId 环境变量。见 ZSteamTool/docs/dev/REF-内核-联机会话.md）
+    private string _hostGameAppId = "";
 
-    public string DllGameAppId
+    public string HostGameAppId
     {
-        get => _dllGameAppId;
-        set => SetProperty(ref _dllGameAppId, value);
+        get => _hostGameAppId;
+        set => SetProperty(ref _hostGameAppId, value);
     }
 
-    private string _dllGameExePath = "";
+    private string _hostGameExePath = "";
 
-    public string DllGameExePath
+    public string HostGameExePath
     {
-        get => _dllGameExePath;
-        set => SetProperty(ref _dllGameExePath, value);
+        get => _hostGameExePath;
+        set => SetProperty(ref _hostGameExePath, value);
     }
 
     /// <summary>协议 AppID：默认 480，或自定义（两个联机视图共用同一份状态）</summary>
@@ -134,55 +136,55 @@ public partial class OnlineViewModel : ObservableObject
     }
 
     /// <summary>按「游戏 AppID」定位已安装游戏的主程序；定位不到返回 null</summary>
-    public string? ResolveDllGameExe()
+    public string? ResolveHostGameExe()
     {
-        if (DllGameAppId.Trim().Length == 0) return null;
+        if (HostGameAppId.Trim().Length == 0) return null;
 
-        var exe = _onlineFixService.ResolveGameExe(DllGameAppId.Trim());
+        var exe = _onlineFixService.ResolveGameExe(HostGameAppId.Trim());
         if (exe is null) return null;
 
-        DllGameExePath = exe;
+        HostGameExePath = exe;
         return exe;
     }
 
-    /// <summary>DLL 注入启动（宿主 480：OnlineHost.exe 以会话身份拉起游戏）</summary>
-    public (bool success, string message) StartDllInject()
+    /// <summary>宿主会话启动：由 OnlineHost.exe 以会话身份拉起游戏（不经 Steam）</summary>
+    public (bool success, string message) StartHostSession()
     {
         if (IsRunning)
             return (false, "已有联机游戏在运行，请先停止");
 
-        if (string.IsNullOrWhiteSpace(DllGameExePath) || !File.Exists(DllGameExePath))
+        if (string.IsNullOrWhiteSpace(HostGameExePath) || !File.Exists(HostGameExePath))
             return (false, "请先单击「查询」定位游戏程序");
 
         var (sessionOk, sessionAppId) = ResolveSessionAppId();
         if (!sessionOk)
             return (false, "请输入正确的协议 AppID（十进制，非 0）");
 
-        var (ok, msg) = _onlineFixService.StartViaHost(DllGameExePath, sessionAppId);
+        var (ok, msg) = _onlineFixService.StartViaHost(HostGameExePath, sessionAppId);
         RefreshRunningState();
         return (ok, msg);
     }
 
-    /// <summary>AppID Changer 启动（文件法：宿主写游戏 exe 同目录的 steam_appid.txt 后拉起游戏，退出即还原）</summary>
-    public (bool success, string message) StartChanger()
+    /// <summary>文件会话启动（文件法：宿主写游戏 exe 同目录的 steam_appid.txt 后拉起游戏，退出即还原）</summary>
+    public (bool success, string message) StartFileSession()
     {
         if (IsRunning)
             return (false, "已有联机游戏在运行，请先停止");
 
-        if (string.IsNullOrWhiteSpace(DllGameExePath) || !File.Exists(DllGameExePath))
+        if (string.IsNullOrWhiteSpace(HostGameExePath) || !File.Exists(HostGameExePath))
             return (false, "请先单击「查询」定位游戏程序");
 
         var (sessionOk, sessionAppId) = ResolveSessionAppId();
         if (!sessionOk)
             return (false, "请输入正确的协议 AppID（十进制，非 0）");
 
-        var (ok, msg) = _onlineFixService.StartViaHost(DllGameExePath, sessionAppId, viaAppIdFile: true);
+        var (ok, msg) = _onlineFixService.StartViaHost(HostGameExePath, sessionAppId, viaAppIdFile: true);
         RefreshRunningState();
         return (ok, msg);
     }
 
-    /// <summary>停止 DLL 注入联机游戏（宿主 + 它拉起的游戏）</summary>
-    public (bool success, string message) StopDllInject()
+    /// <summary>停止宿主会话联机游戏（宿主 + 它拉起的游戏）</summary>
+    public (bool success, string message) StopHostSession()
     {
         var (ok, msg) = _onlineFixService.StopViaHost();
         RefreshRunningState();
@@ -266,7 +268,7 @@ public partial class OnlineViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 刷新运行状态（含两种启动方式：内核 -onlinefix 与 DLL 注入宿主）
+    /// 刷新运行状态（含两种启动方式：命令行会话 `-onlinefix` 与宿主会话）
     /// </summary>
     public void RefreshRunningState()
         => IsRunning = _onlineFixService.IsRunning() || _onlineFixService.IsHostRunning();
