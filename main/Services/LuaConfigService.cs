@@ -263,6 +263,29 @@ else
     }
 
     /// <summary>
+    /// 该 AppID 是否**已入库**：lua 文件里存在 <c>addappid(&lt;appid&gt;[,)])</c>。
+    /// 联机前置检查与 D 加密页共用这一判定口径（"入库"= addappid，不含清单/密钥）。
+    /// </summary>
+    public async Task<bool> ContainsAppIdAsync(string appId)
+    {
+        var id = appId?.Trim();
+        if (string.IsNullOrEmpty(id) || !id.All(char.IsDigit)) return false;
+
+        try
+        {
+            var lua = await ReadLuaContentAsync(id);
+            return lua is not null && Regex.IsMatch(
+                lua,
+                $@"addappid\s*\(\s*{Regex.Escape(id)}\b",
+                RegexOptions.IgnoreCase);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
     /// 读取特定 AppID 的 Lua 文件内容
     /// </summary>
     public async Task<string?> ReadLuaContentAsync(string appId)

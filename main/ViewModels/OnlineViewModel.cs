@@ -1,5 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using OSTGUI.Services;
+using System.Collections.ObjectModel;
 
 namespace OSTGUI.ViewModels;
 
@@ -13,6 +14,9 @@ public partial class OnlineViewModel : ObservableObject
     private readonly GameSearchService _searchService;
     private readonly SteamGameInfoService _gameInfoService;
     private readonly ConfigService _configService;
+    private readonly SteamService _steamService;
+    private readonly SteamDllService _steamDllService;
+    private readonly LuaConfigService _luaService;
 
     private string _onlineAppId = "";
 
@@ -50,12 +54,23 @@ public partial class OnlineViewModel : ObservableObject
 
     // 联机会话身份：默认 Spacewar(480)，自定义时用 SessionAppId
     // 两个联机视图共用这份状态；各视图内的单选靠各自 GroupName 分组（两个视图的名字必须不同）
+    // 选择状态记进 AppConfig（ConfigService.Update 只改内存、退出时统一落盘，所以随手记不心疼）。
     private bool _isDefaultSession = true;
 
     public bool IsDefaultSession
     {
         get => _isDefaultSession;
-        set => SetProperty(ref _isDefaultSession, value);
+        set
+        {
+            if (!SetProperty(ref _isDefaultSession, value)) return;
+            _configService.Update(c => c.SessionIsDefault = value);
+            // 两个单选互斥：这里同步另一边，免得上层忘记
+            if (value && _isCustomSession)
+            {
+                _isCustomSession = false;
+                OnPropertyChanged(nameof(IsCustomSession));
+            }
+        }
     }
 
     private bool _isCustomSession;
@@ -63,7 +78,16 @@ public partial class OnlineViewModel : ObservableObject
     public bool IsCustomSession
     {
         get => _isCustomSession;
-        set => SetProperty(ref _isCustomSession, value);
+        set
+        {
+            if (!SetProperty(ref _isCustomSession, value)) return;
+            _configService.Update(c => c.SessionIsDefault = !value);
+            if (value && _isDefaultSession)
+            {
+                _isDefaultSession = false;
+                OnPropertyChanged(nameof(IsDefaultSession));
+            }
+        }
     }
 
     private string _sessionAppId = "";
@@ -71,7 +95,63 @@ public partial class OnlineViewModel : ObservableObject
     public string SessionAppId
     {
         get => _sessionAppId;
-        set => SetProperty(ref _sessionAppId, value);
+        set
+        {
+            if (!SetProperty(ref _sessionAppId, value)) return;
+            _configService.Update(c => c.SessionAppId = value);
+        }
+    }
+
+    // ── 启动前置检查（宿主会话 / 文件会话）─────────────────────────────────
+    // 三项：Steam 是否运行 · 内核是否已安装 · 游戏是否已入库。
+    // 只做展示，不拦截启动；样式先占位，后续再调。
+    public sealed record OnlinePrecheck(string Glyph, string Text);
+
+    public ObservableCollection<OnlinePrecheck> Prechecks { get; } = new();
+
+    // 入库检查带缓存：按 AppID 记住结果，让定时刷新不必反复读盘（只在首次与换 AppID 时读）。
+    private string _libCheckAppId = "";
+    private bool _libCheckOk;
+
+    /// <summary>
+    /// 刷新三项前置检查。调用点：进联机页、切页、点「查询」，以及页面那个 2 秒定时器。
+    /// </summary>
+    public async Task RefreshPrechecksAsync()
+    {
+        bool steamOk = false, kernelOk = false;
+        try { steamOk = _steamService.IsSteamRunning(); } catch { }
+        try { kernelOk = _steamDllService.IsOSTDllInjected(); } catch { }
+
+        var appId = HostGameAppId.Trim();
+        if (appId != _libCheckAppId)
+        {
+            _libCheckAppId = appId;
+            _libCheckOk = false;
+            if (appId.Length > 0)
+            {
+                try { _libCheckOk = await _luaService.ContainsAppIdAsync(appId); } catch { }
+            }
+        }
+
+        var items = new[]
+        {
+            new OnlinePrecheck(steamOk ? "✓" : "✗",
+                steamOk ? "Steam 已运行（联机需在线模式且已登录）" : "Steam 未运行 —— 请先启动并登录 Steam"),
+            new OnlinePrecheck(kernelOk ? "✓" : "✗",
+                kernelOk ? "内核已安装" : "内核未安装 —— 会话身份不会生效，请先在「内核」页安装"),
+            new OnlinePrecheck(_libCheckOk ? "✓" : "✗",
+                appId.Length == 0
+                    ? "尚未填写游戏 AppID（无法判断是否已入库）"
+                    : _libCheckOk
+                        ? $"AppID {appId} 已入库"
+                        : $"AppID {appId} 未入库 —— 宿主会话要靠它才能洗白身份"),
+        };
+
+        // 内容没变就别动集合（2 秒一次的刷新不该让 UI 反复重建）
+        if (Prechecks.Count == items.Length && !Prechecks.Where((p, i) => p != items[i]).Any()) return;
+
+        Prechecks.Clear();
+        foreach (var item in items) Prechecks.Add(item);
     }
 
     private bool _isRunning;
@@ -195,15 +275,27 @@ public partial class OnlineViewModel : ObservableObject
         OnlineFixService onlineFixService,
         GameSearchService searchService,
         SteamGameInfoService gameInfoService,
-        ConfigService configService)
+        ConfigService configService,
+        SteamService steamService,
+        SteamDllService steamDllService,
+        LuaConfigService luaService)
     {
         _onlineFixService = onlineFixService;
         _searchService = searchService;
         _gameInfoService = gameInfoService;
         _configService = configService;
+        _steamService = steamService;
+        _steamDllService = steamDllService;
+        _luaService = luaService;
 
         // 直接赋字段：走属性会触发一次无意义落盘
         _otherModeIndex = configService.Config.OnlineOtherMode;
+        // 会话身份：恢复上次的选择状态（老配置没有这两个键时用默认值兜底）
+        _isDefaultSession = configService.Config.SessionIsDefault;
+        _isCustomSession = !_isDefaultSession;
+        _sessionAppId = string.IsNullOrWhiteSpace(configService.Config.SessionAppId)
+            ? "480"
+            : configService.Config.SessionAppId;
     }
 
     /// <summary>

@@ -64,6 +64,10 @@ public class AppConfig
     public double NavigationPaneWidth { get; set; } = 200;
     // 联机页「其他」下拉的选中项：0 = 宿主会话（推荐），1 = 文件会话
     public int OnlineOtherMode { get; set; }
+    // 联机会话身份的选择状态（**不分游戏，全局记一份**）：true = 默认（480 / Spacewar），false = 用下面的自定义值
+    public bool SessionIsDefault { get; set; } = true;
+    // 自定义会话身份（十进制 AppID 字符串；默认 480）
+    public string SessionAppId { get; set; } = "480";
     // 入库管理视图形态：list = 列表卡片（默认），grid = 网格卡片
     public string LibraryViewMode { get; set; } = "list";
     // 搜索入库视图形态：同上（两页各自独立记忆；想联动就都读这一个键）
@@ -124,6 +128,8 @@ public class AppConfig
         IsNavigationPaneOpen = true,
         NavigationPaneWidth = 200,
         OnlineOtherMode = 0,
+        SessionIsDefault = true,
+        SessionAppId = "480",
         LibraryViewMode = "list",
         SearchViewMode = "list",
         LogMaxLines = 1000,

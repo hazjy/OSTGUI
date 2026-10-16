@@ -23,8 +23,14 @@ public sealed partial class OnlinePage : Page
         Loaded += (s, e) =>
         {
             VM.RefreshRunningState();
+            _ = VM.RefreshPrechecksAsync();
             _statusTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(2) };
-            _statusTimer.Tick += (_, _) => VM.RefreshRunningState();
+            _statusTimer.Tick += (_, _) =>
+            {
+                VM.RefreshRunningState();
+                // 前置检查也一起刷（Steam 起没起、内核装没装会变；入库那项在 VM 里带缓存，不会反复读盘）
+                _ = VM.RefreshPrechecksAsync();
+            };
             _statusTimer.Start();
         };
 
@@ -44,5 +50,8 @@ public sealed partial class OnlinePage : Page
         var index = OnlineSegmented.SelectedIndex;
         FixView.Visibility = index == 0 ? Visibility.Visible : Visibility.Collapsed;
         OtherView.Visibility = index == 1 ? Visibility.Visible : Visibility.Collapsed;
+
+        // 切页时立刻刷一次前置检查（两个视图的 AppID 输入框不是同一个）
+        _ = VM.RefreshPrechecksAsync();
     }
 }

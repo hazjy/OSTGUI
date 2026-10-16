@@ -8,7 +8,13 @@ namespace OSTGUI.Views;
 /// <summary>其他联机方式视图（宿主会话 / 文件会话，共用同一套输入与启停按钮）</summary>
 public sealed partial class OtherOnlineView : UserControl
 {
-    public OtherOnlineView() => this.InitializeComponent();
+    public OtherOnlineView()
+    {
+        this.InitializeComponent();
+
+        // 前置检查：进入本视图时刷一次（切页与 2 秒定时器由 OnlinePage 负责）
+        Loaded += (_, _) => _ = VM?.RefreshPrechecksAsync();
+    }
 
     private OnlineViewModel? VM => DataContext as OnlineViewModel;
 
@@ -33,6 +39,9 @@ public sealed partial class OtherOnlineView : UserControl
         // 成功不打扰（路径直接显示在下面一行），只有失败才提示
         if (VM.ResolveHostGameExe() is null)
             (App.MainWindow as MainWindow)?.Notify("", "未找到该AppID的已安装游戏", InfoBarSeverity.Warning);
+
+        // AppID 变了 → 前置检查里的「已入库」要跟着重算
+        _ = VM.RefreshPrechecksAsync();
     }
 
     /// <summary>启动：按当前方式分派（宿主会话 / 文件会话）</summary>

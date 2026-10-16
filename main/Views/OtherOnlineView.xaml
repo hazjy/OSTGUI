@@ -72,6 +72,23 @@
                                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
             </Border>
+
+            <!-- 内容块 3：启动前置检查（Steam 运行 / 内核已装 / 已入库）
+                 样式先占位，后续再调（时机：进页面、切页、点「查询」，以及页面 2 秒定时器） -->
+            <Border Width="560" Padding="24" CornerRadius="12"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
+                <ItemsControl ItemsSource="{Binding Prechecks}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,8">
+                                <TextBlock Text="{Binding Glyph}" FontSize="14" Width="16" />
+                                <TextBlock Text="{Binding Text}" FontSize="14" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Border>
         </StackPanel>
     </ScrollViewer>
 </UserControl>
