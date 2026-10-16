@@ -70,7 +70,7 @@
 ## 归档：480 联机实证轮（v1/v2/v3，PEAK + 日志探针）
 
 - 结论与提交见本文件 §实证轮（v1/v2/v3）。
-- 当时三份内核备份（`20260825-kernel-480fix` / `20260825-kernel-v2-friendpatch` / `20260826-kernel-v2-persona`）已随备份目录整理删除；现存内核备份见工作区 `内核备份/`。
+- 当时三份内核备份（`20260825-kernel-480fix` / `20260825-kernel-v2-friendpatch` / `20260826-kernel-v2-persona`）已删除；**现在不保留内核备份**（本地开发，可从提交重建；各版发布包在 `ZSteamTool/发布包/`）。
 
 ## 归档：AppID Changer 本机自测（六项）
 
