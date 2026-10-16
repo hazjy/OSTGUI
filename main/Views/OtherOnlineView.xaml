@@ -74,21 +74,28 @@
             </Border>
 
             <!-- 内容块 3：启动前置检查（Steam 运行 / 内核已装 / 已入库）
-                 样式先占位，后续再调（时机：进页面、切页、点「查询」，以及页面 2 秒定时器） -->
-            <Border Width="560" Padding="24" CornerRadius="12"
-                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
-                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                <ItemsControl ItemsSource="{Binding Prechecks}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <StackPanel Orientation="Horizontal" Spacing="10" Margin="0,0,0,8">
-                                <TextBlock Text="{Binding Glyph}" FontSize="14" Width="16" />
-                                <TextBlock Text="{Binding Text}" FontSize="14" TextWrapping="Wrap" />
-                            </StackPanel>
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
-            </Border>
+                 每项一块、横排一行，文案 = 名称：就绪 / 名称：错误；鼠标悬停有细则。
+                 样式先占位，后续再调。 -->
+            <StackPanel Orientation="Horizontal" Spacing="12" HorizontalAlignment="Center">
+                <Border Width="170" Padding="16" CornerRadius="12"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                        ToolTipService.ToolTip="联机需要 Steam 在线并已登录">
+                    <TextBlock Text="{Binding SteamCheckText}" FontSize="14" HorizontalAlignment="Center" />
+                </Border>
+                <Border Width="170" Padding="16" CornerRadius="12"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                        ToolTipService.ToolTip="会话身份靠内核生效（dwmapi / xinput1_4 / OpenSteamTool 三件套）">
+                    <TextBlock Text="{Binding KernelCheckText}" FontSize="14" HorizontalAlignment="Center" />
+                </Border>
+                <Border Width="170" Padding="16" CornerRadius="12"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1"
+                        ToolTipService.ToolTip="该 AppID 须已入库（lua 里有 addappid），宿主会话才能洗白身份">
+                    <TextBlock Text="{Binding LibraryCheckText}" FontSize="14" HorizontalAlignment="Center" />
+                </Border>
+            </StackPanel>
         </StackPanel>
     </ScrollViewer>
 </UserControl>

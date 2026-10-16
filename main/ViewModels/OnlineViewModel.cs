@@ -1,6 +1,5 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using OSTGUI.Services;
-using System.Collections.ObjectModel;
 
 namespace OSTGUI.ViewModels;
 
@@ -104,14 +103,41 @@ public partial class OnlineViewModel : ObservableObject
 
     // ── 启动前置检查（宿主会话 / 文件会话）─────────────────────────────────
     // 三项：Steam 是否运行 · 内核是否已安装 · 游戏是否已入库。
-    // 只做展示，不拦截启动；样式先占位，后续再调。
-    public sealed record OnlinePrecheck(string Glyph, string Text);
+    // 只做展示，不拦截启动。
+    // 对外只暴露三个字符串（UI 上每项一块、横排一行，文案 = 名称：就绪 / 名称：错误）——
+    // 不走 ItemsControl + 嵌套类型的绑定：AOT + CsWinRT 下嵌套 record 的成员绑定不可靠
+    // （第一版就是这么写的，界面上直接空白），顶层属性最稳。
+    private string _steamCheckText = "Steam：—";
+    public string SteamCheckText
+    {
+        get => _steamCheckText;
+        private set => SetProperty(ref _steamCheckText, value);
+    }
 
-    public ObservableCollection<OnlinePrecheck> Prechecks { get; } = new();
+    private string _kernelCheckText = "内核：—";
+    public string KernelCheckText
+    {
+        get => _kernelCheckText;
+        private set => SetProperty(ref _kernelCheckText, value);
+    }
+
+    private string _libraryCheckText = "入库：—";
+    public string LibraryCheckText
+    {
+        get => _libraryCheckText;
+        private set => SetProperty(ref _libraryCheckText, value);
+    }
 
     // 入库检查带缓存：按 AppID 记住结果，让定时刷新不必反复读盘（只在首次与换 AppID 时读）。
     private string _libCheckAppId = "";
     private bool _libCheckOk;
+
+    // 上一条已应用的结果摘要：只在变化时写日志，免得 2 秒一条刷屏。
+    private string _lastCheckSummary = "";
+
+    // 刷新可能发生在 await 之后（线程池），改属性前统一封送回 UI 线程。
+    private readonly Microsoft.UI.Dispatching.DispatcherQueue? _ui =
+        Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
 
     /// <summary>
     /// 刷新三项前置检查。调用点：进联机页、切页、点「查询」，以及页面那个 2 秒定时器。
@@ -133,25 +159,23 @@ public partial class OnlineViewModel : ObservableObject
             }
         }
 
-        var items = new[]
+        void Apply()
         {
-            new OnlinePrecheck(steamOk ? "✓" : "✗",
-                steamOk ? "Steam 已运行（联机需在线模式且已登录）" : "Steam 未运行 —— 请先启动并登录 Steam"),
-            new OnlinePrecheck(kernelOk ? "✓" : "✗",
-                kernelOk ? "内核已安装" : "内核未安装 —— 会话身份不会生效，请先在「内核」页安装"),
-            new OnlinePrecheck(_libCheckOk ? "✓" : "✗",
-                appId.Length == 0
-                    ? "尚未填写游戏 AppID（无法判断是否已入库）"
-                    : _libCheckOk
-                        ? $"AppID {appId} 已入库"
-                        : $"AppID {appId} 未入库 —— 宿主会话要靠它才能洗白身份"),
-        };
+            SteamCheckText = steamOk ? "Steam：就绪" : "Steam：错误";
+            KernelCheckText = kernelOk ? "内核：就绪" : "内核：错误";
+            LibraryCheckText = _libCheckOk ? "入库：就绪" : "入库：错误";
 
-        // 内容没变就别动集合（2 秒一次的刷新不该让 UI 反复重建）
-        if (Prechecks.Count == items.Length && !Prechecks.Where((p, i) => p != items[i]).Any()) return;
+            var summary = $"{SteamCheckText} {KernelCheckText} {LibraryCheckText}"
+                          + (appId.Length > 0 ? $"（AppID {appId}）" : "（未填 AppID）");
+            if (summary != _lastCheckSummary)
+            {
+                _lastCheckSummary = summary;
+                LogService.Diag($"前置检查：{summary}");
+            }
+        }
 
-        Prechecks.Clear();
-        foreach (var item in items) Prechecks.Add(item);
+        if (_ui is null || _ui.HasThreadAccess) Apply();
+        else _ui.TryEnqueue(Apply);
     }
 
     private bool _isRunning;
