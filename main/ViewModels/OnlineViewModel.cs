@@ -149,7 +149,13 @@ public partial class OnlineViewModel : ObservableObject
         try { kernelOk = _steamDllService.IsOSTDllInjected(); } catch { }
 
         var appId = HostGameAppId.Trim();
-        if (appId != _libCheckAppId)
+        // 入库只对「查询过的那个 AppID」下判断：没查过就显示未查询，免得把半截输入的号码当真
+        if (!_hostGameQueried)
+        {
+            _libCheckAppId = "";
+            _libCheckOk = false;
+        }
+        else if (appId != _libCheckAppId)
         {
             _libCheckAppId = appId;
             _libCheckOk = false;
@@ -163,7 +169,9 @@ public partial class OnlineViewModel : ObservableObject
         {
             SteamCheckText = steamOk ? "Steam：就绪" : "Steam：错误";
             KernelCheckText = kernelOk ? "内核：就绪" : "内核：错误";
-            LibraryCheckText = _libCheckOk ? "入库：就绪" : "入库：错误";
+            LibraryCheckText = !_hostGameQueried
+                ? "入库：未查询"
+                : _libCheckOk ? "入库：就绪" : "入库：错误";
 
             var summary = $"{SteamCheckText} {KernelCheckText} {LibraryCheckText}"
                           + (appId.Length > 0 ? $"（AppID {appId}）" : "（未填 AppID）");
@@ -218,8 +226,16 @@ public partial class OnlineViewModel : ObservableObject
     public string HostGameAppId
     {
         get => _hostGameAppId;
-        set => SetProperty(ref _hostGameAppId, value);
+        set
+        {
+            if (!SetProperty(ref _hostGameAppId, value)) return;
+            // 输入框内容一变，之前的「已查询」就作废 —— 入库状态只对查询过的那个 AppID 才准确
+            _hostGameQueried = false;
+        }
     }
+
+    // 是否已对当前 AppID 点过「查询」并定位成功：入库检查只在查询之后才有意义
+    private bool _hostGameQueried;
 
     private string _hostGameExePath = "";
 
@@ -245,9 +261,14 @@ public partial class OnlineViewModel : ObservableObject
         if (HostGameAppId.Trim().Length == 0) return null;
 
         var exe = _onlineFixService.ResolveGameExe(HostGameAppId.Trim());
-        if (exe is null) return null;
+        if (exe is null)
+        {
+            _hostGameQueried = false;
+            return null;
+        }
 
         HostGameExePath = exe;
+        _hostGameQueried = true;   // 查询成功 → 入库检查从此开始生效
         return exe;
     }
 
