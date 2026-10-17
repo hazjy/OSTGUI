@@ -12,11 +12,10 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Margin="40,32,40,12">
+        <StackPanel Grid.Row="0" Margin="40,32,40,12" Spacing="4">
             <TextBlock Text="联机" FontSize="32" FontWeight="Bold" />
-            <TextBlock Text="更推荐使用「宿主会话」" FontSize="12" Margin="0,6,0,0"
-                       TextWrapping="Wrap"
-                       Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+            <TextBlock FontSize="14" Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                       Text="更推荐使用「宿主会话」" />
         </StackPanel>
 
         <Grid Grid.Row="1" Margin="40,0,40,0">
