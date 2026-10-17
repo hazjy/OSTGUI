@@ -10,6 +10,15 @@
             <Grid IsTabStop="True" TabIndex="0" Width="1" Height="1"
                   HorizontalAlignment="Left" VerticalAlignment="Top" Opacity="0" />
 
+            <!-- 推荐提示：命令行会话走「经 Steam 启动」，对入库游戏无效；宿主会话才进会话身份 -->
+            <StackPanel Width="560" Spacing="4">
+                <TextBlock Text="更推荐使用「宿主会话」" FontSize="14" FontWeight="SemiBold"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <TextBlock FontSize="12" TextWrapping="Wrap"
+                           Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+                           Text="命令行会话按「经 Steam 启动」工作，对入库游戏不生效；宿主会话才会把游戏进程拉进会话身份（见上方「其他」页签）。" />
+            </StackPanel>
+
             <Border Width="560" Padding="24" CornerRadius="12"
                     Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                     BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
@@ -42,6 +51,21 @@
                                      Text="{Binding SessionAppId, Mode=TwoWay}"
                                      IsEnabled="{Binding IsCustomSession}" />
                         </StackPanel>
+                    </StackPanel>
+
+                    <!-- 前置检查：与「其他」页同源（OnlineViewModel.RefreshPrechecksAsync 计算），
+                         本页只做展示；「入库」一项通常显示“未查询”，因为该校验由「其他」页的查询触发 -->
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <TextBlock Text="{Binding SteamCheckText}" FontSize="13"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Text="·" FontSize="13"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                        <TextBlock Text="{Binding KernelCheckText}" FontSize="13"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock Text="·" FontSize="13"
+                                   Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                        <TextBlock Text="{Binding LibraryCheckText}" FontSize="13"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                     </StackPanel>
 
                     <StackPanel Orientation="Horizontal" Spacing="12">
