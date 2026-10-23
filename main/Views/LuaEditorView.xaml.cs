@@ -262,12 +262,6 @@ public sealed partial class LuaEditorView : UserControl
     private void InsertManifestId_Click(object sender, RoutedEventArgs e) =>
         InsertSnippet("setmanifestid(000000, \"0\", 0)", "000000,");
 
-    private void InsertProcess_Click(object sender, RoutedEventArgs e) =>
-        InsertSnippet("addprocess(\"game.exe\")", "game.exe");
-
-    private void InsertForceDenuvo_Click(object sender, RoutedEventArgs e) =>
-        InsertSnippet("forcedenuvo()", "()");
-
     /// <summary>给选中行（或光标所在行）批量加 / 去 <c>-- </c>。</summary>
     private void ToggleComment_Click(object sender, RoutedEventArgs e)
     {

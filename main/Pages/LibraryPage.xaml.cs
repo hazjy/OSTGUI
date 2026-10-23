@@ -169,8 +169,8 @@ public sealed partial class LibraryPage : Page
             PrimaryButtonText = "保存",
             CloseButtonText = "关闭",
             DefaultButton = ContentDialogButton.Primary,
-            MinWidth = 880,
-            MaxWidth = 880,
+            // ⚠️ 不要给 ContentDialog 设 MinWidth/MaxWidth：模板根（含遮罩层）会被一起夹窄，
+            // 弹窗被顶到窗口左边（MainWindow.xaml.cs 里 2026-10-02 就记过这条）。宽度由内容自己定。
         };
 
         // 有未保存修改时关窗要二次确认（Primary=已保存、后面 forceClose=确认放弃，这两种直接放行）

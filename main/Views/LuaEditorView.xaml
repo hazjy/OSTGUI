@@ -2,7 +2,7 @@
     x:Class="OSTGUI.Views.LuaEditorView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    MinWidth="780" MinHeight="460">
+    MinWidth="820" MinHeight="480" HorizontalAlignment="Center">
 
     <!-- 应用内 Lua 编辑器：RichEditBox + 手写词法上色。
          ⚠️ AOT：本视图不用 {Binding}（源生成成员在 AOT 下绑定提供器看不到，见 REF-AOT适配 §1），
@@ -27,10 +27,6 @@
                     ToolTipService.ToolTip="受限 app 需要令牌：addtoken(AppID, &quot;令牌&quot;)" />
             <Button Content="setManifestid" FontSize="12" Padding="8,4" Click="InsertManifestId_Click"
                     ToolTipService.ToolTip="固定版本：setManifestid(depot, &quot;gid&quot;, 大小)；有则锁版本，无则自动更新" />
-            <Button Content="addprocess" FontSize="12" Padding="8,4" Click="InsertProcess_Click"
-                    ToolTipService.ToolTip="把进程名映射到 AppID：addprocess(&quot;游戏.exe&quot;)" />
-            <Button Content="forcedenuvo" FontSize="12" Padding="8,4" Click="InsertForceDenuvo_Click"
-                    ToolTipService.ToolTip="强制该游戏走 D 加密授权链路：forcedenuvo()" />
             <Button Content="注释/取消" FontSize="12" Padding="8,4" Click="ToggleComment_Click"
                     ToolTipService.ToolTip="给选中行加/去 &quot;-- &quot; 前缀" />
         </StackPanel>
@@ -39,13 +35,13 @@
                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}">
             <RichEditBox x:Name="Editor"
                          AcceptsReturn="True"
-                         TextWrapping="NoWrap"
+                         TextWrapping="Wrap"
                          IsSpellCheckEnabled="False"
                          IsTextPredictionEnabled="False"
                          FontFamily="Cascadia Mono, Consolas, Courier New"
                          FontSize="13"
                          BorderThickness="0"
-                         ScrollViewer.HorizontalScrollBarVisibility="Auto"
+                         ScrollViewer.HorizontalScrollBarVisibility="Disabled"
                          ScrollViewer.VerticalScrollBarVisibility="Auto" />
         </Border>
 
