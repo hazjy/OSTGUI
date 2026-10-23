@@ -27,7 +27,6 @@ public partial class LibraryViewModel : ObservableObject
     public IAsyncRelayCommand ToggleVersionCommand { get; }
     public IAsyncRelayCommand RepairVersionConfigCommand { get; }
     public IAsyncRelayCommand CopyAppIdCommand { get; }
-    public IRelayCommand EditLuaCommand { get; }
     public IAsyncRelayCommand DeleteItemCommand { get; }
     public IAsyncRelayCommand ViewOnSteamStoreCommand { get; }
     public IRelayCommand SelectAllCommand { get; }
@@ -177,7 +176,6 @@ public partial class LibraryViewModel : ObservableObject
         ToggleVersionCommand = new AsyncRelayCommand<LibraryItem?>(ToggleVersionAsync);
         RepairVersionConfigCommand = new AsyncRelayCommand<LibraryItem?>(RepairVersionConfigAsync);
         CopyAppIdCommand = new AsyncRelayCommand<LibraryItem?>(CopyAppIdAsync);
-        EditLuaCommand = new RelayCommand<LibraryItem?>(EditLua);
         DeleteItemCommand = new AsyncRelayCommand<LibraryItem?>(DeleteItemAsync);
         ViewOnSteamStoreCommand = new AsyncRelayCommand<LibraryItem?>(ViewOnSteamStoreAsync);
         SelectAllCommand = new RelayCommand(SelectAll);
@@ -437,38 +435,9 @@ item.DlcList = dlcInfo;
     }
 
     /// <summary>
-    /// 使用记事本编辑 Lua 配置
+    /// 「编辑 Lua」已搬到 LibraryPage：应用内编辑器需要 XamlRoot 才能弹 ContentDialog，
+    /// 而 ViewModel 层不碰 UI（原实现是 Process.Start("notepad.exe")，已删除）。
     /// </summary>
-    private void EditLua(LibraryItem? item = null)
-    {
-        item ??= LastRightClickedItem;
-        if (item == null) return;
-
-        var luaDir = _steamService.GetLuaConfigDir();
-        if (string.IsNullOrEmpty(luaDir)) return;
-
-        var filePath = Path.Combine(luaDir, item.FileName);
-        if (!File.Exists(filePath))
-        {
-            // 尝试 AppID.lua
-            filePath = Path.Combine(luaDir, $"{item.AppId}.lua");
-            if (!File.Exists(filePath))
-            {
-                return;
-            }
-        }
-
-        try
-        {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "notepad.exe",
-                Arguments = $"\"{filePath}\"",
-                UseShellExecute = true
-            });
-        }
-        catch { }
-    }
 
     /// <summary>
     /// 删除入库

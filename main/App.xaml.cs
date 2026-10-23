@@ -76,6 +76,9 @@ public partial class App : Application
             if (failure.Length == 0) failure = AchievementListCache.SelfCheck();
             if (failure.Length == 0) failure = ManifestLuaService.SelfCheck();
             if (failure.Length == 0) failure = UpdateService.SelfCheck();
+            if (failure.Length == 0) failure = LuaHighlighter.SelfCheck();
+            if (failure.Length == 0) failure = LuaTextCodec.SelfCheck();
+            if (failure.Length == 0) failure = EditorHistory.SelfCheck();
             LogService.Diag(failure.Length == 0 ? "自检通过" : $"自检失败：{failure}");
             Environment.Exit(failure.Length == 0 ? 0 : 1);
             return;

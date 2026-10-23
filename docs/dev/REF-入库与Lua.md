@@ -1,6 +1,6 @@
 # REF-入库与Lua（GUI 侧）
 
-> 只收 Lua 配置语义 / 搜索与入库链路 / Sudama 密钥缓存；分工与文档地图见工作区根 `README.md`。
+> 只收 Lua 配置语义 / 搜索与入库链路 / Sudama 密钥缓存 / 应用内 Lua 编辑器；分工与文档地图见工作区根 `README.md`。
 
 ## Lua 配置语义（内核查证）
 
@@ -43,3 +43,13 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
 - **缓存文件形状兼容两种**：本程序写的是 `{"Data":{…}}`，读侧也认原始明文 `{…}`（扫描只认"深度 ≤ 2 的键值对"，不关心套在哪一层）。
 - 隐藏调优参数 `DownloadTimeout`（config.json，默认 120，无 UI）：同时影响清单文件下载（max(60,·)）与 Sudama 缓存下载（max(120,·)）的超时。
 - 待做（A2）：冷缓存下载仍是"MemoryStream → 字典 → 再序列化 17.5MB 落盘"三次物化（只在首次 / 刷新时走），可改流式写 `.tmp` + `Move`；要动缓存文件形状且只能靠真实冷缓存验证，暂缓。
+
+## 应用内 Lua 编辑器（2026-10-24）
+
+- 入口：库页「编辑 Lua」→ `ContentDialog` 内嵌 `Views/LuaEditorView`（原来只是 `notepad.exe`，已删除）。
+- 控件与上色：`RichEditBox` + 自写词法 `Services/LuaHighlighter.cs`（注释 / 函数名 / 数字 / 字符串四色，深浅两套配色）；**不用第三方控件、不引 WebView2**。
+- 撤销：**关掉 `RichEditBox.UndoLimit`**，改 `Services/EditorHistory.cs` 的整段文本快照（逐 token 上色会污染原生撤销队列，Ctrl+Z 会先撤销看不见的格式变更）。
+- 换行：`Services/LuaTextCodec.cs` 是唯一转换点——模型一律 `\n`、编辑器用 `\r` 段分隔符、写盘还原文件原本风格（否则保存一次整篇换行就变了）；编码走既有原子写（UTF-8 无 BOM）。
+- 保存后由内核 `LuaFileWatcher` 热重载，**无需重启 Steam**；本文件不维护 `steamtools.lua`，`manifest.lua` 也不归它管（设置页生成、会被覆盖）。
+- 快速插入按钮的模板取自内核真实注册的函数（`ZSteamTool/src/Utils/Config/LuaConfig.cpp:513-526`）；`addappid` 第二参数内核忽略、密钥必须 64 位 hex。
+- 未做（降级）：行号槽（要同步 RichEditBox 内部 ScrollViewer，先不做）、查找替换、自动补全。

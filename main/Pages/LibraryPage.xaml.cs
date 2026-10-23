@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Text;
 using OSTGUI.Helpers;
 using OSTGUI.Models;
+using OSTGUI.Services;
 using OSTGUI.ViewModels;
 using Microsoft.Extensions.DependencyInjection;
 using WinRT;   // .As<T>()：AOT 下 XAML 侧资源的 CLR 硬转会抛 InvalidCastException（CsWinRT #2516）
@@ -141,9 +142,100 @@ public sealed partial class LibraryPage : Page
         }
     }
 
-    private void EditLua_Click(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// 「编辑 Lua」：打开应用内编辑器（替代原来的记事本）。
+    /// 保存走 LuaConfigService 的原子写；内核 LuaFileWatcher 会热重载，无需重启 Steam。
+    /// </summary>
+    private async void EditLua_Click(object sender, RoutedEventArgs e)
     {
-        VM.EditLuaCommand.Execute(null);
+        var item = VM.LastRightClickedItem;
+        if (item is null) return;
+
+        var luaService = App.Services.GetRequiredService<LuaConfigService>();
+        var editor = new Views.LuaEditorView(luaService, item.AppId, item.GameName);
+
+        var (loaded, loadMessage) = await editor.LoadAsync();
+        if (!loaded)
+        {
+            (App.MainWindow as MainWindow)?.Notify("无法编辑", loadMessage);
+            return;
+        }
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = this.XamlRoot,
+            Content = editor,
+            Title = "编辑 Lua",
+            PrimaryButtonText = "保存",
+            CloseButtonText = "关闭",
+            DefaultButton = ContentDialogButton.Primary,
+            MinWidth = 880,
+            MaxWidth = 880,
+        };
+
+        // 有未保存修改时关窗要二次确认（Primary=已保存、后面 forceClose=确认放弃，这两种直接放行）
+        bool forceClose = false;
+        dialog.Closing += async (_, args) =>
+        {
+            if (args.Result == ContentDialogResult.Primary) return;
+            if (forceClose || !editor.HasUnsavedChanges) return;
+            args.Cancel = true;
+
+            var confirm = new ContentDialog
+            {
+                XamlRoot = this.XamlRoot,
+                Title = "放弃修改？",
+                Content = "还有未保存的改动，关闭后不会写回文件。",
+                PrimaryButtonText = "放弃修改",
+                CloseButtonText = "继续编辑",
+                DefaultButton = ContentDialogButton.Close,
+            };
+            Helpers.PopupTheme.Apply(confirm);
+            if (await confirm.ShowAsync() == ContentDialogResult.Primary)
+            {
+                forceClose = true;
+                dialog.Hide();
+            }
+        };
+
+        // Ctrl+S：编辑器里按下的保存请求，走和「保存」按钮同一条路径
+        editor.SaveRequested += async (_, _) =>
+        {
+            var (ok, message) = await editor.SaveAsync();
+            if (!ok)
+            {
+                (App.MainWindow as MainWindow)?.Notify("保存失败", message);
+                return;
+            }
+            (App.MainWindow as MainWindow)?.Notify("已保存", $"{item.AppId}.lua 已写入，内核将自动热重载");
+            forceClose = true;
+            dialog.Hide();
+            await VM.LoadLibraryCommand.ExecuteAsync(null);
+        };
+
+        dialog.PrimaryButtonClick += async (_, args) =>
+        {
+            var deferral = args.GetDeferral();
+            try
+            {
+                var (ok, message) = await editor.SaveAsync();
+                if (!ok)
+                {
+                    args.Cancel = true;
+                    (App.MainWindow as MainWindow)?.Notify("保存失败", message);
+                    return;
+                }
+                (App.MainWindow as MainWindow)?.Notify("已保存", $"{item.AppId}.lua 已写入，内核将自动热重载");
+                await VM.LoadLibraryCommand.ExecuteAsync(null);
+            }
+            finally
+            {
+                deferral.Complete();
+            }
+        };
+
+        Helpers.PopupTheme.Apply(dialog);
+        await dialog.ShowAsync();
     }
 
     private void CopyAppId_Click(object sender, RoutedEventArgs e)
