@@ -229,7 +229,11 @@ public sealed partial class LuaEditorView : UserControl
 
     // ── 快速插入 ───────────────────────────────────────────────
 
-    /// <summary>在光标处插入模板；<paramref name="selectLength"/> 为 0 时把光标停在 <paramref name="caretOffset"/>。</summary>
+    /// <summary>
+    /// 插入模板；<paramref name="selectLength"/> 为 0 时把光标停在 <paramref name="caretOffset"/>。
+    /// 落点规则（用户要求）：光标所在行**有内容** → 插到该行**下面一行**；该行是**空行** → 就在这行开头插。
+    /// 效果是一行只放一个函数，而且永远不会把已有的行拆开。
+    /// </summary>
     private void InsertSnippet(string snippet, int caretOffset, int selectLength = 0)
     {
         var model = CurrentModel();
@@ -238,18 +242,26 @@ public sealed partial class LuaEditorView : UserControl
         int lineEnd = model.IndexOf('\n', caret);
         if (lineEnd < 0) lineEnd = model.Length;
 
-        // 一行只放一个函数：光标那一行前面有内容就先换行，后面还有内容就补一行
-        bool hasBefore = model.AsSpan(lineStart, caret - lineStart).Trim().Length > 0;
-        bool hasAfter = model.AsSpan(caret, lineEnd - caret).Trim().Length > 0;
-
-        var prefix = hasBefore ? "\r" : "";
-        var suffix = hasAfter ? "\r" : "";
+        bool lineHasContent = model.AsSpan(lineStart, lineEnd - lineStart).Trim().Length > 0;
 
         var selection = Editor.Document.Selection;
-        selection.Text = prefix + snippet + suffix;
+        int start;
+        if (lineHasContent)
+        {
+            // 在该行末尾插入「换行 + 模板」：新函数独占下一行，原行内容一个字都不动
+            selection.SetRange(lineEnd, lineEnd);
+            selection.Text = "\r" + snippet;
+            start = lineEnd + 1;
+        }
+        else
+        {
+            // 空行：直接用模板替换掉这一行的空白
+            selection.SetRange(lineStart, lineEnd);
+            selection.Text = snippet;
+            start = lineStart;
+        }
 
-        int insertStart = Math.Max(0, selection.StartPosition - (prefix.Length + snippet.Length + suffix.Length));
-        int at = Math.Clamp(insertStart + prefix.Length + caretOffset, 0, int.MaxValue);
+        int at = Math.Clamp(start + caretOffset, 0, int.MaxValue);
         Editor.Document.Selection.SetRange(at, at + Math.Max(0, selectLength));
 
         CommitEdit();
