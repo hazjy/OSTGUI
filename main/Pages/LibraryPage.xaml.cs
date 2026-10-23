@@ -182,7 +182,12 @@ public sealed partial class LibraryPage : Page
         dialog.IsPrimaryButtonEnabled = false;
         editor.DirtyStateChanged += (_, _) => dialog.IsPrimaryButtonEnabled = editor.HasUnsavedChanges;
 
-        // Ctrl+S：编辑器里按下的保存请求，走和「保存」按钮同一条路径（没改动就什么都不做）
+        // 保存成功只置标记；**列表刷新一定要等弹窗真正关掉之后再做**——
+        // 以前是在 PrimaryButtonClick 的 deferral 里 await 全量重扫（几十个条目 + 封面），
+        // 弹窗在这段时间被挡住不关，popup 拆掉时整窗会黑一帧（用户实测"点保存后界面黑一下"）。
+        bool saved = false;
+
+        // Ctrl+S：走同一条保存路径（没改动就什么都不做）
         editor.SaveRequested += async (_, _) =>
         {
             if (!editor.HasUnsavedChanges) return;
@@ -192,9 +197,9 @@ public sealed partial class LibraryPage : Page
                 (App.MainWindow as MainWindow)?.Notify("保存失败", message);
                 return;
             }
+            saved = true;
             (App.MainWindow as MainWindow)?.Notify("已保存", $"{item.AppId}.lua 已写入，内核将自动热重载");
             dialog.Hide();
-            await VM.LoadLibraryCommand.ExecuteAsync(null);
         };
 
         dialog.PrimaryButtonClick += async (_, args) =>
@@ -209,8 +214,8 @@ public sealed partial class LibraryPage : Page
                     (App.MainWindow as MainWindow)?.Notify("保存失败", message);
                     return;
                 }
+                saved = true;
                 (App.MainWindow as MainWindow)?.Notify("已保存", $"{item.AppId}.lua 已写入，内核将自动热重载");
-                await VM.LoadLibraryCommand.ExecuteAsync(null);
             }
             finally
             {
@@ -220,6 +225,9 @@ public sealed partial class LibraryPage : Page
 
         Helpers.PopupTheme.Apply(dialog);
         await dialog.ShowAsync();
+
+        // 关窗之后再刷新：此时遮罩已拆、界面已稳定，重扫不会再遮挡渲染
+        if (saved) await VM.LoadLibraryCommand.ExecuteAsync(null);
     }
 
     private void CopyAppId_Click(object sender, RoutedEventArgs e)
