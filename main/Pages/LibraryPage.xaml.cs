@@ -169,9 +169,14 @@ public sealed partial class LibraryPage : Page
             PrimaryButtonText = "保存",
             CloseButtonText = "关闭",
             DefaultButton = ContentDialogButton.Primary,
-            // ⚠️ 不要给 ContentDialog 设 MinWidth/MaxWidth：模板根（含遮罩层）会被一起夹窄，
-            // 弹窗被顶到窗口左边（MainWindow.xaml.cs 里 2026-10-02 就记过这条）。宽度由内容自己定。
         };
+
+        // ⚠️ 宽度只能这样给：ContentDialog 模板里的 BackgroundElement 用的是**主题资源**
+        // ContentDialogMinWidth/MaxWidth（默认 320/548），所以
+        //   · 给对话框自己设 MinWidth/MaxWidth 没用，还会把模板根（含遮罩）夹窄、弹窗被顶到左边；
+        //   · 正解是在对话框的 Resources 里覆盖这两个主题资源，内容再按需定 MinWidth。
+        dialog.Resources["ContentDialogMinWidth"] = 560.0;
+        dialog.Resources["ContentDialogMaxWidth"] = 1000.0;
 
         // 有未保存修改时关窗要二次确认（Primary=已保存、后面 forceClose=确认放弃，这两种直接放行）
         bool forceClose = false;

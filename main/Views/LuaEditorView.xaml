@@ -2,7 +2,7 @@
     x:Class="OSTGUI.Views.LuaEditorView"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    MinWidth="820" MinHeight="480" HorizontalAlignment="Center">
+    MinWidth="820" MinHeight="480">
 
     <!-- 应用内 Lua 编辑器：RichEditBox + 手写词法上色。
          ⚠️ AOT：本视图不用 {Binding}（源生成成员在 AOT 下绑定提供器看不到，见 REF-AOT适配 §1），
