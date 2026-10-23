@@ -39,7 +39,15 @@ public sealed partial class LuaEditorView : UserControl
     /// <summary>用户按 Ctrl+S 时抛给外层弹窗处理（外层负责保存成功后关闭）。</summary>
     public event EventHandler? SaveRequested;
 
-    public bool HasUnsavedChanges => CurrentModel() != _originalModel;
+    // 读文档失败时按"有改动"处理（宁可多拦一次，也不要让用户在关窗过程中撞异常卡死）
+    public bool HasUnsavedChanges
+    {
+        get
+        {
+            try { return CurrentModel() != _originalModel; }
+            catch { return true; }
+        }
+    }
 
     public LuaEditorView(LuaConfigService luaService, string appId, string? displayName)
     {
@@ -231,8 +239,8 @@ public sealed partial class LuaEditorView : UserControl
 
     // ── 快速插入 ───────────────────────────────────────────────
 
-    /// <summary>在光标处插入模板，并把某个占位符选中，方便直接改写。</summary>
-    private void InsertSnippet(string snippet, string placeholder)
+    /// <summary>在光标处插入模板；<paramref name="selectLength"/> 为 0 时把光标停在 <paramref name="caretOffset"/>。</summary>
+    private void InsertSnippet(string snippet, int caretOffset, int selectLength = 0)
     {
         var selection = Editor.Document.Selection;
         selection.Text = snippet;
@@ -240,27 +248,23 @@ public sealed partial class LuaEditorView : UserControl
         int insertStart = selection.StartPosition - snippet.Length;
         if (insertStart < 0) insertStart = 0;
 
-        int at = snippet.IndexOf(placeholder, StringComparison.Ordinal);
-        if (at >= 0)
-        {
-            // ITextRange 没有无参 Select()；设置选区要用 ITextDocument.Selection.SetRange
-            Editor.Document.Selection.SetRange(insertStart + at, insertStart + at + placeholder.Length);
-        }
+        int at = Math.Clamp(insertStart + caretOffset, 0, int.MaxValue);
+        Editor.Document.Selection.SetRange(at, at + Math.Max(0, selectLength));
 
         CommitEdit();
     }
 
     private void InsertAppId_Click(object sender, RoutedEventArgs e) =>
-        InsertSnippet($"addappid({_appId})", _appId);
+        InsertSnippet("addappid()", 9);                 // 光标停在括号里
 
     private void InsertDepotKey_Click(object sender, RoutedEventArgs e) =>
-        InsertSnippet("addappid(000000, 1, \"0000000000000000000000000000000000000000000000000000000000000000\")", "000000,");
+        InsertSnippet("addappid(0, 1, \"\")", 9, 1);    // 选中占位的 0
 
     private void InsertToken_Click(object sender, RoutedEventArgs e) =>
-        InsertSnippet($"addtoken({_appId}, \"\")", "\"\"");
+        InsertSnippet("addtoken()", 9);
 
     private void InsertManifestId_Click(object sender, RoutedEventArgs e) =>
-        InsertSnippet("setmanifestid(000000, \"0\", 0)", "000000,");
+        InsertSnippet("setmanifestid(0, \"\", 0)", 14, 1);
 
     /// <summary>给选中行（或光标所在行）批量加 / 去 <c>-- </c>。</summary>
     private void ToggleComment_Click(object sender, RoutedEventArgs e)
@@ -305,6 +309,12 @@ public sealed partial class LuaEditorView : UserControl
     }
 
     // ── 状态栏 ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// 关窗被拦下时的提示（两步确认：再点一次「关闭」才放弃）。
+    /// 不弹二级对话框——同一 XamlRoot 同时只能开一个 ContentDialog，嵌套会抛异常。
+    /// </summary>
+    public void ShowDiscardHint() => DirtyText.Text = "有未保存改动：再点一次「关闭」将放弃";
 
     private void UpdateStatus()
     {

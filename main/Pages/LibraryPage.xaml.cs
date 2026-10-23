@@ -178,29 +178,21 @@ public sealed partial class LibraryPage : Page
         dialog.Resources["ContentDialogMinWidth"] = 560.0;
         dialog.Resources["ContentDialogMaxWidth"] = 1000.0;
 
-        // 有未保存修改时关窗要二次确认（Primary=已保存、后面 forceClose=确认放弃，这两种直接放行）
+        // 有未保存修改时关窗要确认。**不能在这里再弹一个 ContentDialog**：
+        // 同一个 XamlRoot 同时只能开一个 ContentDialog，嵌套 ShowAsync 会抛异常，
+        // 而 Closing 里的 async void 异常没有出口 —— 表现就是"改过 lua 之后弹窗彻底关不掉"。
+        // 改成两步：第一次点「关闭」拦下并在编辑器状态栏提示，再点一次才真的放弃。
         bool forceClose = false;
-        dialog.Closing += async (_, args) =>
+        bool discardArmed = false;
+        dialog.Closing += (_, args) =>
         {
-            if (args.Result == ContentDialogResult.Primary) return;
+            if (args.Result == ContentDialogResult.Primary) return;   // 保存路径
             if (forceClose || !editor.HasUnsavedChanges) return;
-            args.Cancel = true;
+            if (discardArmed) return;                                  // 第二次点击：放行（放弃修改）
 
-            var confirm = new ContentDialog
-            {
-                XamlRoot = this.XamlRoot,
-                Title = "放弃修改？",
-                Content = "还有未保存的改动，关闭后不会写回文件。",
-                PrimaryButtonText = "放弃修改",
-                CloseButtonText = "继续编辑",
-                DefaultButton = ContentDialogButton.Close,
-            };
-            Helpers.PopupTheme.Apply(confirm);
-            if (await confirm.ShowAsync() == ContentDialogResult.Primary)
-            {
-                forceClose = true;
-                dialog.Hide();
-            }
+            args.Cancel = true;
+            discardArmed = true;
+            editor.ShowDiscardHint();
         };
 
         // Ctrl+S：编辑器里按下的保存请求，走和「保存」按钮同一条路径
