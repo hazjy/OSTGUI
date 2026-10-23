@@ -39,16 +39,6 @@ public sealed partial class LuaEditorView : UserControl
     /// <summary>用户按 Ctrl+S 时抛给外层弹窗处理（外层负责保存成功后关闭）。</summary>
     public event EventHandler? SaveRequested;
 
-    // 读文档失败时按"有改动"处理（宁可多拦一次，也不要让用户在关窗过程中撞异常卡死）
-    public bool HasUnsavedChanges
-    {
-        get
-        {
-            try { return CurrentModel() != _originalModel; }
-            catch { return true; }
-        }
-    }
-
     public LuaEditorView(LuaConfigService luaService, string appId, string? displayName)
     {
         InitializeComponent();
@@ -242,13 +232,24 @@ public sealed partial class LuaEditorView : UserControl
     /// <summary>在光标处插入模板；<paramref name="selectLength"/> 为 0 时把光标停在 <paramref name="caretOffset"/>。</summary>
     private void InsertSnippet(string snippet, int caretOffset, int selectLength = 0)
     {
+        var model = CurrentModel();
+        int caret = Math.Clamp(Editor.Document.Selection.StartPosition, 0, model.Length);
+        int lineStart = caret == 0 ? 0 : model.LastIndexOf('\n', caret - 1) + 1;
+        int lineEnd = model.IndexOf('\n', caret);
+        if (lineEnd < 0) lineEnd = model.Length;
+
+        // 一行只放一个函数：光标那一行前面有内容就先换行，后面还有内容就补一行
+        bool hasBefore = model.AsSpan(lineStart, caret - lineStart).Trim().Length > 0;
+        bool hasAfter = model.AsSpan(caret, lineEnd - caret).Trim().Length > 0;
+
+        var prefix = hasBefore ? "\r" : "";
+        var suffix = hasAfter ? "\r" : "";
+
         var selection = Editor.Document.Selection;
-        selection.Text = snippet;
+        selection.Text = prefix + snippet + suffix;
 
-        int insertStart = selection.StartPosition - snippet.Length;
-        if (insertStart < 0) insertStart = 0;
-
-        int at = Math.Clamp(insertStart + caretOffset, 0, int.MaxValue);
+        int insertStart = Math.Max(0, selection.StartPosition - (prefix.Length + snippet.Length + suffix.Length));
+        int at = Math.Clamp(insertStart + prefix.Length + caretOffset, 0, int.MaxValue);
         Editor.Document.Selection.SetRange(at, at + Math.Max(0, selectLength));
 
         CommitEdit();
@@ -311,10 +312,22 @@ public sealed partial class LuaEditorView : UserControl
     // ── 状态栏 ─────────────────────────────────────────────────
 
     /// <summary>
-    /// 关窗被拦下时的提示（两步确认：再点一次「关闭」才放弃）。
-    /// 不弹二级对话框——同一 XamlRoot 同时只能开一个 ContentDialog，嵌套会抛异常。
+    /// 是否与"打开那一刻/上次保存后"不同。由外层据此启用「保存」按钮（没改动时按钮是灰的）。
+    /// 读文档失败时按"有改动"处理，避免关窗/保存过程中撞异常卡死。
     /// </summary>
-    public void ShowDiscardHint() => DirtyText.Text = "有未保存改动：再点一次「关闭」将放弃";
+    public bool HasUnsavedChanges
+    {
+        get
+        {
+            try { return CurrentModel() != _originalModel; }
+            catch { return true; }
+        }
+    }
+
+    /// <summary>改动状态翻转时通知外层（启用/禁用保存按钮）。</summary>
+    public event EventHandler? DirtyStateChanged;
+
+    private bool _lastDirty;
 
     private void UpdateStatus()
     {
@@ -323,6 +336,13 @@ public sealed partial class LuaEditorView : UserControl
         var (line, column) = LuaTextCodec.LineColumn(model, offset);
 
         StatusText.Text = $"行 {line}，列 {column} · {model.Length} 字符";
-        DirtyText.Text = model == _originalModel ? "未修改" : "已修改";
+
+        bool dirty = model != _originalModel;
+        DirtyText.Text = dirty ? "已修改（未保存）" : "未修改";
+        if (dirty != _lastDirty)
+        {
+            _lastDirty = dirty;
+            DirtyStateChanged?.Invoke(this, EventArgs.Empty);
+        }
     }
 }

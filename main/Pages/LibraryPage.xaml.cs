@@ -178,26 +178,14 @@ public sealed partial class LibraryPage : Page
         dialog.Resources["ContentDialogMinWidth"] = 560.0;
         dialog.Resources["ContentDialogMaxWidth"] = 1000.0;
 
-        // 有未保存修改时关窗要确认。**不能在这里再弹一个 ContentDialog**：
-        // 同一个 XamlRoot 同时只能开一个 ContentDialog，嵌套 ShowAsync 会抛异常，
-        // 而 Closing 里的 async void 异常没有出口 —— 表现就是"改过 lua 之后弹窗彻底关不掉"。
-        // 改成两步：第一次点「关闭」拦下并在编辑器状态栏提示，再点一次才真的放弃。
-        bool forceClose = false;
-        bool discardArmed = false;
-        dialog.Closing += (_, args) =>
-        {
-            if (args.Result == ContentDialogResult.Primary) return;   // 保存路径
-            if (forceClose || !editor.HasUnsavedChanges) return;
-            if (discardArmed) return;                                  // 第二次点击：放行（放弃修改）
+        // 只有"内容与打开那一刻不同"时才让「保存」可点；「关闭」永远直接关掉、不写盘。
+        dialog.IsPrimaryButtonEnabled = false;
+        editor.DirtyStateChanged += (_, _) => dialog.IsPrimaryButtonEnabled = editor.HasUnsavedChanges;
 
-            args.Cancel = true;
-            discardArmed = true;
-            editor.ShowDiscardHint();
-        };
-
-        // Ctrl+S：编辑器里按下的保存请求，走和「保存」按钮同一条路径
+        // Ctrl+S：编辑器里按下的保存请求，走和「保存」按钮同一条路径（没改动就什么都不做）
         editor.SaveRequested += async (_, _) =>
         {
+            if (!editor.HasUnsavedChanges) return;
             var (ok, message) = await editor.SaveAsync();
             if (!ok)
             {
@@ -205,7 +193,6 @@ public sealed partial class LibraryPage : Page
                 return;
             }
             (App.MainWindow as MainWindow)?.Notify("已保存", $"{item.AppId}.lua 已写入，内核将自动热重载");
-            forceClose = true;
             dialog.Hide();
             await VM.LoadLibraryCommand.ExecuteAsync(null);
         };
