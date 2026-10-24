@@ -93,19 +93,11 @@ public partial class ManifestSource
     }
 
     /// <summary>
-    /// URL 模板是否具备"按 depot+gid 点播"的能力（不管 key 填没填）。
-    /// 密钥源（Sudama）没有这种端点，设置页也不给它「测活」按钮。
+    /// 这个源是不是"按 depot+gid 点播"的清单源。预置里显式写死：
+    /// MHub / Ryuu = true，Sudama（密钥源，只有全量文件下载）= false。
+    /// 级联下载按它筛，「测活」按钮与连通性也按它显示——不做模板字符串嗅探。
     /// </summary>
-    public bool SupportsPerDepotUrl =>
-        !string.IsNullOrEmpty(BaseUrl) &&
-        BaseUrl.Contains(PlaceholderDepotId) &&
-        BaseUrl.Contains(PlaceholderManifestId);
-
-    /// <summary>真正能参与级联：模板支持点播，且（需要 key 的源）已填 key。</summary>
-    public bool SupportsPerDepotFetch => SupportsPerDepotUrl && (!RequiresToken || !string.IsNullOrEmpty(ApiKey));
-
-    /// <summary>是否显示「测活」按钮与连通性文案（只有点播型源才有意义）。</summary>
-    public bool ShowProbe => SupportsPerDepotUrl;
+    public bool PerDepotFetch { get; set; }
 
     /// <summary>
     /// 是否显示"上次更新"时间。密钥永久的源（Ryuu 的 auth code）不必显示，否则只会误导。
@@ -131,7 +123,7 @@ public partial class ManifestSource
         {
             Id = "mhub", Name = "MHub", Description = "清单源",
             BaseUrl = "https://api.manifesthub2.filegear-sg.me/manifest?apikey={key}&depotid={depotid}&manifestid={manifestid}",
-            Type = ManifestSourceType.MHub, RequiresToken = true, Priority = 1
+            Type = ManifestSourceType.MHub, RequiresToken = true, Priority = 1, PerDepotFetch = true
         },
         new()
         {
@@ -145,9 +137,9 @@ public partial class ManifestSource
             // 点播腿：按 depot+gid 取单份清单（返回内层格式，实测 magic 0x71F617D0）。
             // 排在 MHub 之后当兜底：它有限额，MHub 能拿到就不该消耗额度。
             // key = 站点登录后的永久 auth code（也接受 X-Auth-Key 头，这里走查询参数）。
-            Id = "ryuu", Name = "Ryuu's Manifests", Description = "按 depot 点播（有每日限额）",
+            Id = "ryuu", Name = "Ryuu's Manifests", Description = "每 24 小时 50 次，从第一次请求起算",
             BaseUrl = "https://generator.ryuu.lol/api/manifest?depot_id={depotid}&manifest_id={manifestid}&auth_key={key}",
-            Type = ManifestSourceType.MHub, RequiresToken = true, Priority = 5,
+            Type = ManifestSourceType.MHub, RequiresToken = true, Priority = 5, PerDepotFetch = true,
             ShowKeyUpdatedAt = false,   // auth code 是固定的，不显示"上次更新"
         },
     };

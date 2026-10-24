@@ -254,9 +254,9 @@ public class ManifestDownloadService
             ct.ThrowIfCancellationRequested();
 
             var isRyuu = string.Equals(source.Id, "ryuu", StringComparison.OrdinalIgnoreCase);
-            if (isRyuu && !SourceQuota.CanUse(_configService.Config.RyuuQuotaUsed, _configService.Config.RyuuQuotaLimit))
+            if (isRyuu && _ryuuRejectedThisSession)
             {
-                Log($"清单源「{source.Name}」今日额度已用尽，改用下一个源：Depot {depotId}");
+                Log($"清单源「{source.Name}」本次运行已被拒绝过（密钥无效或额度用尽），跳过：Depot {depotId}");
                 continue;
             }
 
@@ -268,8 +268,7 @@ public class ManifestDownloadService
 
                 if (isRyuu)
                 {
-                    _ = TryReadLimit(response, out var limit);
-                    await RecordRyuuUsageAsync(limit, response.IsSuccessStatusCode, ct);
+                    await RecordRyuuUsageAsync(response.IsSuccessStatusCode, (int)response.StatusCode, ct);
                 }
 
                 if (!response.IsSuccessStatusCode)
@@ -322,11 +321,10 @@ public class ManifestDownloadService
     {
         if (!source.IsEnabled) return (false, "未启用");
         if (source.RequiresToken && string.IsNullOrEmpty(source.ApiKey)) return (false, "未填密钥");
-        if (!source.SupportsPerDepotFetch) return (false, "该源不支持按 depot 取清单");
+        if (!source.PerDepotFetch) return (false, "该源不支持按 depot 取清单");
 
         var isRyuu = string.Equals(source.Id, "ryuu", StringComparison.OrdinalIgnoreCase);
-        if (isRyuu && !SourceQuota.CanUse(_configService.Config.RyuuQuotaUsed, _configService.Config.RyuuQuotaLimit))
-            return (false, "今日额度已用尽");
+        if (isRyuu && _ryuuRejectedThisSession) return (false, "本次运行已被拒绝（密钥无效或额度用尽）");
 
         var tmp = Path.Combine(Path.GetTempPath(), "ostgui_probe_" + Guid.NewGuid().ToString("N") + ".manifest");
         try
@@ -337,8 +335,7 @@ public class ManifestDownloadService
 
             if (isRyuu)
             {
-                TryReadLimit(response, out var limit);
-                await RecordRyuuUsageAsync(limit, response.IsSuccessStatusCode, ct);
+                await RecordRyuuUsageAsync(response.IsSuccessStatusCode, (int)response.StatusCode, ct);
             }
 
             if (!response.IsSuccessStatusCode)
@@ -385,41 +382,36 @@ public class ManifestDownloadService
         }
 
         return all
-            .Where(s => s.IsEnabled && ManifestSource.IsImplementedSource(s.Id) && s.SupportsPerDepotFetch)
+            .Where(s => s.IsEnabled && ManifestSource.IsImplementedSource(s.Id) && s.PerDepotFetch)
             .OrderBy(s => s.Priority)
             .ToList();
     }
 
-    /// <summary>读 Ryuu 响应头里的额度上限（没有就返回 0，表示未知）。</summary>
-    private static bool TryReadLimit(HttpResponseMessage response, out int limit)
-    {
-        limit = 0;
-        if (!response.Headers.TryGetValues("x-ratelimit-limit", out var values)) return false;
-        var raw = values.FirstOrDefault();
-        return int.TryParse(raw, out limit) && limit > 0;
-    }
+    /// <summary>Ryuu 本次运行里被明确拒绝过（401/403/429）就不再打它，免得一个入库流程把额度全烧在失败请求上。</summary>
+    private bool _ryuuRejectedThisSession;
 
-    /// <summary>记一次 Ryuu 用量（按日计；上限有变化就一并写回）。额度写盘失败不影响下载。</summary>
-    private async Task RecordRyuuUsageAsync(int limit, bool success, CancellationToken ct)
+    /// <summary>
+    /// 记一次 Ryuu 用量。口径："每 24 小时 50 次，从第一次请求起算"（不是自然日），
+    /// 所以存窗口起点、只用 <see cref="SourceQuota"/> 推进；上限不落盘也不展示（服务器头与站点显示不符）。
+    /// 写盘失败不影响下载。
+    /// </summary>
+    private async Task RecordRyuuUsageAsync(bool success, int statusCode, CancellationToken ct)
     {
+        if (!success && statusCode is 401 or 403 or 429)
+            _ryuuRejectedThisSession = true;
+
         try
         {
             await _configService.UpdateAndSaveAsync(c =>
             {
-                var today = DateTime.Now.ToString("yyyy-MM-dd");
-                var (date, used) = SourceQuota.Normalize(today, c.RyuuQuotaDate, c.RyuuQuotaUsed);
-                c.RyuuQuotaDate = date;
+                var (start, used) = SourceQuota.Normalize(DateTime.Now, c.RyuuQuotaWindowStart, c.RyuuQuotaUsed);
+                c.RyuuQuotaWindowStart = start.ToString("o");
                 c.RyuuQuotaUsed = used + 1;
-                if (limit > 0) c.RyuuQuotaLimit = limit;
-                // 服务端明确拒绝（401/403/429）时把"今日已用"顶到上限，本会话不再重试这一家，
-                // 免得一个入库流程把剩余额度全打在失败请求上；上限本身不改（那是服务器的口径）。
-                if (!success && c.RyuuQuotaLimit > 0)
-                    c.RyuuQuotaUsed = Math.Max(c.RyuuQuotaUsed, c.RyuuQuotaLimit);
             });
         }
         catch (Exception ex)
         {
-            Log($"记录 Ryuu 额度失败（不影响本次下载）：{ex.Message}");
+            Log($"记录 Ryuu 用量失败（不影响本次下载）：{ex.Message}");
         }
     }
 

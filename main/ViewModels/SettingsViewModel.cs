@@ -499,15 +499,15 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 依据配置里的本地计数刷新有限额源（Ryuu）的额度文案。
-    /// 它没有额度查询端点，界面只能写"今日已用 N / 上限 M（服务器返回）"——见 Services/SourceQuota.cs。
+    /// 依据配置里的本地计数刷新有限额源（Ryuu）的用量文案。
+    /// 它没有额度查询端点，限额口径是"每 24 小时 50 次、从第一次请求起算"，所以只报"已使用：N 次"
+    ///（上限服务器头与站点显示不一致，不展示）——见 Services/SourceQuota.cs。
     /// </summary>
     public void RefreshQuotaText()
     {
         var c = _configService.Config;
-        var today = DateTime.Now.ToString("yyyy-MM-dd");
-        var (_, used) = SourceQuota.Normalize(today, c.RyuuQuotaDate, c.RyuuQuotaUsed);
-        var text = SourceQuota.Describe(used, c.RyuuQuotaLimit);
+        var (_, used) = SourceQuota.Normalize(DateTime.Now, c.RyuuQuotaWindowStart, c.RyuuQuotaUsed);
+        var text = SourceQuota.Describe(used);
 
         for (var i = 0; i < VisibleSources.Count; i++)
         {
@@ -648,10 +648,11 @@ public partial class SettingsViewModel : ObservableObject
                 }
                 else if (ManifestSource.IsImplementedSource(preset.Id))
                 {
-                    // 内置源的显示名/说明/顺序以代码为准（旧配置里存的是历史文案，如"Sudama 库"）
+                    // 内置源的显示名/说明/顺序/能力标记以代码为准（旧配置里存的是历史文案，如"Sudama 库"）
                     existing.Name = preset.Name;
                     existing.Description = preset.Description;
                     existing.Priority = preset.Priority;
+                    existing.PerDepotFetch = preset.PerDepotFetch;
                 }
             }
         }
