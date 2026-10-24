@@ -646,15 +646,19 @@ public partial class SettingsViewModel : ObservableObject
                 {
                     sources.Add(preset);
                 }
-                else if (ManifestSource.IsImplementedSource(preset.Id) &&
-                         (existing.Name != preset.Name || existing.Description != preset.Description))
+                else if (ManifestSource.IsImplementedSource(preset.Id))
                 {
-                    // 内置源的显示名/说明以代码为准（旧配置里存的是历史文案，如"Sudama 库"）
+                    // 内置源的显示名/说明/顺序以代码为准（旧配置里存的是历史文案，如"Sudama 库"）
                     existing.Name = preset.Name;
                     existing.Description = preset.Description;
+                    existing.Priority = preset.Priority;
                 }
             }
         }
+
+        // 列表顺序 = Priority（Sudama 0 在最上，其后 MHub 1、Ryuu 5）：
+        // 旧配置里存的是历史序，这里统一排一次，免得"加了新源却排在老源后面"看起来像没生效。
+        sources = sources.OrderBy(s => s.Priority).ToList();
 
         Sources.Clear();
         VisibleSources.Clear();

@@ -93,14 +93,19 @@ public partial class ManifestSource
     }
 
     /// <summary>
-    /// 该源能否按 depot+gid 点播（BaseUrl 同时含 {depotid} 与 {manifestid}，且需要 key 的源已填 key）。
-    /// 级联下载按这个筛：Sudama 只有密钥库端点，天然被排除。
+    /// URL 模板是否具备"按 depot+gid 点播"的能力（不管 key 填没填）。
+    /// 密钥源（Sudama）没有这种端点，设置页也不给它「测活」按钮。
     /// </summary>
-    public bool SupportsPerDepotFetch =>
+    public bool SupportsPerDepotUrl =>
         !string.IsNullOrEmpty(BaseUrl) &&
         BaseUrl.Contains(PlaceholderDepotId) &&
-        BaseUrl.Contains(PlaceholderManifestId) &&
-        (!RequiresToken || !string.IsNullOrEmpty(ApiKey));
+        BaseUrl.Contains(PlaceholderManifestId);
+
+    /// <summary>真正能参与级联：模板支持点播，且（需要 key 的源）已填 key。</summary>
+    public bool SupportsPerDepotFetch => SupportsPerDepotUrl && (!RequiresToken || !string.IsNullOrEmpty(ApiKey));
+
+    /// <summary>是否显示「测活」按钮与连通性文案（只有点播型源才有意义）。</summary>
+    public bool ShowProbe => SupportsPerDepotUrl;
 
     /// <summary>
     /// 是否显示"上次更新"时间。密钥永久的源（Ryuu 的 auth code）不必显示，否则只会误导。
@@ -130,9 +135,10 @@ public partial class ManifestSource
         },
         new()
         {
+            // 密钥源排在清单源之前显示（用户要求）：它不参与清单级联，Priority 只影响列表顺序
             Id = "sudama", Name = "Sudama", Description = "密钥源",
             BaseUrl = "https://api.993499094.xyz/depotkeys.json",
-            Type = ManifestSourceType.KeyOnly, Priority = 2
+            Type = ManifestSourceType.KeyOnly, Priority = 0
         },
         new()
         {

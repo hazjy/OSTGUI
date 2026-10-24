@@ -151,19 +151,24 @@
                                                         <TextBlock Text="{Binding Description}" FontSize="11" VerticalAlignment="Center"
                                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                                         <TextBlock Text="|" FontSize="12" VerticalAlignment="Center"
-                                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                                   Visibility="{Binding ShowProbe, Converter={StaticResource BoolToVis}}" />
                                                         <TextBlock Text="连通性：" FontSize="11" VerticalAlignment="Center"
-                                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                                   Visibility="{Binding ShowProbe, Converter={StaticResource BoolToVis}}" />
                                                         <TextBlock Text="{Binding ConnectivityText}" FontSize="11" VerticalAlignment="Center"
-                                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                                                   Visibility="{Binding ShowProbe, Converter={StaticResource BoolToVis}}" />
                                                     </StackPanel>
                                                     <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
                                                         <!-- 刻意 OneWay：模型由 Toggled 处理器单写（与请求码源一致） -->
                                                         <ToggleSwitch MinWidth="0" IsOn="{Binding IsEnabled, Mode=OneWay}"
                                                                       Toggled="OnManifestSourceToggled"
                                                                       ToolTipService.ToolTip="关闭后该源不参与清单下载级联" />
+                                                        <!-- 只有点播型源（有 {depotid}/{manifestid} 模板）才有测活的说法；密钥源没有 -->
                                                         <Button Content="测活" Tag="{Binding}"
                                                                 Click="OnManifestSourceTestClick" VerticalAlignment="Center"
+                                                                Visibility="{Binding ShowProbe, Converter={StaticResource BoolToVis}}"
                                                                 ToolTipService.ToolTip="用一组实测可用的 depot+gid 单独请求这家源；有限额的源（Ryuu）会消耗 1 次额度" />
                                                         <Button Content="刷新缓存" Click="RefreshSudamaCache_Click"
                                                                 Tag="{Binding}"
