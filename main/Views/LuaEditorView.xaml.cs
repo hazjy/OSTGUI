@@ -5,7 +5,6 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using OSTGUI.Services;
-using System.Text;
 using Windows.System;
 using Windows.UI;
 using Windows.UI.Core;
@@ -279,45 +278,20 @@ public sealed partial class LuaEditorView : UserControl
     private void InsertManifestId_Click(object sender, RoutedEventArgs e) =>
         InsertSnippet("setmanifestid(0, \"\", 0)", 14, 1);
 
-    /// <summary>给选中行（或光标所在行）批量加 / 去 <c>-- </c>。</summary>
+    /// <summary>
+    /// 给选中行（或光标所在行）批量加 / 去 <c>-- </c>。
+    /// 字符串处理全在 <see cref="LuaTextCodec.ToggleComment"/>（纯逻辑、挂自检），这里只管应用到控件。
+    /// </summary>
     private void ToggleComment_Click(object sender, RoutedEventArgs e)
     {
         var model = CurrentModel();
         var selection = Editor.Document.Selection;
 
-        int selStart = Math.Clamp(Math.Min(selection.StartPosition, selection.EndPosition), 0, model.Length);
-        int selEnd = Math.Clamp(Math.Max(selection.StartPosition, selection.EndPosition), 0, model.Length);
+        var result = LuaTextCodec.ToggleComment(model, selection.StartPosition, selection.EndPosition);
+        if (result.Text == model) return;
 
-        int lineStart = selStart == 0 ? 0 : model.LastIndexOf('\n', selStart - 1) + 1;
-        int lineEnd = model.IndexOf('\n', Math.Min(selEnd, model.Length));
-        if (lineEnd < 0) lineEnd = model.Length;
-
-        var block = model[lineStart..lineEnd];
-        var lines = block.Split('\n');
-
-        bool allCommented = lines.Where(l => l.Trim().Length > 0).All(l => l.TrimStart().StartsWith("--", StringComparison.Ordinal));
-
-        var sb = new StringBuilder();
-        for (int i = 0; i < lines.Length; i++)
-        {
-            if (i > 0) sb.Append('\n');
-            var line = lines[i];
-            if (allCommented)
-            {
-                int dash = line.IndexOf("--", StringComparison.Ordinal);
-                var stripped = line.Remove(dash, 2);
-                if (stripped.StartsWith(' ')) stripped = stripped[1..];
-                sb.Append(stripped);
-            }
-            else
-            {
-                sb.Append(line.Length == 0 ? line : "-- " + line);
-            }
-        }
-
-        var updated = model[..lineStart] + sb + model[lineEnd..];
-        ApplyModel(updated, resetHistory: false);
-        Editor.Document.Selection.SetRange(lineStart, lineStart);
+        ApplyModel(result.Text, resetHistory: false);
+        Editor.Document.Selection.SetRange(result.SelectionStart, result.SelectionEnd);
         CommitEdit();
     }
 
