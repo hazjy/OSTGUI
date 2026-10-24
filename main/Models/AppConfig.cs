@@ -94,6 +94,13 @@ public class AppConfig
     // === 完整清单源配置（内置 + 自定义，通用格式） ===
     public List<ManifestSource> ManifestSources { get; set; } = new();
 
+    // === 有限额源（Ryuu）的本地额度计数 ===
+    // 它没有额度查询端点（/api/usage、/api/quota 全 404），只在响应头给 x-ratelimit-limit；
+    // "已用多少"只能本地按日计。日期不同即归零（见 Services/SourceQuota.cs）。
+    public string RyuuQuotaDate { get; set; } = string.Empty;
+    public int RyuuQuotaUsed { get; set; }
+    public int RyuuQuotaLimit { get; set; }
+
     // === 内核请求码源（GUI 渲染成 <Steam>\config\lua\manifest.lua，内核运行时级联取码） ===
     // 与上面的 ManifestSources 不是一回事：那些是入库时下载 .manifest 用的，这份是内核每次
     // 被 Steam 要请求码时跑一遍的。全部关闭 = 生成短路版 manifest.lua（不注入任何码）。

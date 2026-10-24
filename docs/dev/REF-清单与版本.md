@@ -27,6 +27,7 @@
 - **从 CDN 直抓的清单是 zip 外层，不能直接投喂**：CDN 端点 `depot/<id>/manifest/<gid>/5/<code>` 返回 zip（magic `PK`），内含单条目 `z`，**解出的内层**才是 depotcache 要的格式——magic `d0 17 f6 71`（Steam 的 manifest magic `0x71F617D0`），现存 depotcache 里所有清单都是这个 magic。
 - 直接投入 zip 的后果：Steam 记一行 `WARNING! Deleted corrupt manifest file (parsing_failed)` 并删掉它，然后照旧去要请求码 → 看起来像"投喂完全没生效"。
 - MHub / Sudama 给的本来就是内层格式，故 GUI 投喂链路不受影响；只有自行走 CDN 抓取时才要解包（例：`2001761_5463549948452951231` zip 1,190,689 B → 内层 1,554,210 B）。
+- **多源级联 + 落盘前校验（2026-10-24）**：单份清单由 `ManifestDownloadService.DownloadOneManifestAsync` 按 `ManifestSource.Priority` 逐家尝试（当前 MHub → Ryuu），**每家下完先校验头 4 字节 `d0 17 f6 71`**，不是内层的（HTML 错误页 / zip 外壳）就丢掉换下一家；全部失败才算这份没拿到。入库与「清单按需投喂」共用这一条路径，所以两边行为天然一致。各源接入状态见 `SOURCES.md`（唯一权威）。
 
 ## 固定版本体系对应实现（GUI 侧事实）
 - `setManifestid` → `ManifestOverrides` → 内核 `BuildDepotDependency` 直接 patch depot 条目的 gid；同时双向拦截 `GetManifestRequestCode`（出站换 code / 入站伪造 OK），实测可回退旧版。

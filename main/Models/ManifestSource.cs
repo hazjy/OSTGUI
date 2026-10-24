@@ -53,7 +53,7 @@ public partial class ManifestSource
     /// </summary>
     public string ApiKeyUpdatedAtText { get; set; } = "";
 
-    public bool ShowApiKeyUpdatedAt => RequiresToken && !string.IsNullOrEmpty(ApiKeyUpdatedAtText);
+    public bool ShowApiKeyUpdatedAt => RequiresToken && ShowKeyUpdatedAt && !string.IsNullOrEmpty(ApiKeyUpdatedAtText);
 
     /// <summary>
     /// 获取该源 API Key / Token 的页面地址（无则返回 null）
@@ -61,6 +61,7 @@ public partial class ManifestSource
     public static string? GetTokenPageUrl(string sourceId) => sourceId switch
     {
         "mhub" => "https://manifesthub2.filegear-sg.me/",
+        "ryuu" => "https://generator.ryuu.lol/login",
         "github_auiowu" => "https://github.com/settings/tokens",
         _ => null
     };
@@ -70,7 +71,7 @@ public partial class ManifestSource
     /// </summary>
     public static bool IsImplementedSource(string sourceId) => sourceId switch
     {
-        "mhub" or "sudama" => true,
+        "mhub" or "sudama" or "ryuu" => true,
         _ => false
     };
 
@@ -92,6 +93,31 @@ public partial class ManifestSource
     }
 
     /// <summary>
+    /// 该源能否按 depot+gid 点播（BaseUrl 同时含 {depotid} 与 {manifestid}，且需要 key 的源已填 key）。
+    /// 级联下载按这个筛：Sudama 只有密钥库端点，天然被排除。
+    /// </summary>
+    public bool SupportsPerDepotFetch =>
+        !string.IsNullOrEmpty(BaseUrl) &&
+        BaseUrl.Contains(PlaceholderDepotId) &&
+        BaseUrl.Contains(PlaceholderManifestId) &&
+        (!RequiresToken || !string.IsNullOrEmpty(ApiKey));
+
+    /// <summary>
+    /// 是否显示"上次更新"时间。密钥永久的源（Ryuu 的 auth code）不必显示，否则只会误导。
+    /// </summary>
+    public bool ShowKeyUpdatedAt { get; set; } = true;
+
+    /// <summary>卡片上的额度文案（目前只有 Ryuu 用；空串则不显示）。</summary>
+    public string QuotaText { get; set; } = string.Empty;
+
+    /// <summary>是否显示额度行（只在有文案时显示）。</summary>
+    public bool ShowQuota => !string.IsNullOrEmpty(QuotaText);
+
+    /// <summary>「测活」结果文案（未测 / 测试中… / 是 / 否）。只显示，不落盘。</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string ConnectivityText { get; set; } = "未测";
+
+    /// <summary>
     /// 预置清单源列表
     /// </summary>
     public static List<ManifestSource> GetPresetSources() => new()
@@ -107,6 +133,16 @@ public partial class ManifestSource
             Id = "sudama", Name = "Sudama", Description = "密钥源",
             BaseUrl = "https://api.993499094.xyz/depotkeys.json",
             Type = ManifestSourceType.KeyOnly, Priority = 2
+        },
+        new()
+        {
+            // 点播腿：按 depot+gid 取单份清单（返回内层格式，实测 magic 0x71F617D0）。
+            // 排在 MHub 之后当兜底：它有限额，MHub 能拿到就不该消耗额度。
+            // key = 站点登录后的永久 auth code（也接受 X-Auth-Key 头，这里走查询参数）。
+            Id = "ryuu", Name = "Ryuu's Manifests", Description = "按 depot 点播（有每日限额）",
+            BaseUrl = "https://generator.ryuu.lol/api/manifest?depot_id={depotid}&manifest_id={manifestid}&auth_key={key}",
+            Type = ManifestSourceType.MHub, RequiresToken = true, Priority = 5,
+            ShowKeyUpdatedAt = false,   // auth code 是固定的，不显示"上次更新"
         },
     };
 }

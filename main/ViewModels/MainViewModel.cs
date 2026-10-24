@@ -1,6 +1,7 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Dispatching;
+using Microsoft.Extensions.DependencyInjection;
 using OSTGUI.Models;
 using OSTGUI.Services;
 
@@ -102,7 +103,7 @@ public partial class MainViewModel : ObservableObject
         DenuvoVM = new DenuvoViewModel(
             ticketService, luaService, ostFileService,
             steamGameInfoService, steamService);
-        SettingsVM = new SettingsViewModel(configService, steamService, _steamDllService, sudamaCache, manifestWatcher, manifestLuaService);
+        SettingsVM = new SettingsViewModel(configService, steamService, _steamDllService, sudamaCache, manifestWatcher, manifestLuaService, App.Services.GetRequiredService<ManifestDownloadService>());
         OnlineVM = new OnlineViewModel(
             onlineFixService, searchService, gameInfoService, configService,
             steamService, _steamDllService, luaService);

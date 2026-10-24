@@ -58,12 +58,9 @@ public class ManifestDownloadService
 
         try
         {
-            var mhubSource = GetSource("mhub");
-            var apiKey = !string.IsNullOrEmpty(mhubSource?.ApiKey)
-                ? mhubSource.ApiKey
-                : _configService.Config.ManifestHubApiKey;
-            if (string.IsNullOrEmpty(apiKey))
-                return new AddGameResult { Success = false, Message = "未配置 ManifestHub API Key" };
+            // 源可用性：不再只看 MHub 一家——任一"已启用 + 已填密钥"的点播源都算（见 GetPerDepotSources）
+            if (GetPerDepotSources().Count == 0)
+                return new AddGameResult { Success = false, Message = "未配置可用的清单源，请到设置页「清单源」填好密钥并启用" };
 
             // 1. 从 Steam 官方 API 获取 depot + manifest gid（不依赖 GitHub）
             Log("正在从 Steam API 获取 depot/manifest 信息…");
@@ -221,7 +218,13 @@ public class ManifestDownloadService
     /// <summary>
     /// 抓单份清单并落到 <paramref name="destDir"/>（流式 + `.part` + Move）。
     /// 入库的逐 depot 循环与「清单按需投喂」共用这一条路径。
-    /// 成功返回落盘文件路径；HTTP 非 2xx 或异常返回 null——失败细节（状态码 / 异常）在方法内写日志，
+    ///
+    /// 多源级联（2026-10-24 加）：按 <see cref="ManifestSource.Priority"/> 依次尝试所有
+    /// **已启用 + 已接入 + 能按 depot+gid 点播**的源（当前是 MHub、Ryuu），任一成功即返回。
+    /// 落地前必须校验内层清单 magic（<c>0x71F617D0</c>）——投喂 zip 外壳或错误页会被 Steam
+    /// 当损坏清单删掉，看起来像"投喂完全没生效"（见 REF-清单与版本.md）。
+    ///
+    /// 成功返回落盘文件路径；全部源都失败返回 null——失败细节（状态码 / 异常）在方法内写日志，
     /// 调用方只负责汇总，避免两个调用点各写一份措辞。
     /// 用户取消照原样透传：⚠️ HttpClient 的**超时也是 OCE**（TaskCanceledException），那种必须算
     /// "这份没拿到"而不是"整场取消"，否则一次超时会被判成已取消。
@@ -233,48 +236,212 @@ public class ManifestDownloadService
         string destDir,
         CancellationToken ct = default)
     {
-        var mhubSource = GetSource("mhub");
-        var apiKey = !string.IsNullOrEmpty(mhubSource?.ApiKey)
-            ? mhubSource.ApiKey
-            : _configService.Config.ManifestHubApiKey;
-        var url = !string.IsNullOrEmpty(mhubSource?.BaseUrl)
-            ? mhubSource!.BuildUrl(null, depotId, manifestGid)
-            : $"https://api.manifesthub2.filegear-sg.me/manifest?apikey={apiKey}&depotid={depotId}&manifestid={manifestGid}";
+        var sources = GetPerDepotSources();
+        if (sources.Count == 0)
+        {
+            Log($"没有可用的清单源（请检查设置页「清单源」是否已启用并填好密钥）：Depot {depotId}");
+            return null;
+        }
 
         var fileName = $"{depotId}_{manifestGid}.manifest";
         var filePath = Path.Combine(destDir, fileName);
         var partPath = filePath + ".part";
 
-        try
+        try { Directory.CreateDirectory(destDir); } catch { /* 落盘时再报 */ }
+
+        foreach (var source in sources)
         {
-            Directory.CreateDirectory(destDir);
-            var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
-            if (!response.IsSuccessStatusCode)
+            ct.ThrowIfCancellationRequested();
+
+            var isRyuu = string.Equals(source.Id, "ryuu", StringComparison.OrdinalIgnoreCase);
+            if (isRyuu && !SourceQuota.CanUse(_configService.Config.RyuuQuotaUsed, _configService.Config.RyuuQuotaLimit))
             {
-                var code = (int)response.StatusCode;
-                Log($"清单下载失败（HTTP {code}）：Depot {depotId} 的清单 {manifestGid}");
-                return null;
+                Log($"清单源「{source.Name}」今日额度已用尽，改用下一个源：Depot {depotId}");
+                continue;
             }
 
-            await using (var fs = File.Create(partPath))
+            // ⚠️ URL 里带密钥：任何日志都不要打完整 URL
+            var url = source.BuildUrl(null, depotId, manifestGid);
+            try
+            {
+                using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
+
+                if (isRyuu)
+                {
+                    _ = TryReadLimit(response, out var limit);
+                    await RecordRyuuUsageAsync(limit, response.IsSuccessStatusCode, ct);
+                }
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var code = (int)response.StatusCode;
+                    Log($"清单源「{source.Name}」下载失败（HTTP {code}）：Depot {depotId} 的清单 {manifestGid}"
+                        + (code is 401 or 403 ? "（密钥无效或未登录）" : code == 429 ? "（额度用尽）" : ""));
+                    continue;
+                }
+
+                await using (var fs = File.Create(partPath))
+                {
+                    await using var src = await response.Content.ReadAsStreamAsync(ct);
+                    await src.CopyToAsync(fs, ct);
+                }
+
+                // 内层清单 magic：d0 17 f6 71
+                if (!IsInnerManifest(partPath))
+                {
+                    TryDelete(partPath);
+                    Log($"清单源「{source.Name}」返回的不是内层清单（magic 不符），已丢弃：Depot {depotId} 的清单 {manifestGid}");
+                    continue;
+                }
+
+                File.Move(partPath, filePath, true);   // 原子落地：要么没有，要么完整
+                return filePath;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                TryDelete(partPath);
+                throw;
+            }
+            catch (Exception ex)
+            {
+                TryDelete(partPath);
+                Log($"清单源「{source.Name}」下载异常（Depot {depotId} 的清单 {manifestGid}）：{ex.Message}");
+                // 继续下一个源
+            }
+        }
+
+        Log($"所有清单源都没能拿到 Depot {depotId} 的清单 {manifestGid}");
+        return null;
+    }
+
+    /// <summary>
+    /// 设置页「测活」：只打**这一家**源，用实测可用的 depot+gid 拿一份清单，看状态码与 magic。
+    /// ⚠️ 对有限额的源（Ryuu）这算一次真实请求，会消耗 1 次额度——界面按钮的提示里要写明。
+    /// </summary>
+    public async Task<(bool ok, string text)> ProbeSourceAsync(ManifestSource source, CancellationToken ct = default)
+    {
+        if (!source.IsEnabled) return (false, "未启用");
+        if (source.RequiresToken && string.IsNullOrEmpty(source.ApiKey)) return (false, "未填密钥");
+        if (!source.SupportsPerDepotFetch) return (false, "该源不支持按 depot 取清单");
+
+        var isRyuu = string.Equals(source.Id, "ryuu", StringComparison.OrdinalIgnoreCase);
+        if (isRyuu && !SourceQuota.CanUse(_configService.Config.RyuuQuotaUsed, _configService.Config.RyuuQuotaLimit))
+            return (false, "今日额度已用尽");
+
+        var tmp = Path.Combine(Path.GetTempPath(), "ostgui_probe_" + Guid.NewGuid().ToString("N") + ".manifest");
+        try
+        {
+            using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(Math.Max(30, _configService.Config.DownloadTimeout)) };
+            using var response = await client.GetAsync(source.BuildUrl(null, ProbeDepotId, ProbeManifestGid),
+                HttpCompletionOption.ResponseHeadersRead, ct);
+
+            if (isRyuu)
+            {
+                TryReadLimit(response, out var limit);
+                await RecordRyuuUsageAsync(limit, response.IsSuccessStatusCode, ct);
+            }
+
+            if (!response.IsSuccessStatusCode)
+                return (false, $"否（HTTP {(int)response.StatusCode}）");
+
+            await using (var fs = File.Create(tmp))
             {
                 await using var src = await response.Content.ReadAsStreamAsync(ct);
                 await src.CopyToAsync(fs, ct);
             }
-            File.Move(partPath, filePath, true);   // 原子落地：要么没有，要么完整
-            return filePath;
+
+            return IsInnerManifest(tmp) ? (true, "是") : (false, "否（返回的不是内层清单）");
         }
         catch (OperationCanceledException) when (ct.IsCancellationRequested)
         {
-            try { if (File.Exists(partPath)) File.Delete(partPath); } catch { }
             throw;
         }
         catch (Exception ex)
         {
-            try { if (File.Exists(partPath)) File.Delete(partPath); } catch { }
-            Log($"清单下载异常（Depot {depotId} 的清单 {manifestGid}）：{ex.Message}");
-            return null;
+            return (false, $"否（{ex.Message}）");
         }
+        finally
+        {
+            TryDelete(tmp);
+        }
+    }
+
+    // 实测可用的探针配对：CS2(730) 的 depot 731 与其当前 gid（2026-10-24 Ryuu 实测 200、内层 magic 正确）
+    private const string ProbeDepotId = "731";
+    private const string ProbeManifestGid = "1914580569200573996";
+
+    /// <summary>取可点播的清单源，按优先级升序（MHub 在前、Ryuu 兜底）。</summary>
+    private List<ManifestSource> GetPerDepotSources()
+    {
+        var all = _configService.Config.ManifestSources;
+        if (all is null || all.Count == 0) return new List<ManifestSource>();
+
+        // 旧配置兜底：早先只有全局 ManifestHubApiKey 字段，没写进 mhub 源的 ApiKey
+        var mhub = all.FirstOrDefault(s => s.Id == "mhub");
+        if (mhub is not null && string.IsNullOrEmpty(mhub.ApiKey) &&
+            !string.IsNullOrEmpty(_configService.Config.ManifestHubApiKey))
+        {
+            mhub.ApiKey = _configService.Config.ManifestHubApiKey;
+        }
+
+        return all
+            .Where(s => s.IsEnabled && ManifestSource.IsImplementedSource(s.Id) && s.SupportsPerDepotFetch)
+            .OrderBy(s => s.Priority)
+            .ToList();
+    }
+
+    /// <summary>读 Ryuu 响应头里的额度上限（没有就返回 0，表示未知）。</summary>
+    private static bool TryReadLimit(HttpResponseMessage response, out int limit)
+    {
+        limit = 0;
+        if (!response.Headers.TryGetValues("x-ratelimit-limit", out var values)) return false;
+        var raw = values.FirstOrDefault();
+        return int.TryParse(raw, out limit) && limit > 0;
+    }
+
+    /// <summary>记一次 Ryuu 用量（按日计；上限有变化就一并写回）。额度写盘失败不影响下载。</summary>
+    private async Task RecordRyuuUsageAsync(int limit, bool success, CancellationToken ct)
+    {
+        try
+        {
+            await _configService.UpdateAndSaveAsync(c =>
+            {
+                var today = DateTime.Now.ToString("yyyy-MM-dd");
+                var (date, used) = SourceQuota.Normalize(today, c.RyuuQuotaDate, c.RyuuQuotaUsed);
+                c.RyuuQuotaDate = date;
+                c.RyuuQuotaUsed = used + 1;
+                if (limit > 0) c.RyuuQuotaLimit = limit;
+                // 服务端明确拒绝（401/403/429）时把"今日已用"顶到上限，本会话不再重试这一家，
+                // 免得一个入库流程把剩余额度全打在失败请求上；上限本身不改（那是服务器的口径）。
+                if (!success && c.RyuuQuotaLimit > 0)
+                    c.RyuuQuotaUsed = Math.Max(c.RyuuQuotaUsed, c.RyuuQuotaLimit);
+            });
+        }
+        catch (Exception ex)
+        {
+            Log($"记录 Ryuu 额度失败（不影响本次下载）：{ex.Message}");
+        }
+    }
+
+    /// <summary>文件头 4 字节是否为内层清单 magic（0x71F617D0，小端即 d0 17 f6 71）。</summary>
+    private static bool IsInnerManifest(string path)
+    {
+        try
+        {
+            using var fs = File.OpenRead(path);
+            Span<byte> head = stackalloc byte[4];
+            if (fs.Read(head) < 4) return false;
+            return head[0] == 0xD0 && head[1] == 0x17 && head[2] == 0xF6 && head[3] == 0x71;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static void TryDelete(string path)
+    {
+        try { if (File.Exists(path)) File.Delete(path); } catch { }
     }
 
     private ManifestSource? GetSource(string id)

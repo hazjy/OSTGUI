@@ -19,6 +19,7 @@ public partial class SettingsViewModel : ObservableObject
     private readonly SudamaKeyCache _sudamaCache;
     private readonly ManifestLogWatcher _manifestWatcher;
     private readonly ManifestLuaService _luaService;
+    private readonly ManifestDownloadService _manifestDownloads;
     private bool _isLoading;
 
     // 命令手写在 VM 上：Native AOT 下 CsWinRT 绑定提供器看不到源生成成员，XAML {Binding} 会失效
@@ -369,7 +370,7 @@ public partial class SettingsViewModel : ObservableObject
 
     public SettingsViewModel(ConfigService configService, SteamService steamService,
         SteamDllService steamDllService, SudamaKeyCache sudamaCache, ManifestLogWatcher manifestWatcher,
-        ManifestLuaService luaService)
+        ManifestLuaService luaService, ManifestDownloadService manifestDownloads)
     {
         _configService = configService;
         _steamService = steamService;
@@ -377,6 +378,7 @@ public partial class SettingsViewModel : ObservableObject
         _sudamaCache = sudamaCache;
         _manifestWatcher = manifestWatcher;
         _luaService = luaService;
+        _manifestDownloads = manifestDownloads;
 
         ApplyNavigationPaneWidthCommand = new RelayCommand(ApplyNavigationPaneWidth);
         RefreshSudamaCacheCommand = new AsyncRelayCommand(RefreshSudamaCache);
@@ -494,6 +496,48 @@ public partial class SettingsViewModel : ObservableObject
         SaveAllToConfig();
         LogService.Event($"清单源「{source.Name}」的 API Key / Token 已更新");
         return true;
+    }
+
+    /// <summary>
+    /// 依据配置里的本地计数刷新有限额源（Ryuu）的额度文案。
+    /// 它没有额度查询端点，界面只能写"今日已用 N / 上限 M（服务器返回）"——见 Services/SourceQuota.cs。
+    /// </summary>
+    public void RefreshQuotaText()
+    {
+        var c = _configService.Config;
+        var today = DateTime.Now.ToString("yyyy-MM-dd");
+        var (_, used) = SourceQuota.Normalize(today, c.RyuuQuotaDate, c.RyuuQuotaUsed);
+        var text = SourceQuota.Describe(used, c.RyuuQuotaLimit);
+
+        for (var i = 0; i < VisibleSources.Count; i++)
+        {
+            if (VisibleSources[i].Id == "ryuu")
+            {
+                VisibleSources[i].QuotaText = text;
+                VisibleSources[i] = VisibleSources[i];   // 整项替换触发该行重绑定
+            }
+        }
+    }
+
+    /// <summary>设置页「测活」：只打这一家源，结果写进该行文案（Ryuu 会消耗 1 次额度）。</summary>
+    public async Task TestManifestSourceAsync(ManifestSource source)
+    {
+        source.ConnectivityText = "测试中…";
+        RefreshManifestSourceItem(source);
+
+        var (ok, text) = await _manifestDownloads.ProbeSourceAsync(source);
+
+        source.ConnectivityText = text;
+        RefreshManifestSourceItem(source);
+        RefreshQuotaText();
+        LogService.Event($"清单源「{source.Name}」测活：{text}");
+    }
+
+    /// <summary>让绑定到这一项的控件重建一次（模型不带 INotifyPropertyChanged）。</summary>
+    private void RefreshManifestSourceItem(ManifestSource source)
+    {
+        var index = VisibleSources.IndexOf(source);
+        if (index >= 0) VisibleSources[index] = source;
     }
 
     /// <summary>

@@ -52,6 +52,7 @@ public sealed partial class SettingsPage : Page
             // 每次进入页面同步一次当前日志：仅在无新日志事件时，日志栏不依赖事件也有内容
             VM.LogsText = LogService.GetText();
             VM.RefreshSudamaCacheAge();
+            VM.RefreshQuotaText();
             VM.RefreshPaths();
             VM.RefreshDenuvoModeFromKernel();
             VM.RefreshManifestLuaStateQuiet();   // 只读回显 manifest.lua 状态，不写盘
@@ -207,6 +208,23 @@ public sealed partial class SettingsPage : Page
 
         source.IsEnabled = toggle.IsOn;
         VM.SaveAllToConfig();       // 内部同步 manifest.lua
+    }
+
+    /// <summary>清单源开关：写模型并落盘（级联下载按 IsEnabled 过滤）</summary>
+    private void OnManifestSourceToggled(object sender, RoutedEventArgs e)
+    {
+        if (sender is not ToggleSwitch { DataContext: ManifestSource source } toggle) return;
+        if (source.IsEnabled == toggle.IsOn) return;
+
+        source.IsEnabled = toggle.IsOn;
+        VM.SaveAllToConfig();
+    }
+
+    /// <summary>清单源「测活」：只打这一家源（有限额的源会消耗 1 次额度）</summary>
+    private void OnManifestSourceTestClick(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: ManifestSource source }) return;
+        _ = VM.TestManifestSourceAsync(source);
     }
 
     /// <summary>请求码源「测活」：拿一组实测可用的 depot+gid 去问这家源</summary>
