@@ -80,6 +80,7 @@ public partial class App : Application
             if (failure.Length == 0) failure = LuaTextCodec.SelfCheck();
             if (failure.Length == 0) failure = EditorHistory.SelfCheck();
             if (failure.Length == 0) failure = SourceQuota.SelfCheck();
+            if (failure.Length == 0) failure = BuildVersionPlanner.SelfCheck();
             LogService.Diag(failure.Length == 0 ? "自检通过" : $"自检失败：{failure}");
             Environment.Exit(failure.Length == 0 ? 0 : 1);
             return;
@@ -119,6 +120,7 @@ public partial class App : Application
         services.AddSingleton<LuaBuilder>();
         services.AddSingleton<ManifestFileService>();
         services.AddSingleton<ManifestDownloadService>();
+        services.AddSingleton<BuildCatalogService>();   // 版本切换器：读 appinfo 的分支/build 列表
         services.AddSingleton<ManifestLogWatcher>();
         services.AddSingleton<ManifestLuaService>();   // 生成 <Steam>\config\lua\manifest.lua（请求码源级联）
         services.AddSingleton<TicketService>();

@@ -34,3 +34,14 @@
 - 内核不写 `.acf` / depotcache，全部内存 hook；`pinApp` 已弃用。
 - 入库勾选"写入固定版本配置" = 预写**注释形式** `--setManifestid(...)`，默认仍是自动更新；库页切换锁定模式按文件实际内容判断（有未注释 `setManifestid` → 注释掉变 auto；无 → 需存在注释形式才取消注释）。
 - **覆盖检查**：auto→fixed 要求每个 depot 都有 `setManifestid` 覆盖，缺则拒绝并列出缺失项；「补齐版本配置」（`RepairVersionConfigAsync`）取全部 depot 的当前 GID 写进注释块（即始终锁到当前最新版）。
+
+## 版本切换器（GUI，2026-10-25）
+
+- **入口**：库页卡片上的双向箭头按钮（`&#xE8AB;`，替换原「切换版本模式」），点开是弹窗：顶部「保持最新版本」开关 + 下面按 build 列分支。
+- **可选 build 的数据源**：`api.steamcmd.net/v1/info/<appid>` —— `depots.branches.<名>` 给 buildid/时间，每个 depot 的 `manifests.<分支>` 给该分支的 gid（`SteamGameInfoService` 现在会把全部分支收进 `DepotInfo.ManifestsByBranch`，`Manifests` 仍只放 public）。Valve 会把旧版本留在分支上（实测 CS2 有 7 个旧 build、BG3 有 patch6/patch7），所以"能选的版本 = 分支列表"。结果按 appid 缓存 5 分钟（`BuildCatalogService`）。
+- **写入语义**（纯逻辑 `BuildVersionPlanner`，挂 `--trainer-selftest`）：
+  - 丢掉旧的**所有** `setManifestid` 行与块头，按所选 build 重发一次 → 天然幂等、换 build 不留残影；
+  - `保持最新` 开 → 行全部注释（块头"预写备用，未启用"）；关 → 行未注释（块头"已启用，锁定 build"）；
+  - 只对"该分支里有 gid"的 depot 写；缺的进 `MissingDepots`，弹窗黄字列出并**保持自动更新**。
+- **不做清单预下载**：下载时由内核 `manifest.lua` 的请求码级联负责（旧 gid 的码实测可取，见 `SOURCES.md` §MHub 旧清单实测）。因此切换动作只改 lua，不碰 `.acf`、不写 depotcache。
+- 当前锁定状态 = `ParseActiveGids(lua)` 里未注释的行；弹窗据此预置开关，并能把 gid 集合比对上某个分支做预选（对不上就提示"当前锁定值不属于任何分支"）。

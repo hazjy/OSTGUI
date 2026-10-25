@@ -108,13 +108,240 @@ public sealed partial class LibraryPage : Page
         _ = VM.SetViewModeAsync(ViewSegmented.SelectedIndex == 1 ? "grid" : "list");
     }
 
-    private async void ToggleVersion_Click(object sender, RoutedEventArgs e)
+    /// <summary>
+    /// 版本切换器：顶部「保持最新版本」开关，下面是可选 build 列表（appinfo 的 depots.branches）。
+    /// 只写 lua 的 setManifestid（不下载清单）——下载时由内核 manifest.lua 的请求码级联负责。
+    /// </summary>
+    private async void Version_Click(object sender, RoutedEventArgs e)
     {
-        if (sender is Button btn && btn.Tag is LibraryItem item)
+        if (sender is not Button { Tag: LibraryItem item }) return;
+        VM.LastRightClickedItem = item;
+
+        var luaService = App.Services.GetRequiredService<LuaConfigService>();
+        var catalogService = App.Services.GetRequiredService<BuildCatalogService>();
+
+        var content = await luaService.ReadLuaContentAsync(item.AppId);
+        if (content is null)
         {
-            VM.LastRightClickedItem = item;
-            await VM.ToggleVersionCommand.ExecuteAsync(item);
+            (App.MainWindow as MainWindow)?.Notify("无法读取配置", $"未找到 {item.AppId}.lua");
+            return;
         }
+
+        var luaDepots = LuaConfigService.ExtractDepotIds(content);
+        if (luaDepots.Count == 0)
+        {
+            (App.MainWindow as MainWindow)?.Notify("无法切换版本", "这个 lua 里没有可锁定的 depot");
+            return;
+        }
+
+        var activeGids = BuildVersionPlanner.ParseActiveGids(content);   // 有未注释行 = 已锁定
+
+        // ── 弹窗骨架 ────────────────────────────────────────────
+        var panel = new StackPanel { Spacing = 12, Width = 520 };
+
+        var keepLatest = new ToggleSwitch
+        {
+            Header = "保持最新版本",
+            IsOn = activeGids.Count == 0,
+            OnContent = "自动更新",
+            OffContent = "锁定版本",
+        };
+        panel.Children.Add(keepLatest);
+        panel.Children.Add(new TextBlock
+        {
+            Text = "开启时注释掉所有 setManifestid（跟随最新）；关闭时锁定到下面选中的 build。只改 lua，不下载清单。",
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray),
+        });
+
+        var status = new TextBlock { Text = "正在读取版本列表…", FontSize = 12, TextWrapping = TextWrapping.Wrap };
+        var listPanel = new StackPanel { Spacing = 2 };
+        var missingText = new TextBlock
+        {
+            FontSize = 12,
+            TextWrapping = TextWrapping.Wrap,
+            Visibility = Visibility.Collapsed,
+            Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Goldenrod),
+        };
+        var scroll = new ScrollViewer
+        {
+            MaxHeight = 320,
+            VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+            Content = listPanel,
+        };
+        panel.Children.Add(status);
+        panel.Children.Add(scroll);
+        panel.Children.Add(missingText);
+
+        var dialog = new ContentDialog
+        {
+            XamlRoot = this.XamlRoot,
+            Title = $"版本 · {item.GameName}",
+            Content = panel,
+            PrimaryButtonText = "应用",
+            CloseButtonText = "取消",
+            DefaultButton = ContentDialogButton.Primary,
+            IsPrimaryButtonEnabled = false,
+        };
+        // ⚠️ 宽度只能覆盖主题资源，不能设元素属性（见 doc/开发踩坑.md）
+        dialog.Resources["ContentDialogMinWidth"] = 560.0;
+        dialog.Resources["ContentDialogMaxWidth"] = 760.0;
+
+        BuildOption? selected = null;
+        var radioButtons = new List<RadioButton>();
+        var radioGroup = "ver-" + Guid.NewGuid().ToString("N")[..8];
+
+        void UpdateMissingHint(BuildOption? option)
+        {
+            if (option is null || option.Covered >= option.Total)
+            {
+                missingText.Visibility = Visibility.Collapsed;
+                return;
+            }
+            var lacking = luaDepots.Where(d => !option.Gids.ContainsKey(d)).OrderBy(d => d).ToList();
+            missingText.Text = $"⚠ {lacking.Count} 个 depot 在这个 build 里没有清单，将保持自动更新：{string.Join("、", lacking)}";
+            missingText.Visibility = Visibility.Visible;
+        }
+
+        keepLatest.Toggled += (_, _) =>
+        {
+            var listEnabled = !keepLatest.IsOn;
+            foreach (var rb in radioButtons) rb.IsEnabled = listEnabled;
+            dialog.IsPrimaryButtonEnabled = keepLatest.IsOn || selected is not null;
+            if (keepLatest.IsOn) missingText.Visibility = Visibility.Collapsed;
+            else UpdateMissingHint(selected);
+        };
+
+        dialog.Opened += async (_, _) =>
+        {
+            var catalog = await catalogService.GetAsync(item.AppId, luaDepots);
+            status.Text = catalog.Ok
+                ? "选择要锁定的 build："
+                : (catalog.Error.Length > 0 ? catalog.Error : "没有可选版本");
+
+            if (!catalog.Ok)
+            {
+                dialog.IsPrimaryButtonEnabled = keepLatest.IsOn;   // 至少还能"保持最新"
+                return;
+            }
+
+            // 预选：当前锁定值与某个分支的 gid 完全一致就选它
+            BuildOption? preSelected = null;
+            if (activeGids.Count > 0)
+            {
+                preSelected = catalog.Builds.FirstOrDefault(b =>
+                    b.Gids.Count == activeGids.Count &&
+                    b.Gids.All(kv => activeGids.TryGetValue(kv.Key, out var g) && g == kv.Value));
+            }
+
+            foreach (var option in catalog.Builds)
+            {
+                var title = new TextBlock
+                {
+                    Text = option.Title,
+                    FontSize = 14,
+                    FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                };
+                var sub = new TextBlock
+                {
+                    Text = option.SubTitle,
+                    FontSize = 11,
+                    Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray),
+                };
+                var rowContent = new StackPanel { Spacing = 2 };
+                rowContent.Children.Add(title);
+                rowContent.Children.Add(sub);
+
+                var rb = new RadioButton
+                {
+                    GroupName = radioGroup,
+                    Content = rowContent,
+                    IsEnabled = !keepLatest.IsOn,
+                    Tag = option,
+                };
+                rb.Checked += (s, _) =>
+                {
+                    if (s is not RadioButton { Tag: BuildOption opt }) return;
+                    selected = opt;
+                    dialog.IsPrimaryButtonEnabled = true;
+                    UpdateMissingHint(opt);
+                };
+
+                if (preSelected is not null && ReferenceEquals(option, preSelected))
+                {
+                    rb.IsChecked = true;
+                    selected = option;
+                    dialog.IsPrimaryButtonEnabled = true;
+                    UpdateMissingHint(option);
+                }
+
+                radioButtons.Add(rb);
+                listPanel.Children.Add(rb);
+            }
+
+            if (preSelected is null && activeGids.Count > 0)
+            {
+                listPanel.Children.Add(new TextBlock
+                {
+                    Text = "当前锁定值不属于任何分支（可能被手改过），重新选择后会被覆盖。",
+                    FontSize = 11,
+                    TextWrapping = TextWrapping.Wrap,
+                    Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray),
+                });
+            }
+        };
+
+        dialog.PrimaryButtonClick += async (_, args) =>
+        {
+            var deferral = args.GetDeferral();
+            try
+            {
+                if (keepLatest.IsOn)
+                {
+                    var (ok, message) = await luaService.KeepLatestAsync(item.AppId);
+                    if (!ok)
+                    {
+                        args.Cancel = true;
+                        (App.MainWindow as MainWindow)?.Notify("切换失败", message);
+                        return;
+                    }
+                    (App.MainWindow as MainWindow)?.Notify("已切回自动更新", message);
+                }
+                else
+                {
+                    if (selected is null)
+                    {
+                        args.Cancel = true;
+                        return;
+                    }
+                    var (ok, message, _) = await luaService.ApplyBuildAsync(item.AppId, selected.Gids);
+                    if (!ok)
+                    {
+                        args.Cancel = true;
+                        (App.MainWindow as MainWindow)?.Notify("锁定失败", message);
+                        return;
+                    }
+                    (App.MainWindow as MainWindow)?.Notify($"已锁定到 {selected.Title}", message);
+                }
+            }
+            finally
+            {
+                deferral.Complete();
+            }
+        };
+
+        Helpers.PopupTheme.Apply(dialog);
+        var result = await dialog.ShowAsync();
+        if (result == ContentDialogResult.Primary) await RefreshLibraryAfterDialogAsync();
+    }
+
+
+    /// <summary>弹窗关掉之后再刷新列表：避免把重扫塞进按钮 deferral 里导致黑一帧（同 Lua 编辑器那次）。</summary>
+    private async Task RefreshLibraryAfterDialogAsync()
+    {
+        if (VM.LoadLibraryCommand.CanExecute(null))
+            await VM.LoadLibraryCommand.ExecuteAsync(null);
     }
 
     /// <summary>更多菜单里的「删除」（红色）。菜单打开时 LastRightClickedItem 已由 More_Click 设好</summary>

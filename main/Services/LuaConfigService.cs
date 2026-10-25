@@ -134,6 +134,84 @@ public class LuaConfigService
     }
 
     /// <summary>
+    /// 解析 lua 里声明的 depot（排除主 AppID 与"DLC"段之后的行）。
+    /// 「补齐版本配置」与版本切换器共用这一份判定，避免两个入口算出不同的 depot 集合。
+    /// </summary>
+    public static HashSet<string> ExtractDepotIds(string content)
+    {
+        var result = new HashSet<string>();
+        var matches = AddAppIdRegex.Matches(content).Cast<Match>().ToList();
+        if (matches.Count == 0) return result;
+
+        var mainAppId = matches[0].Groups[1].Value;
+        var dlcCommentIndex = content.IndexOf("-- 所有 DLC", StringComparison.OrdinalIgnoreCase);
+        foreach (var m in matches)
+        {
+            var id = m.Groups[1].Value;
+            if (id != mainAppId && (dlcCommentIndex < 0 || m.Index < dlcCommentIndex))
+                result.Add(id);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// 切换版本：锁定到某个 build（<paramref name="gids"/> = depot→gid）。
+    /// 只写 lua、不下载清单——下载时由内核 manifest.lua 的请求码级联负责。
+    /// 返回该 build 里没有清单、因而保持自动更新的 depot。
+    /// </summary>
+    public async Task<(bool success, string message, IReadOnlyList<string> missing)> ApplyBuildAsync(
+        string appId, IReadOnlyDictionary<string, string> gids)
+    {
+        var luaDir = _steamService.GetLuaConfigDir();
+        if (string.IsNullOrEmpty(luaDir))
+            return (false, "未找到 Lua 配置目录。", Array.Empty<string>());
+
+        var filePath = Path.Combine(luaDir, $"{appId}.lua");
+        if (!File.Exists(filePath))
+            return (false, "Lua 配置文件不存在。", Array.Empty<string>());
+
+        var content = await File.ReadAllTextAsync(filePath);
+        var depots = ExtractDepotIds(content);
+        if (depots.Count == 0)
+            return (false, "这个 lua 里没有可锁定的 depot。", Array.Empty<string>());
+
+        var plan = BuildVersionPlanner.Plan(content, keepLatest: false, gids, depots);
+        if (plan.NewLua == content)
+            return (true, "该版本已经是当前配置。", plan.MissingDepots);
+
+        await WriteFileAtomicallyAsync(filePath, plan.NewLua);
+        var locked = depots.Count - plan.MissingDepots.Count;
+        var message = $"已锁定到该 build：{locked} 个 depot 写入 setManifestid"
+                    + (plan.MissingDepots.Count > 0
+                        ? $"；{plan.MissingDepots.Count} 个 depot 在这个 build 里没有清单，保持自动更新"
+                        : "");
+        return (true, message, plan.MissingDepots);
+    }
+
+    /// <summary>切回"保持最新版本"：把所有 setManifestid 注释掉（保留为备用值）。</summary>
+    public async Task<(bool success, string message)> KeepLatestAsync(string appId)
+    {
+        var luaDir = _steamService.GetLuaConfigDir();
+        if (string.IsNullOrEmpty(luaDir))
+            return (false, "未找到 Lua 配置目录。");
+
+        var filePath = Path.Combine(luaDir, $"{appId}.lua");
+        if (!File.Exists(filePath))
+            return (false, "Lua 配置文件不存在。");
+
+        var content = await File.ReadAllTextAsync(filePath);
+        var depots = ExtractDepotIds(content);
+        var plan = BuildVersionPlanner.Plan(content, keepLatest: true,
+            new Dictionary<string, string>(), depots);
+
+        if (plan.NewLua == content)
+            return (true, "已经是自动更新。");
+
+        await WriteFileAtomicallyAsync(filePath, plan.NewLua);
+        return (true, "已切回自动更新（setManifestid 已注释，保留为备用值）");
+    }
+
+    /// <summary>
     /// 写入 Lua 文件
     /// </summary>
     public async Task<(bool success, string message, string filePath)> WriteLuaFileAsync(string appId, string content)
