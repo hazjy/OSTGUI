@@ -157,11 +157,11 @@
 
                                 <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2"
                                             VerticalAlignment="Center">
-                                    <Button Click="Version_Click" Tag="{Binding}"
-                                            ToolTipService.ToolTip="版本（选择 build）"
+                                    <Button Click="ToggleVersion_Click" Tag="{Binding}"
+                                            ToolTipService.ToolTip="切换版本模式"
                                             Width="32" Height="32" MinWidth="0" Padding="0"
                                             Background="Transparent" BorderThickness="0">
-                                        <FontIcon Glyph="&#xE8AB;" FontSize="16" />
+                                        <FontIcon Glyph="&#xE895;" FontSize="16" />
                                     </Button>
                                     <Button Click="Info_Click" Tag="{Binding}"
                                             ToolTipService.ToolTip="信息"
@@ -256,11 +256,11 @@
 
                                 <!-- 操作按钮与列表卡片完全一致（同一批 Click 处理器与 MoreMenu） -->
                                 <StackPanel Orientation="Horizontal" Spacing="2" HorizontalAlignment="Center">
-                                    <Button Click="Version_Click" Tag="{Binding}"
-                                            ToolTipService.ToolTip="版本（选择 build）"
+                                    <Button Click="ToggleVersion_Click" Tag="{Binding}"
+                                            ToolTipService.ToolTip="切换版本模式"
                                             Width="32" Height="32" MinWidth="0" Padding="0"
                                             Background="Transparent" BorderThickness="0">
-                                        <FontIcon Glyph="&#xE8AB;" FontSize="16" />
+                                        <FontIcon Glyph="&#xE895;" FontSize="16" />
                                     </Button>
                                     <Button Click="Info_Click" Tag="{Binding}"
                                             ToolTipService.ToolTip="信息"

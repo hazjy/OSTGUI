@@ -131,25 +131,6 @@ public class SteamGameInfoService
                 if (appData.TryGetProperty("name", out var nameElem))
                     game.Name = nameElem.GetString() ?? "";
 
-                // 可选 build 列表（depots.branches.<名字> = { buildid, timeupdated, ... }）：
-                // 版本切换器用它列分支；Valve 会把旧版本留在分支上（如 CS2 的 1.40.8.8）
-                if (depotsObj.TryGetProperty("branches", out var branchesObj) &&
-                    branchesObj.ValueKind == JsonValueKind.Object)
-                {
-                    foreach (var b in branchesObj.EnumerateObject())
-                    {
-                        var br = new BuildBranch { Name = b.Name };
-                        if (b.Value.TryGetProperty("buildid", out var buildIdElem))
-                            br.BuildId = buildIdElem.GetString() ?? "";
-                        if (b.Value.TryGetProperty("timeupdated", out var updatedElem))
-                        {
-                            var unix = GetInt64Safe(updatedElem);
-                            if (unix > 0) br.UpdatedAt = DateTimeOffset.FromUnixTimeSeconds(unix);
-                        }
-                        game.Branches.Add(br);
-                    }
-                }
-
                 var depotCount = 0;
                 foreach (var prop in depotsObj.EnumerateObject())
                 {
@@ -163,26 +144,19 @@ public class SteamGameInfoService
                         depot.Name = depotName.GetString() ?? "";
 
                     if (depotData.TryGetProperty("manifests", out var manifestsObj) &&
-                        manifestsObj.ValueKind == JsonValueKind.Object)
+                        manifestsObj.TryGetProperty("public", out var publicManifest))
                     {
-                        // 按分支收全（版本切换器要的就是这份）；Manifests 仍只放 public，保持入库链路语义
-                        foreach (var m in manifestsObj.EnumerateObject())
+                        if (publicManifest.TryGetProperty("gid", out var gidElem))
                         {
-                            if (m.Value.ValueKind != JsonValueKind.Object) continue;
-                            if (!m.Value.TryGetProperty("gid", out var gidElem)) continue;
                             var gid = gidElem.GetString();
-                            if (!string.IsNullOrEmpty(gid)) depot.ManifestsByBranch[m.Name] = gid;
+                            if (gid != null)
+                                depot.Manifests.Add(gid);
                         }
-                        if (depot.ManifestsByBranch.TryGetValue("public", out var publicGid))
-                            depot.Manifests.Add(publicGid);
 
-                        if (manifestsObj.TryGetProperty("public", out var publicManifest))
-                        {
-                            if (publicManifest.TryGetProperty("download", out var downloadElem))
-                                depot.MaxSize = GetInt64Safe(downloadElem);
-                            else if (publicManifest.TryGetProperty("size", out var sizeElem))
-                                depot.MaxSize = GetInt64Safe(sizeElem);
-                        }
+                        if (publicManifest.TryGetProperty("download", out var downloadElem))
+                            depot.MaxSize = GetInt64Safe(downloadElem);
+                        else if (publicManifest.TryGetProperty("size", out var sizeElem))
+                            depot.MaxSize = GetInt64Safe(sizeElem);
                     }
 
                     if (depotData.TryGetProperty("dlcappid", out var dlcElem))
@@ -288,20 +262,16 @@ public class SteamGameInfoService
                     var depot = new DepotInfo { DepotId = depotId };
 
                     if (depotData.TryGetProperty("manifests", out var manifestsObj) &&
-                        manifestsObj.ValueKind == JsonValueKind.Object)
+                        manifestsObj.TryGetProperty("public", out var publicManifest))
                     {
-                        // 同主解析：按分支收全，Manifests 只放 public
-                        foreach (var m in manifestsObj.EnumerateObject())
+                        if (publicManifest.TryGetProperty("gid", out var gidElem))
                         {
-                            if (m.Value.ValueKind != JsonValueKind.Object) continue;
-                            if (!m.Value.TryGetProperty("gid", out var gidElem)) continue;
                             var gid = gidElem.GetString();
-                            if (!string.IsNullOrEmpty(gid)) depot.ManifestsByBranch[m.Name] = gid;
-                        }
-                        if (depot.ManifestsByBranch.TryGetValue("public", out var publicGid))
-                        {
-                            depot.Manifests.Add(publicGid);
-                            Log($"Depot {depotId}：Manifest GID = {publicGid}");
+                            if (gid != null)
+                            {
+                                depot.Manifests.Add(gid);
+                                Log($"Depot {depotId}：Manifest GID = {gid}");
+                            }
                         }
                     }
                     else
