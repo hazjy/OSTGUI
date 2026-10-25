@@ -48,7 +48,7 @@
 | `OstMemory` | 大缓冲用完手动压一次 LOH（治标：让已提交内存还回去；调用点都选在"用户刚干完一件事"） |
 | `UpdateService` / `VersionCompare` | 检查更新：读 GitHub Releases（**GUI 与内核两个仓库**并行，302 `Location` 主源 + API 备源，各 5 秒硬超时；合成一条通知、最多两个按钮；文案与去重在 `SelfCheck()` 里断言）/ 版本比较与 tag 解析（纯逻辑、零依赖，可单独验） |
 ## 5. 已知限制（仍然有效的）
-- MHub 只支持最新清单；「补齐版本配置」写入的是当前 GID
+- MHub **不是"仅最新"**：按 depot+gid 取，旧分支 gid 也能取到（2026-10-25 实测 CS2 `1.40.8.8`、BG3 `release_patch6_hf9` 均 200 + 内层 magic）；不存在的 gid → 404 `{"success":false,"error":"Manifest not found"}`。「补齐版本配置」写入的仍是当前 GID
 - 名称缓存 30 天 TTL，游戏改名后会显示旧名（机制：仅主游戏入缓存；库页 = 纯缓存读 + 后台静默补名；联机 / DLC 等显示名处实时查询不参与缓存）
 - DLC token 无按需查询渠道：生成 Lua 时会逐个查 Sudama 全量缓存并写入命中的 `addtoken`，dump 未收录的受限 DLC 没有补充途径
 - 480 联机一次只能跑一个（内核侧会话状态只有一份；宿主路线由 GUI 按 `OnlineHost` 进程数管理）

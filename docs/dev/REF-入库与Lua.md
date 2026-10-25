@@ -20,7 +20,7 @@ setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 
 ## 搜索与入库链路（GUI 侧实现事实）
 
 - **搜索统一走 `cc=us`**（AppID 详情、storesearch 主源、HTML 备源、关键词源均已统一）→ 成人内容不再被 cn 区过滤，名称搜索可直接命中；**能搜到 ≠ 能入库**（还需密钥存在）。
-- **清单源与密钥源分离**：MHub = 清单源（**仅最新版**），Sudama = 仅密钥源；`IsImplementedSource` 只认 `mhub` / `sudama`——各源（含内核侧请求码源）的接入与实测状态见 `SOURCES.md`（唯一权威）。
+- **清单源与密钥源分离**：MHub = 清单源（按 depot+gid，**旧分支 gid 也能取**，2026-10-25 实测）、Sudama = 仅密钥源、Ryuu = 清单点播源；`IsImplementedSource` 认 `mhub` / `sudama` / `ryuu`——各源（含内核侧请求码源）的接入与实测状态见 `SOURCES.md`（唯一权威）。
 - **GitHub(Auiowu) 源已废弃**：上游 `SteamAutoCracks/ManifestHub` 自 2025-07-24 停更，实测 CS2(730) / Palworld(1623730) / Deadlock(892970) / 黑神话(2358720) 四分支全 404，社区生态已迁到 MHub API（Hubcap / ManifestHub3 / SteaMidra 等都不再走 GitHub 分支）。
 - 随之清理：`DownloadFromGithubAsync`、`GetSourceApiKey` / `GetSourceBaseUrl`、`GitHub` / `GitHubSearch` 枚举值、`CustomGithubRepos` / `CustomZipUrls` / `CustomManifestSources` 字段、`AppConfig.GithubToken` 均已删除，另清掉 5 个从未接入的源预设。
 - 入库勾选「下载 Manifest」（默认开）：MHub → Sudama(仅密钥) 级联；不勾则跳过清单直接生成 Lua，由内核运行时兜底取清单（成功提示会注明兜底）。
