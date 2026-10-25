@@ -137,7 +137,7 @@ public partial class ManifestSource
             // 点播腿：按 depot+gid 取单份清单（返回内层格式，实测 magic 0x71F617D0）。
             // 排在 MHub 之后当兜底：它有限额，MHub 能拿到就不该消耗额度。
             // key = 站点登录后的永久 auth code（也接受 X-Auth-Key 头，这里走查询参数）。
-            Id = "ryuu", Name = "Ryuu's Manifests", Description = "每 24 小时 50 次，从第一次请求起算",
+            Id = "ryuu", Name = "Ryuu's Manifests", Description = "清单源|每 24 小时 50 次，从第一次请求起算",
             BaseUrl = "https://generator.ryuu.lol/api/manifest?depot_id={depotid}&manifest_id={manifestid}&auth_key={key}",
             Type = ManifestSourceType.MHub, RequiresToken = true, Priority = 5, PerDepotFetch = true,
             ShowKeyUpdatedAt = false,   // auth code 是固定的，不显示"上次更新"
