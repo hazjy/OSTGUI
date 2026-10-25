@@ -34,3 +34,4 @@
 - 内核不写 `.acf` / depotcache，全部内存 hook；`pinApp` 已弃用。
 - 入库勾选"写入固定版本配置" = 预写**注释形式** `--setManifestid(...)`，默认仍是自动更新；库页切换锁定模式按文件实际内容判断（有未注释 `setManifestid` → 注释掉变 auto；无 → 需存在注释形式才取消注释）。
 - **覆盖检查**：auto→fixed 要求每个 depot 都有 `setManifestid` 覆盖，缺则拒绝并列出缺失项；「补齐版本配置」（`RepairVersionConfigAsync`）取全部 depot 的当前 GID 写进注释块（即始终锁到当前最新版）。
+- **不做"版本切换器"（2026-10-25 决定，曾实现后回退）**：`depots.branches` 只能看到开发者**公开**的分支，而那些分支本来就是给玩家在 Steam「属性 → Betas」里切的，自己做等于重做官方 UI；只有 `public` 的游戏（艾尔登法环 / 黑神话 / 幻兽帕鲁）根本没有第二个版本可选。非拥有者即便锁了旧 gid，也要第三方源恰好收录该 gid 才有清单，且请求码链只有 `20770407` / `manifestdex` 对旧 gid 有效（`wudrm` / `steamrun` 实测 502）。结论：**回旧版走官方 Betas；要手动锁特定 gid 直接编辑 lua**，不为它做界面。
