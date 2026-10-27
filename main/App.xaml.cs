@@ -3,6 +3,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using OSTGUI.ViewModels;
 using OSTGUI.Services;
+using OSTGUI.Models;
 using NoSteamLauncher.Services;
 using System.Net.Http;
 using System.Text.Json;
@@ -80,6 +81,8 @@ public partial class App : Application
             if (failure.Length == 0) failure = LuaTextCodec.SelfCheck();
             if (failure.Length == 0) failure = EditorHistory.SelfCheck();
             if (failure.Length == 0) failure = SourceQuota.SelfCheck();
+            if (failure.Length == 0) failure = ManifestSource.SelfCheck();
+            if (failure.Length == 0) failure = ConfigService.SelfCheck();
             LogService.Diag(failure.Length == 0 ? "自检通过" : $"自检失败：{failure}");
             Environment.Exit(failure.Length == 0 ? 0 : 1);
             return;

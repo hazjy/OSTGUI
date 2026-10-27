@@ -79,6 +79,9 @@ public class ManifestDownloadService
                 return new AddGameResult { Success = false, Message = "Steam API 未返回任何 manifest 信息，无法下载清单" };
 
             Log($"找到 {manifestFiles.Count} 个清单文件，开始下载…");
+            // 把本次实际参与级联的源与顺序写进日志：源被漏掉（未勾选 / 能力标记不对 / 配置没同步）
+            // 过去完全看不出来，只能从"只有某一家的 404"倒推（2026-10-27 排查 Ryuu 404 时就是靠猜）。
+            Log($"清单源级联顺序：{string.Join(" → ", GetPerDepotSources().Select(s => s.Name))}");
 
             // 2. 下载每个 manifest
             Directory.CreateDirectory(tempDir);

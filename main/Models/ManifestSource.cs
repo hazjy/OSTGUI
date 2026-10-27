@@ -34,11 +34,6 @@ public partial class ManifestSource
     public int Priority { get; set; } = 100;
 
     /// <summary>
-    /// 是否为用户自定义源
-    /// </summary>
-    public bool IsCustom => Type == ManifestSourceType.Custom;
-
-    /// <summary>
     /// 该源是否需要手动刷新缓存的按钮（当前仅 Sudama 密钥库）
     /// </summary>
     public bool ShowRefreshCacheButton => Id == "sudama";
@@ -137,18 +132,57 @@ public partial class ManifestSource
             // 点播腿：按 depot+gid 取单份清单（返回内层格式，实测 magic 0x71F617D0）。
             // 排在 MHub 之后当兜底：它有限额，MHub 能拿到就不该消耗额度。
             // key = 站点登录后的永久 auth code（也接受 X-Auth-Key 头，这里走查询参数）。
+            // ⚠️ 只能用**路径式**端点 `/api/manifest/<depot>_<gid>.manifest`：查询式
+            // `/api/manifest?depot_id=&manifest_id=` 已下线，带不带 key 都恒回 404 `{"error":"Not Found"}`
+            // （2026-10-27 实测，连 10-24 记的那组可用配对 731/1914580569200573996 也 404）。
+            // 该腿不带 key 也能取（实测 200）；限流/额度口径未测试。
             Id = "ryuu", Name = "Ryuu's Manifests", Description = "清单源|每 24 小时 50 次，从第一次请求起算",
-            BaseUrl = "https://generator.ryuu.lol/api/manifest?depot_id={depotid}&manifest_id={manifestid}&auth_key={key}",
+            BaseUrl = "https://generator.ryuu.lol/api/manifest/{depotid}_{manifestid}.manifest?auth_key={key}",
             Type = ManifestSourceType.MHub, RequiresToken = true, Priority = 5, PerDepotFetch = true,
             ShowKeyUpdatedAt = false,   // auth code 是固定的，不显示"上次更新"
         },
     };
+
+    /// <summary>
+    /// 自检（挂 <c>OSTGUI.exe --trainer-selftest</c> 链）：内置源的接口地址是**死写在这里**的，
+    /// 站点一改端点就整条静默失效——2026-10-27 Ryuu 的查询式端点下线后，入库的每个 depot 都 404，
+    /// 界面上却只显示"下载失败"，看不出是接口形态变了。全通过返回空串。
+    /// </summary>
+    public static string SelfCheck()
+    {
+        foreach (var s in GetPresetSources())
+        {
+            // 预置表里的每一家都必须"已接入"：漏了就是界面看不见、级联不参与，且没有任何报错。
+            if (!IsImplementedSource(s.Id))
+                return $"预置源「{s.Name}」没有进 IsImplementedSource：界面不可见、清单级联也不参与";
+
+            if (string.IsNullOrWhiteSpace(s.BaseUrl)) return $"内置源「{s.Name}」没有接口地址";
+
+            var url = s.BuildUrl("APPID", "DEPOTID", "MANIFESTID");
+            var at = url.IndexOf('{');
+            if (at >= 0) return $"内置源「{s.Name}」的地址残留未替换的占位符：{url[at..]}";
+
+            if (s.PerDepotFetch &&
+                (!s.BaseUrl.Contains(PlaceholderDepotId) || !s.BaseUrl.Contains(PlaceholderManifestId)))
+                return $"点播源「{s.Name}」的地址缺少 {PlaceholderDepotId} / {PlaceholderManifestId} 占位符";
+
+            // 查询式 `/api/manifest?depot_id=&manifest_id=` 已下线（带不带 key 都恒 404 `Not Found`），
+            // 路径式 `/api/manifest/<depot>_<gid>.manifest` 才是可用的那条。改回查询式不会报错，
+            // 只会让每个 depot 静默 404，故在此拦下。
+            if (s.Id == "ryuu" && s.BaseUrl.Contains("depot_id="))
+                return "Ryuu 必须用路径式端点 /api/manifest/{depotid}_{manifestid}.manifest：查询式端点已于 2026-10-27 下线（恒 404）";
+        }
+        return string.Empty;
+    }
 }
 
+/// <summary>
+/// 清单源类型。只为阅读配置方便而保留：全项目没有任何分支读它，
+/// 能力判定走显式的 <see cref="ManifestSource.PerDepotFetch"/> 与 <see cref="ManifestSource.RequiresToken"/>。
+/// 自定义源 / opensteamtool 两代早已下线，枚举值不再保留（老配置里的 2/3 会被启动清理按 id 丢掉）。
+/// </summary>
 public enum ManifestSourceType
 {
     MHub,
-    KeyOnly,
-    OpenSteamTool,
-    Custom
+    KeyOnly
 }

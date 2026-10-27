@@ -608,12 +608,8 @@ public partial class SettingsViewModel : ObservableObject
     private void LoadSourcesFromConfig(AppConfig c)
     {
         var sources = c.ManifestSources;
-        if (sources != null)
-        {
-            // 清理已移除的内置源与自定义源（自定义源功能已下线）
-            // 只改内存，退出时统一落盘
-            sources.RemoveAll(s => s.Id == "opensteamtool" || s.IsCustom);
-        }
+        // 已下线 / 自定义源的残留条目不在这一步清理：ConfigService.MergeDefaults 每次启动就按
+        // 预置表清完了，这里再删一遍只会变成"打不打开设置页结果不同"的第二个真相。
 
         if (sources == null || sources.Count == 0)
         {
