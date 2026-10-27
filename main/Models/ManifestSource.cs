@@ -36,6 +36,7 @@ public partial class ManifestSource
     /// <summary>
     /// 该源是否需要手动刷新缓存的按钮（当前仅 Sudama 密钥库）
     /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
     public bool ShowRefreshCacheButton => Id == "sudama";
 
     /// <summary>
@@ -60,6 +61,7 @@ public partial class ManifestSource
         _ => "可选，留空则不使用"
     };
 
+    [System.Text.Json.Serialization.JsonIgnore]
     public bool ShowApiKeyUpdatedAt => RequiresToken && ShowKeyUpdatedAt && !string.IsNullOrEmpty(ApiKeyUpdatedAtText);
 
     /// <summary>
@@ -111,15 +113,34 @@ public partial class ManifestSource
     /// </summary>
     public bool ShowKeyUpdatedAt { get; set; } = true;
 
-    /// <summary>卡片上的额度文案（目前只有 Ryuu 用；空串则不显示）。</summary>
+    /// <summary>卡片上的额度文案（目前只有 Ryuu 用；空串则不显示）。打开设置页时按 RyuuQuota* 重算，不落盘。</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
     public string QuotaText { get; set; } = string.Empty;
 
-    /// <summary>是否显示额度行（只在有文案时显示）。</summary>
+    /// <summary>是否显示额度行（只在有文案时显示）。派生自 <see cref="QuotaText"/>。</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
     public bool ShowQuota => !string.IsNullOrEmpty(QuotaText);
 
     /// <summary>「测活」结果文案（未测 / 测试中… / 是 / 否）。只显示，不落盘。</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public string ConnectivityText { get; set; } = "未测";
+
+    /// <summary>
+    /// 把预置表里的**代码事实**覆盖到配置对象上（名称 / 说明 / 接口地址 / 顺序 / 能力标记）。
+    /// <c>Id</c> / <c>ApiKey</c> / <c>IsEnabled</c> 属于用户数据，不碰。
+    /// 只在 <c>ConfigService.MergeDefaults</c> 里调用——那是唯一的"以代码为准"入口。
+    /// </summary>
+    public void ApplyPreset(ManifestSource preset)
+    {
+        Name = preset.Name;
+        Description = preset.Description;
+        BaseUrl = preset.BaseUrl;
+        Priority = preset.Priority;
+        PerDepotFetch = preset.PerDepotFetch;
+        RequiresToken = preset.RequiresToken;
+        ShowKeyUpdatedAt = preset.ShowKeyUpdatedAt;
+        Type = preset.Type;
+    }
 
     /// <summary>
     /// 预置清单源列表

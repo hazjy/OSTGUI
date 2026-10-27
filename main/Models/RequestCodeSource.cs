@@ -34,7 +34,8 @@ public partial class RequestCodeSource
     /// <summary>响应体是 JSON（{"content":"&lt;码&gt;"}）而非裸十进制数字</summary>
     public bool JsonResponse { get; set; }
 
-    /// <summary>URL 模板用到了 {depotid}（为真时 fetch_manifest_code(gid) 那一路会跳过它）</summary>
+    /// <summary>URL 模板用到了 {depotid}（为真时 fetch_manifest_code(gid) 那一路会跳过它）。派生自模板，不落盘</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
     public bool NeedsDepotId => UrlTemplate.Contains(PlaceholderDepotId);
 
     /// <summary>是否参与级联（全关 = 生成短路版 manifest.lua，不注入任何码）</summary>
@@ -46,6 +47,20 @@ public partial class RequestCodeSource
     /// <summary>「测活」结果：是 / 否（未测时是「未测」，「测活」进行中是「测试中…」）。只显示，不落盘</summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public string ConnectivityText { get; set; } = "未测";
+
+    /// <summary>
+    /// 把预置表里的**代码事实**覆盖到配置对象上（名称 / 说明 / 接口地址 / UA / 响应形态 / 顺序）。
+    /// <c>Id</c> / <c>IsEnabled</c> 属于用户数据，不碰。只在 <c>ConfigService.MergeDefaults</c> 里调用。
+    /// </summary>
+    public void ApplyPreset(RequestCodeSource preset)
+    {
+        Name = preset.Name;
+        Description = preset.Description;
+        UrlTemplate = preset.UrlTemplate;
+        UserAgent = preset.UserAgent;
+        JsonResponse = preset.JsonResponse;
+        Priority = preset.Priority;
+    }
 
     /// <summary>
     /// 预置请求码源。顺序即级联顺序，2026-10-06 全部实测可拿 CDN 清单

@@ -634,22 +634,11 @@ public partial class SettingsViewModel : ObservableObject
         }
         else
         {
-            // 配置已存在：合并预置源，防止旧配置缺少新增的内置源
+            // 配置已存在：只补齐缺失的预置源。字段同步（名称/URL/顺序/能力标记）已在
+            // ConfigService.MergeDefaults 里做过——启动时一次，不在这里再来一遍。
             foreach (var preset in ManifestSource.GetPresetSources())
             {
-                var existing = sources.FirstOrDefault(s => s.Id == preset.Id);
-                if (existing == null)
-                {
-                    sources.Add(preset);
-                }
-                else if (ManifestSource.IsImplementedSource(preset.Id))
-                {
-                    // 内置源的显示名/说明/顺序/能力标记以代码为准（旧配置里存的是历史文案，如"Sudama 库"）
-                    existing.Name = preset.Name;
-                    existing.Description = preset.Description;
-                    existing.Priority = preset.Priority;
-                    existing.PerDepotFetch = preset.PerDepotFetch;
-                }
+                if (sources.All(s => s.Id != preset.Id)) sources.Add(preset);
             }
         }
 
@@ -673,26 +662,18 @@ public partial class SettingsViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 加载请求码源：合并预置表（新增的补进来、已下线的清掉），用户勾选保留。
-    /// URL / UA / 解析方式一律以代码里的预置表为准——上游端点会变，跟着版本走，用户只管开关。
+    /// 加载请求码源：补齐缺失的预置源，用户勾选保留。
+    /// URL / UA / 解析方式 / 顺序以代码里的预置表为准——同步已在 <c>ConfigService.MergeDefaults</c>
+    /// 启动时做过，这里不再重复；"已下线的 id 清掉"同理。
     /// </summary>
     private void LoadRequestCodeSources(AppConfig c)
     {
         var presets = RequestCodeSource.GetPresetSources();
         var sources = c.RequestCodeSources ?? new List<RequestCodeSource>();
 
-        sources.RemoveAll(s => presets.All(p => p.Id != s.Id));
         foreach (var preset in presets)
         {
-            var existing = sources.FirstOrDefault(s => s.Id == preset.Id);
-            if (existing == null) { sources.Add(preset); continue; }
-
-            existing.Name = preset.Name;
-            existing.Description = preset.Description;
-            existing.UrlTemplate = preset.UrlTemplate;
-            existing.UserAgent = preset.UserAgent;
-            existing.JsonResponse = preset.JsonResponse;
-            existing.Priority = preset.Priority;
+            if (sources.All(s => s.Id != preset.Id)) sources.Add(preset);
         }
         c.RequestCodeSources = sources;
 
