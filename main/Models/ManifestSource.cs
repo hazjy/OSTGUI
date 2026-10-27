@@ -48,6 +48,18 @@ public partial class ManifestSource
     /// </summary>
     public string ApiKeyUpdatedAtText { get; set; } = "";
 
+    /// <summary>
+    /// 「API Key / Token」输入框的占位说明。各家对密钥的依赖不同（MHub 没 key 就不能用，
+    /// Ryuu 的路径式点播没 key 也能取），别再共用一个含糊的"留空则不使用"。
+    /// </summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string ApiKeyPlaceholder => Id switch
+    {
+        "mhub" => "未配置密钥则不使用",
+        "ryuu" => "可选，无密钥也可使用",
+        _ => "可选，留空则不使用"
+    };
+
     public bool ShowApiKeyUpdatedAt => RequiresToken && ShowKeyUpdatedAt && !string.IsNullOrEmpty(ApiKeyUpdatedAtText);
 
     /// <summary>
