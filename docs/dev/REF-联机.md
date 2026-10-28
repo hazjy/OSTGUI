@@ -1,83 +1,44 @@
 # REF-联机（GUI 侧）
 
 > 只收三条联机路线（宿主会话 / 文件会话 / 命令行会话）、会话身份与 PEB 读取；分工与文档地图见工作区根 `README.md`。
-> 命名沿革（2026-10 改名，代码与界面已同步）：DLL 注入 → **宿主会话**；AppID Changer → **文件会话**；内核原生 → **命令行会话**。
+> 命名沿革（2026-10）：DLL 注入 → 宿主会话；AppID Changer → 文件会话；内核原生 → 命令行会话。
 
-- **与免 Steam 部署互斥**：GBE 换掉游戏目录的 `steam_api*.dll` 后游戏不再连真 Steam，三条路线（宿主会话 / 文件会话 / 命令行会话）全部失效——要联机先「一键还原」；部署后想在模拟器世界里联机需另找联机补丁，本项目不提供、由使用者自行下载。
+- **与免 Steam 部署互斥**：GBE 换掉游戏目录的 `steam_api*.dll` 后游戏不再连真 Steam，三条路线全部失效。要联机先「一键还原」；部署后想在模拟器世界里联机需自备联机补丁，本项目不提供。
+- **前提**：DLL 注入类工具只在客户端层伪造所有权，匹配由服务端按账号校验，假入库无法联机；通用解是在拥有许可的 AppID（480 Spacewar）下做"一致世界"。
+- **会话身份**：默认 480，`-onlinefix=<appid>` 可指定；内核侧的 8 处一致化清单见 `REF-内核-联机会话.md`。
 
-## 480 联机邀请失效：调研、直启实验与既定方向
+## 宿主会话（v4，当前路线）
 
-- **症状**：`-onlinefix` 下 Steam 正确显示在玩 480，但被好友邀请时游戏无反应、不进房（PEAK 实测；双方均为 OSTGUI 同版本）。
-- **根因分析**：内核把 `GetAppID` 响应从 480 还原成真实 AppId（为 DLC / 成就 / 自身校验），而网络侧好友状态、邀请、大厅全是 480 → 身份分裂；游戏做 `invite.gameID == GetAppID()` 类自检时邀请被静默丢弃。
-- **环境变量直启实验**：设 `SteamAppId/SteamGameId=480` 启动游戏 exe 可形成全一致世界。旧记录两条"硬伤"中，"叠加层必丢"已实测推翻——客户端只要看到进程以该身份初始化成功，就照常登记并注入叠加层；"带自检的游戏可能放弃联机"仍成立（`RestartAppIfNecessary` 或 Facepunch 式 `GetAppID()==硬编码` 校验在 480 身份下可能失败），改由"宿主先注册成同一 AppID"解决，即 v4 路线。
-- **既定方向（已实施）**：内核微补丁——保留 `GetAppID` 还原（自身自检通过），在 `SendCallbackToPipe` 加 `LobbyInvite_t` 分支把 `m_ulGameID` 从 480 改回真实 AppId。
-- **教训**：GreenLuma / SteamTools 类 DLL 注入只解决入库（客户端层伪造所有权），Valve 服务端按账号验证匹配请求——"假入库不能联机"是系统性死穴；能联机的通用解只有"在拥有许可的 AppID 下做匹配"，即 480 一致世界。
-- **会话身份可自定义**：内核支持 `-onlinefix=<appid>`，GUI 联机页已提供「默认身份（480）／自定义身份」开关；内核侧的 8 处一致化清单见 `REF-内核-联机会话.md`。
+- 起点：以 `SteamAppId` / `SteamGameId` = 480 直接启动游戏 exe 即可形成全一致世界，叠加层照常注入（推翻了早先"叠加层必丢"的判断）；带自检的游戏改用"宿主先注册成同一身份"解决。
+- 做法：宿主先设 `SteamAppId` / `SteamGameId` = `<身份>`，用游戏自带 `steam_api64.dll` 初始化 Steam，再把游戏作为子进程拉起；子进程继承环境变量后以同一身份初始化。全程不碰内核，游戏自身的 appid、大厅、P2P 证书、叠加层天然一致。实现：`OnlineHost/Program.cs` + `OnlineFixService.StartViaHost`。
+- 实测：进程日志两条 `AppID 480 adding PID …`；`GameOverlay: started 'gameoverlayui64.exe' … for game process`；内核侧抓到 `ClientMMSUserJoinedLobby` 与 `LobbyChatMsg`，走的是真大厅；PEAK 好友邀请进房成功。
+- 实现坑：现代 `steam_api64.dll` 只导出 `SteamAPI_InitFlat` / `SteamAPI_InitSafe` / `SteamInternal_SteamAPI_Init`，按 `SteamAPI_Init` 找会全部落空；回退链 InitFlat → InitSafe（部分垫片只导出后者）；`steam_appid.txt` 不再从 CWD 生效，要用环境变量或放在 exe 同目录。
+- 游戏 exe 解析：`libraryfolders.vdf` 找库 → `appmanifest_<appid>.acf` 的 `installdir` → 目录同名 exe，否则取目录里最大的 exe（排除 CrashHandler / vcredist / unins）。
+- 停止链：从宿主命令行取最后一个带引号的 `.exe`（第一个可能是宿主自身）→ 按进程名结束游戏 → 再结束宿主（给 3 秒收尾再强杀）。
+- 日志：`%LOCALAPPDATA%\OSTGUI\logs\onlinehost.log`，每次会话写会话头（身份 + 游戏 exe）、垫片路径、自注册结果。`SteamAPI_InitFlat` 已传 `SteamErrMsg` 缓冲区，失败打印结果码：0 = OK / 1 = FailedGeneric / 2 = NoSteamClient（Steam 未运行或未登录）/ 3 = VersionMismatch（垫片与客户端版本不匹配）。"联机点了没反应"先看这行。
 
-### 实证轮（v1/v2/v3，PEAK + 日志探针）
+## 文件会话（原 AppID Changer）
 
-- v1 只改 `LobbyInvite_t`：补丁生效但**邀请不走大厅通道**（零 `LobbyInvite:` 日志、零 MMS 流量，只来 2 条旧式 `InviteToGame(7005)`）→ LobbyInvite 假设不成立。
-- v2 加 Persona 好友改写：真凶不在好友表——改写块被 selfEntry 早退拦掉，且好友 480 状态常在启动游戏前已进客户端缓存，改写永无机会执行。
-- v3 定位真凶 = 内核提交 #40（叠加层身份还原）：`BuildSpawnEnvBlock` 把 `SteamOverlayGameId` 还原成真实 AppId → 叠加层与 480 大厅不匹配 → `ActivateGameOverlayInviteDialog` 降级成普通好友列表 → 邀请退化为 7005。
-- v3 修法 = 撤销叠加层还原（保留 OptedInMask 手柄还原）+ Persona 改写移到 selfEntry 早退之前；代价仅截图标签 / 社区链接显示 Spacewar。提交在内核分支 `fix/onlinefix-lobby-invite`（v1: 94a80b8，v3: 36708b9）。
+- 做法：`OnlineHost.exe --appid-txt "<游戏 exe>" <AppID>` 写 `<游戏 exe 同目录>\steam_appid.txt`，设 `SteamAppId` / `SteamGameId` / `SteamOverlayGameId`，自己先用游戏自带 shim 自注册一次，再以该目录为工作目录拉起游戏；退出后按台账还原。
+- CWD 等于 exe 目录，"文件放 CWD"与"放 exe 同目录"两种口径重合。
+- 关键结论：进程环境才是关键。只写文件、不设环境变量时，Steam 日志有 `AppID 480 adding PID …`、进程内三 DLL 齐全，但没有任何 `GameOverlay: started … for game process`，真机实测判为不生效。闭源工具的同类做法也是对副本灌整套 Steam 启动环境后由它拉游戏。
+- 还原：台账 `%LOCALAPPDATA%\OSTGUI\appid-changer.txt`（游戏目录 / 原本有无该文件 / 原内容，LF 分行、原内容原样不 Trim），先写台账再动文件；宿主被杀会留台账，GUI 启动时补还原（有台账且无 `OnlineHost` 在跑才动手）。
+- 本机自测覆盖：原本无文件则退出后删除；原内容逐字写回；杀宿主后文件为 480 且台账残留；原文件被独占锁则宿主退出码 5、不动文件、不启动游戏；带残留开 GUI 自动还原；子进程 PEB 直读环境变量与身份一致。
+- 未测：真机 480 进房（好友侧）；"启动器 → 另起的 exe"场景下的还原时机；残留文件长期不还原对"之后从 Steam 正常启动"的影响。
 
-## 宿主会话（原「DLL 注入」，v4，实测打通；取代上面几轮的内核思路）
+## 命令行会话（原内核原生）
 
-- 主张：宿主进程先设 `SteamAppId/SteamGameId=<会话身份>` 并用游戏自带的 `steam_api64.dll` 初始化 Steam，再把游戏作为**子进程**拉起——游戏继承环境变量后，它自己的 steam_api 也以同一身份初始化。
-- 实测证据（进程侧）：`logs\gameprocess_log.txt` 两条 `AppID 480 adding PID …`（宿主 `OnlineHost.exe` 与 `PEAK.exe` 各一条）；`logs\console_log.txt` 有 `GameOverlay: started 'gameoverlayui64.exe' … for game process 161412`。
-- 实测证据（叠加层注入）：PEAK 进程内 `gameoverlayrenderer64.dll` + `steamclient64.dll` 均在。
-- 实测证据（内核侧）：`Recv k_EMsgClientMMSUserJoinedLobby(6619)` 与 `LobbyChatMsg(6614)`——这条路走的是**真大厅**。
-- 进房结果：PEAK 好友邀请**由用户与好友实测成功进房**（对照内核原生路线测 PEAK：纯好友邀请能弹界面但进不去）。
-- **全程不碰内核**（不需要 `-onlinefix`）：游戏自身的 appid / 大厅 / P2P 证书 / 叠加层天然一致，没有身份分裂可补。实现：GUI 联机页「其他 → 宿主会话」（`OnlineHost/Program.cs` + `OnlineFixService.StartViaHost`）。
-- 实现坑①：现代 Valve `steam_api64.dll` 只导出 `SteamAPI_InitFlat` / `InitSafe` / `SteamInternal_SteamAPI_Init`，**没有 `SteamAPI_Init`**（PEAK 自带那份 1089 个导出可证），按老名字找会全部落空。
-- 实现坑②：`steam_appid.txt` 不再从 CWD 生效（报错原文 `No appID found…`），必须用环境变量或放在 exe 同目录。
-- **回退链 `SteamAPI_InitFlat` → `SteamAPI_InitSafe`**：部分游戏自带的垫片只导出 `InitSafe`（星露谷那份），只认 InitFlat 会白白跳过自注册；两个都没有的老垫片才打"跳过自注册"。
-- 游戏 exe 由 GUI 按 AppID 自动解析：`libraryfolders.vdf` 找库 → `appmanifest_<appid>.acf` 的 `installdir` → 目录同名 exe，否则取目录里最大的 exe（排除 CrashHandler / vcredist / unins）。
-- 停止链：先从宿主命令行里取**最后一个带引号的 `.exe`**（第一个可能是宿主自身）→ 按进程名结束游戏 → 再结束宿主（给宿主 3 秒自己收尾再强杀）。
-- **宿主日志 `%LOCALAPPDATA%\OSTGUI\logs\onlinehost.log`**（与 `ostgui.log` 同目录，设置页「打开日志文件」落在同一个文件夹）。
-- 日志内容：每次会话写会话头（身份 + 游戏 exe）→ 垫片路径 → 自注册结果；文件法另写写入 / 还原两行。
-- `SteamAPI_InitFlat` 已改传 `SteamErrMsg` 缓冲区，失败打印结果码 + 错误串：**0=OK / 1=FailedGeneric / 2=NoSteamClient（Steam 没跑或没登录）/ 3=VersionMismatch（垫片与客户端版本不匹配）**——"联机点了没反应"先看这行。
+- 启动：`steam.exe -applaunch <游戏 AppID> -onlinefix=<会话 AppID>`；其它 `-onlinefix*` 写法一律回落 480。前提 Steam 已启动并登录。
+- 检测与停止：扫命令行含 `-onlinefix` 的进程（排除 `steam.exe`），停止即 Kill。
+- 内核侧会话状态只有一份，同一时间只能有一个 480 会话，v1.1.3 起随游戏进程退出即清空。残留会污染入站 persona 改写，症状是好友显示成真实游戏名，日志 `Patched friend persona entries (480 -> 3527290)`。
 
-## 文件会话（原「AppID Changer」：环境变量 + steam_appid.txt）实测
+## 读进程环境（PEB 布局）
 
-- **做法**：宿主（`OnlineHost.exe --appid-txt "<游戏 exe>" <AppID>`）写 `<游戏 exe 同目录>\steam_appid.txt`，**并设 `SteamAppId`/`SteamGameId`/`SteamOverlayGameId`=会话 AppID、自己也先用游戏自带 shim 自注册一次**，然后**以该目录为工作目录**拉起游戏，退出后按台账还原；不碰内核。
-- CWD == exe 目录，故"文件放 CWD"与"放 exe 同目录"两种口径重合，不必赌 SDK 读哪个。
-- **⚠️ 原设计（只写文件、不设环境变量）已被实测推翻**：那条路 Steam 会给 `AppID 480 adding PID …PEAK.exe`、PEAK 进程内也齐了 `steam_api64/steamclient64/gameoverlayrenderer64`，但 `console_log.txt` 里**一条 `GameOverlay: started … for game process` 都没有**，用户真机实测判为"不生效"——**文件不是关键，进程环境才是**。
-- **对照物：闭源工具 `D:\入库工具\caiNG\CaIInstallNext gen1.05.exe`**：点「AppID Changer 联机」时再起一个自己的副本（父进程即它的 GUI，GUI 自身**没有**任何 Steam 变量），给副本灌上整套 Steam 启动环境，由副本注册并拉起游戏。
-- 游戏（PEAK PID 17228）继承到：`SteamAppId=480`、`SteamGameId=480`、**`SteamOverlayGameId=480`**、`SteamEnv=1`、`SteamAppUser=zjypl07`、`SteamVirtualGamepadInfo=<steam>\config\virtualgamepadinfo.txt`、`STEAM_COMPAT_MEDIA_PATH=<steam>\steamapps\shadercache\480/fozmediav1`（另加 `SteamGenericControllers` 与两条 `STEAM_COMPAT_*` / `STEAM_FOSSILIZE_*`）。
-- Steam 侧证据链：`Game process added : AppID 480 ""…CaIInstallNext gen1.05.exe"", ProcID 10964` →（写文件）→ `Game process updated … ProcID 17228`（PEAK）→ `GameOverlay: started 'gameoverlayui64.exe' … for game process 17228`（多条）→ 控制器配置与 `CAPIJobRequestUserStats` 走的是 480 的 schema。
-- 它目录里留着 `temp\SysCache_*\steam_api64.dll` → 先加载 shim 自注册，再拉游戏（与我们的路线 B 同构）。
-- **我们跟进的**：`SteamAppId`/`SteamGameId`/`SteamOverlayGameId` + 宿主自注册 + 文件；**没跟的**：`SteamEnv`/`SteamAppUser`/`SteamVirtualGamepadInfo`/`SteamGenericControllers`/`STEAM_COMPAT_*`（账号名、手柄信息、着色器缓存、设备清单，与联机无关；`SteamEnv` 语义不明）。闭源工具同样"先注册再拉游戏"，与本项目一致。
-- **还原机制**：台账 `%LOCALAPPDATA%\OSTGUI\appid-changer.txt`（游戏目录 / 原本有无该文件 / 原内容，LF 分行、原内容原样不 Trim）；宿主先写台账再动文件 → 中途被杀也能还原。
-- 宿主被杀会留台账，GUI 启动时补还原（有台账且没有 `OnlineHost` 在跑才动手）。
-- 六项本机自测（含 PEB 直读子进程环境块）见本文件 §归档：AppID Changer 本机自测（六项）。
-- **未测（留给好友实测）**：真机 480 联机进房；"启动器 → 另起的 exe"场景下的还原时机（代码已标 `ponytail:`）。
-- 未测之二：残留文件若长期不还原，对"之后从 Steam 正常启动"的实际影响（按最坏情况强制还原 + 启动巡检）。
+- PEB+0x20 → `RTL_USER_PROCESS_PARAMETERS`，+0x70 = CommandLine、+0x80 = Environment。
+- 环境块按 128KB 整块读再按 `\0` 拆（`EnvironmentSize` 位置随版本变）。
 
-## 命令行会话（原「内核原生」）实现事实
+## 历史：480 邀请失效的三轮内核尝试
 
-- 启动：`steam.exe -applaunch <游戏 AppID> -onlinefix=<会话 AppID>`；其它 `-onlinefix*` 写法一律回落 480（内核侧事实见 `REF-内核-联机会话.md`）。
-- 检测与停止：GUI 扫描**命令行含 `-onlinefix` 的进程**（排除 `steam.exe`），停止即 Kill 这些进程。
-- 命令行通过读 **PEB** 取得（x64 布局：PEB +0x20 → `RTL_USER_PROCESS_PARAMETERS`，+0x70 → CommandLine 的 `UNICODE_STRING`）；读进程环境另见本文件 §读进程环境（PEB 布局）。
-- 前提：Steam 已启动并登录（在线模式）。
-- 内核侧**会话状态只有一份**（`-onlinefix` 语义），故同一时间只能有一个 480 会话；**v1.1.3 起随游戏进程退出即清空**。
-- 残留会污染入站 persona 改写——症状：好友（如 PEAK）被显示成真实游戏名而不是 480，日志里能抓到 `Patched friend persona entries (480 -> 3527290)`。
-
-## 读进程环境（PEB 布局，实测事实）
-
-- 读进程环境：PEB+0x20 → `RTL_USER_PROCESS_PARAMETERS`，+0x70 = CommandLine、**+0x80 = Environment**。
-- 环境块按 128KB 整块读再按 `\0` 拆（`EnvironmentSize` 位置随版本变）；读命令行扫 `-onlinefix` 进程的用法见 §命令行会话。
-
-## 归档：480 联机实证轮（v1/v2/v3，PEAK + 日志探针）
-
-- 结论与提交见本文件 §实证轮（v1/v2/v3）。
-- 当时三份内核备份（`20260825-kernel-480fix` / `20260825-kernel-v2-friendpatch` / `20260826-kernel-v2-persona`）已删除；备份只为**省去重编**，需要时在 `ZSteamTool/内核备份/` 存一份、用不上即删（各版发布包在 `ZSteamTool/发布包/`）。
-
-## 归档：AppID Changer（文件会话）本机自测（六项）
-
-- ① 原本无该文件 → 退出后删除。
-- ② 原本是 `3527290`（7 字节、无换行）→ 逐字写回。
-- ③ 杀掉宿主 → 文件 480 + 台账残留、游戏照跑。
-- ④ 原文件被独占锁 → 宿主退出码 5、什么都不动、游戏不启动。
-- ⑤ 带残留开 GUI → 自动还原并清台账。
-- ⑥ 子进程确实继承到 `SteamAppId`/`SteamGameId`/`SteamOverlayGameId=480`（PEB 直读子进程环境块）。
+- v1 只改 `LobbyInvite_t`：补丁生效但邀请不走大厅通道（零 `LobbyInvite:` 日志，只有旧式 `InviteToGame(7005)`）。
+- v2 加 Persona 好友改写：被 selfEntry 早退拦掉，且好友的 480 状态常在启动游戏前已进客户端缓存。
+- v3 定位真凶：内核提交 #40 的叠加层身份还原（`BuildSpawnEnvBlock` 把 `SteamOverlayGameId` 还原成真实 AppId），叠加层与 480 大厅不匹配，`ActivateGameOverlayInviteDialog` 降级。修在内核分支 `fix/onlinefix-lobby-invite`；PEAK 好友邀请能弹界面但进不去，结论转向宿主会话。
