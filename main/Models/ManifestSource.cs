@@ -57,6 +57,7 @@ public partial class ManifestSource
     public string ApiKeyPlaceholder => Id switch
     {
         "mhub" => "未配置密钥则不使用",
+        "ryuu" => "整包下载需要，请填 auth code",
         _ => "可选，留空则不使用"
     };
 
@@ -69,6 +70,7 @@ public partial class ManifestSource
     public static string? GetTokenPageUrl(string sourceId) => sourceId switch
     {
         "mhub" => "https://manifesthub2.filegear-sg.me/",
+        "ryuu" => "https://generator.ryuu.lol/login",
         "github_auiowu" => "https://github.com/settings/tokens",
         _ => null
     };
@@ -78,7 +80,7 @@ public partial class ManifestSource
     /// </summary>
     public static bool IsImplementedSource(string sourceId) => sourceId switch
     {
-        "mhub" or "sudama" => true,
+        "mhub" or "sudama" or "ryuu" => true,
         _ => false
     };
 
@@ -107,6 +109,13 @@ public partial class ManifestSource
     public bool PerDepotFetch { get; set; }
 
     /// <summary>
+    /// 这个源是不是"按 appid 整包"给清单：一次拿 zip，内含 `&lt;appid&gt;.lua` 与
+    /// `&lt;depot&gt;_&lt;gid&gt;.manifest`。整包源不参与按 depot 的级联，只在点播源全失败后兜底。
+    /// URL 模板用 <see cref="PlaceholderAppId"/> 与 <see cref="PlaceholderKey"/>。
+    /// </summary>
+    public bool WholeAppFetch { get; set; }
+
+    /// <summary>
     /// 是否显示"上次更新"时间。密钥长期有效的源不必显示，否则只会误导。
     /// </summary>
     public bool ShowKeyUpdatedAt { get; set; } = true;
@@ -127,6 +136,7 @@ public partial class ManifestSource
         BaseUrl = preset.BaseUrl;
         Priority = preset.Priority;
         PerDepotFetch = preset.PerDepotFetch;
+        WholeAppFetch = preset.WholeAppFetch;
         RequiresToken = preset.RequiresToken;
         ShowKeyUpdatedAt = preset.ShowKeyUpdatedAt;
         Type = preset.Type;
@@ -150,10 +160,18 @@ public partial class ManifestSource
             BaseUrl = "https://api.993499094.xyz/depotkeys.json",
             Type = ManifestSourceType.KeyOnly, Priority = 0
         },
-        // Ryuu's Manifests 已于 2026-10-30 下架：站点把"按 depot+gid 点播"的接口整体移除，
-        // 只剩整包下载（/api/download/{appid}?file_type=lua|manifest，需要 auth code），
-        // 现在的点播请求一律回 404 {"error":"Manifest not found."}。接入整包腿的计划见
-        // doc/TODO/待办/261030-Ryuu整包腿接入.md。
+        new()
+        {
+            // 整包腿（2026-10-30 起站点唯一可用的清单接口）：GET /api/download/{appid}?file_type=manifest
+            // 返回 zip，内含 <appid>.lua 与 <depot>_<gid>.manifest；必须带 auth code。
+            // 点播腿 /api/manifest/<depot>_<gid>.manifest 已被站点移除（任何配对恒 404
+            // {"error":"Manifest not found."}），故 PerDepotFetch = false、不再参与按 depot 的级联。
+            Id = "ryuu", Name = "Ryuu's Manifests", Description = "清单源|整包，需 auth code",
+            BaseUrl = "https://generator.ryuu.lol/api/download/{appid}?file_type=manifest&auth_key={key}",
+            Type = ManifestSourceType.MHub, RequiresToken = true, Priority = 5,
+            PerDepotFetch = false, WholeAppFetch = true,
+            ShowKeyUpdatedAt = false,   // auth code 长期有效，不显示"上次更新"
+        },
     };
 
     /// <summary>
@@ -178,6 +196,9 @@ public partial class ManifestSource
             if (s.PerDepotFetch &&
                 (!s.BaseUrl.Contains(PlaceholderDepotId) || !s.BaseUrl.Contains(PlaceholderManifestId)))
                 return $"点播源「{s.Name}」的地址缺少 {PlaceholderDepotId} / {PlaceholderManifestId} 占位符";
+
+            if (s.WholeAppFetch && !s.BaseUrl.Contains(PlaceholderAppId))
+                return $"整包源「{s.Name}」的地址缺少 {PlaceholderAppId} 占位符";
         }
         return string.Empty;
     }

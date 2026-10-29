@@ -58,8 +58,8 @@ public class ManifestDownloadService
 
         try
         {
-            // 源可用性：不再只看 MHub 一家——任一"已启用 + 已填密钥"的点播源都算（见 GetPerDepotSources）
-            if (GetPerDepotSources().Count == 0)
+            // 源可用性：点播源（MHub）与整包源（Ryuu）任一存在即可；两家都没有才拒跑
+            if (GetPerDepotSources().Count == 0 && GetWholeAppSources().Count == 0)
                 return new AddGameResult { Success = false, Message = "未配置可用的清单源，请到设置页「清单源」填好密钥并启用" };
 
             // 1. 从 Steam 官方 API 获取 depot + manifest gid（不依赖 GitHub）
@@ -82,6 +82,8 @@ public class ManifestDownloadService
             // 把本次实际参与级联的源与顺序写进日志：源被漏掉（未勾选 / 能力标记不对 / 配置没同步）
             // 过去完全看不出来，只能从"只有某一家的 404"倒推（2026-10-27 排查 Ryuu 404 时就是靠猜）。
             Log($"清单源级联顺序：{string.Join(" → ", GetPerDepotSources().Select(s => s.Name))}");
+            if (GetWholeAppSources().Count > 0)
+                Log($"整包兜底源：{string.Join(" → ", GetWholeAppSources().Select(s => s.Name))}（点播源全失败时才用）");
 
             // 2. 下载每个 manifest
             Directory.CreateDirectory(tempDir);
@@ -105,6 +107,23 @@ public class ManifestDownloadService
                 }
                 downloaded.Add((depotId, manifestGid, new FileInfo(file).Length));
                 Log($"已下载 {Path.GetFileName(file)}");
+            }
+
+            // 点播源没拿全（或没有点播源）时退到整包源：一次下整个 app 的 zip，解出 <depot>_<gid>.manifest。
+            // ⚠️ 整包里的 gid 未必等于 Steam API 给的 gid（站点自己爬到的版本），落盘名与 Lua 必须用 zip 里的那个。
+            if (failedDepots.Count > 0 || downloaded.Count == 0)
+            {
+                var (whole, _) = await DownloadWholeAppAsync(dlClient, appId, tempDir, ct);
+                if (whole.Count > 0)
+                {
+                    var have = downloaded.Select(d => d.depotId).ToHashSet();
+                    foreach (var item in whole)
+                    {
+                        if (have.Contains(item.depotId)) continue;
+                        downloaded.Add(item);
+                        failedDepots.Remove(item.depotId);
+                    }
+                }
             }
 
             // 仅在实际内容 depot（appinfo 中有 manifest GID）的清单未下载（HTTP 失败/异常）时才警告；
@@ -367,6 +386,236 @@ public class ManifestDownloadService
             .Where(s => s.IsEnabled && ManifestSource.IsImplementedSource(s.Id) && s.PerDepotFetch)
             .OrderBy(s => s.Priority)
             .ToList();
+    }
+
+    /// <summary>整包源本次运行被明确拒绝过（401/403/429）就不再打它，免得把额度烧在必然失败的请求上。</summary>
+    private bool _wholeAppRejectedThisSession;
+
+    /// <summary>取整包源（按 appid 一次拿 zip 的那种），按优先级升序。</summary>
+    private List<ManifestSource> GetWholeAppSources()
+    {
+        var all = _configService.Config.ManifestSources;
+        if (all is null || all.Count == 0) return new List<ManifestSource>();
+
+        return all
+            .Where(s => s.IsEnabled && ManifestSource.IsImplementedSource(s.Id) && s.WholeAppFetch)
+            .OrderBy(s => s.Priority)
+            .ToList();
+    }
+
+    /// <summary>
+    /// 整包兜底：向整包源要这个 app 的 zip，解出全部 <c>&lt;depot&gt;_&lt;gid&gt;.manifest</c> 落到
+    /// <paramref name="destDir"/>，返回 (depotId, gid, size) 列表（已校验内层 magic）。
+    /// 日志记一行条目数与字节数；单源失败不影响下一个源。
+    /// </summary>
+    public async Task<(List<(string depotId, string manifestGid, long size)> got, string? failReason)> DownloadWholeAppAsync(
+        HttpClient client, string appId, string destDir, CancellationToken ct = default)
+    {
+        var sources = GetWholeAppSources();
+        if (sources.Count == 0) return (new(), null);
+
+        Directory.CreateDirectory(destDir);
+        foreach (var source in sources)
+        {
+            ct.ThrowIfCancellationRequested();
+            if (_wholeAppRejectedThisSession)
+            {
+                Log($"整包源「{source.Name}」本次运行已被拒绝过（密钥无效或额度用尽），跳过：AppID {appId}");
+                break;
+            }
+            var url = source.BuildUrl(appId);   // 替换 {appid} 与 {key}；日志里不打 URL（带密钥）
+            var zipPath = Path.Combine(Path.GetTempPath(), $"ostgui_whole_{appId}_{Guid.NewGuid():N}.zip");
+            try
+            {
+                long bytes;
+                using (var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct))
+                {
+                    if (!response.IsSuccessStatusCode)
+                    {
+                        var code = (int)response.StatusCode;
+                        if (code is 401 or 403 or 429) _wholeAppRejectedThisSession = true;
+                        Log($"整包源「{source.Name}」下载失败（HTTP {code}）"
+                            + (code is 401 or 403 ? "（密钥无效或未登录）" : code == 429 ? "（当日额度用尽）" : "")
+                            + $"：AppID {appId}");
+                        continue;
+                    }
+
+                    await using (var fs = File.Create(zipPath))
+                    await using (var src = await response.Content.ReadAsStreamAsync(ct))
+                        await src.CopyToAsync(fs, ct);
+                    bytes = new FileInfo(zipPath).Length;
+                }
+
+                var sw = System.Diagnostics.Stopwatch.StartNew();
+                var got = ExtractManifests(zipPath, destDir);
+                sw.Stop();
+                if (got.Count == 0)
+                {
+                    Log($"整包源「{source.Name}」的包里没有可用清单：AppID {appId}（{bytes / 1024} KB）");
+                    continue;
+                }
+
+                var entries = CountManifestEntries(zipPath);
+                Log($"整包源「{source.Name}」解出 {got.Count} 份清单：AppID {appId}，"
+                    + $"zip {bytes / 1024} KB / {entries} 条目 / 解包 {sw.ElapsedMilliseconds} ms");
+                return (got, null);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                Log($"整包源「{source.Name}」下载异常：AppID {appId}，{ex.Message}");
+            }
+            finally
+            {
+                TryDelete(zipPath);
+            }
+        }
+
+        Log($"所有整包源都没能拿到 AppID {appId} 的清单");
+        return (new(), "整包源都没能拿到清单");
+    }
+
+    /// <summary>
+    /// 把整包 zip 里的 <c>&lt;depot&gt;_&lt;gid&gt;.manifest</c> 解到 <paramref name="destDir"/>，逐份校验
+    /// 内层 magic；不符合的直接删掉。其余条目（<c>&lt;appid&gt;.lua</c>、目录项）忽略。
+    /// </summary>
+    internal static List<(string depotId, string manifestGid, long size)> ExtractManifests(string zipPath, string destDir)
+    {
+        var got = new List<(string, string, long)>();
+        using var zip = ZipFile.OpenRead(zipPath);
+        foreach (var entry in zip.Entries)
+        {
+            if (!TryParseManifestEntryName(entry.FullName, out var depotId, out var gid)) continue;
+
+            var target = Path.Combine(destDir, $"{depotId}_{gid}.manifest");
+            try
+            {
+                entry.ExtractToFile(target, true);
+            }
+            catch
+            {
+                continue;
+            }
+
+            if (!IsInnerManifest(target))
+            {
+                TryDelete(target);
+                continue;
+            }
+            got.Add((depotId, gid, new FileInfo(target).Length));
+        }
+        return got;
+    }
+
+    private static int CountManifestEntries(string zipPath)
+    {
+        try
+        {
+            using var zip = ZipFile.OpenRead(zipPath);
+            return zip.Entries.Count;
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
+    /// <summary>
+    /// 解析整包 zip 里的条目名：<c>&lt;depot&gt;_&lt;gid&gt;.manifest</c>（允许带目录前缀）。
+    /// 只认"两段全数字 + .manifest 结尾"，避免把 <c>730.lua</c>、<c>__MACOSX/…</c> 当清单。
+    /// </summary>
+    internal static bool TryParseManifestEntryName(string entryName, out string depotId, out string gid)
+    {
+        depotId = gid = string.Empty;
+        if (string.IsNullOrEmpty(entryName)) return false;
+
+        var name = entryName.Replace('\\', '/');
+        var parts = name.Split('/');
+        // 允许普通目录前缀（有的 zip 会套一层），但跳过 macOS 垃圾条目（__MACOSX/._xxx）
+        if (parts.Length > 1)
+        {
+            for (var i = 0; i < parts.Length - 1; i++)
+            {
+                if (parts[i].StartsWith("__", StringComparison.Ordinal) || parts[i].StartsWith('.')) return false;
+            }
+        }
+        name = parts[^1];
+        if (!name.EndsWith(".manifest", StringComparison.OrdinalIgnoreCase)) return false;
+        name = name[..^".manifest".Length];
+
+        var us = name.IndexOf('_');
+        if (us <= 0 || us == name.Length - 1) return false;
+        var maybeDepot = name[..us];
+        var maybeGid = name[(us + 1)..];
+        if (!maybeDepot.All(char.IsAsciiDigit) || !maybeGid.All(char.IsAsciiDigit)) return false;
+
+        depotId = maybeDepot;
+        gid = maybeGid;
+        return true;
+    }
+
+    /// <summary>
+    /// 自检（挂 <c>OSTGUI.exe --trainer-selftest</c> 链）：整包解包链路的纯逻辑——条目名解析 + zip 解包
+    /// + 内层 magic 过滤。真网络请求不在这里做（要 auth code），只在入库时跑。
+    /// </summary>
+    public static string SelfCheck()
+    {
+        // 条目名解析：认清单、拒其它
+        var accept = new (string name, string depot, string gid)[]
+        {
+            ("731_1914580569200573996.manifest", "731", "1914580569200573996"),
+            ("folder/731_1914580569200573996.manifest", "731", "1914580569200573996"),
+            ("folder\\731_1914580569200573996.MANIFEST", "731", "1914580569200573996"),
+        };
+        foreach (var (name, depot, gid) in accept)
+        {
+            if (!TryParseManifestEntryName(name, out var d, out var g) || d != depot || g != gid)
+                return $"整包自检：条目名「{name}」应被接受并解析为 {depot}/{gid}";
+        }
+
+        foreach (var name in new[] { "730.lua", "__MACOSX/731_1.manifest", "731.manifest", "_1.manifest", "731_.manifest", "a_1.manifest", "731_1.manifest.bak" })
+        {
+            if (TryParseManifestEntryName(name, out _, out _))
+                return $"整包自检：条目名「{name}」应被拒绝";
+        }
+
+        // 解包：合法清单留下、magic 不符的删掉、lua 忽略
+        var tmpDir = Path.Combine(Path.GetTempPath(), "ostgui_wholecheck_" + Guid.NewGuid().ToString("N"));
+        var zipPath = tmpDir + ".zip";
+        try
+        {
+            Directory.CreateDirectory(tmpDir);
+            using (var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create))
+            {
+                WriteEntry(zip, "730.lua", "addappid(730,0,\"x\")"u8.ToArray());
+                WriteEntry(zip, "731_1914580569200573996.manifest", [0xD0, 0x17, 0xF6, 0x71, 1, 2, 3, 4]);
+                WriteEntry(zip, "732_1.manifest", "<html>error</html>"u8.ToArray());
+            }
+
+            var got = ExtractManifests(zipPath, tmpDir);
+            if (got.Count != 1) return $"整包自检：应从 3 个条目里解出 1 份清单，实际 {got.Count} 份";
+            if (got[0].depotId != "731" || got[0].manifestGid != "1914580569200573996")
+                return $"整包自检：解出的清单名不对（{got[0].depotId}/{got[0].manifestGid}）";
+            if (File.Exists(Path.Combine(tmpDir, "732_1.manifest")))
+                return "整包自检：magic 不符的条目没有删掉";
+        }
+        finally
+        {
+            TryDelete(zipPath);
+            ManifestFileService.TryDeleteDir(tmpDir);
+        }
+
+        return string.Empty;
+
+        static void WriteEntry(ZipArchive zip, string name, byte[] bytes)
+        {
+            var entry = zip.CreateEntry(name);
+            using var s = entry.Open();
+            s.Write(bytes);
+        }
     }
 
     /// <summary>文件头 4 字节是否为内层清单 magic（0x71F617D0，小端即 d0 17 f6 71）。</summary>
