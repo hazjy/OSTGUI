@@ -56,7 +56,7 @@ public partial class ManifestSource
     [System.Text.Json.Serialization.JsonIgnore]
     public string ApiKeyPlaceholder => Id switch
     {
-        "mhub" => "未配置密钥则不使用",
+        "mhub" or "hubcap" => "未配置密钥则不使用",
         "ryuu" => "整包下载需要，请填 auth code",
         _ => "可选，留空则不使用"
     };
@@ -70,6 +70,7 @@ public partial class ManifestSource
     public static string? GetTokenPageUrl(string sourceId) => sourceId switch
     {
         "mhub" => "https://manifesthub2.filegear-sg.me/",
+        "hubcap" => "https://hubcapmanifest.com/",
         "ryuu" => "https://generator.ryuu.lol/login",
         "github_auiowu" => "https://github.com/settings/tokens",
         _ => null
@@ -80,7 +81,7 @@ public partial class ManifestSource
     /// </summary>
     public static bool IsImplementedSource(string sourceId) => sourceId switch
     {
-        "mhub" or "sudama" or "ryuu" => true,
+        "mhub" or "hubcap" or "sudama" or "ryuu" => true,
         _ => false
     };
 
@@ -152,6 +153,16 @@ public partial class ManifestSource
             Id = "mhub", Name = "MHub", Description = "清单源",
             BaseUrl = "https://api.manifesthub2.filegear-sg.me/manifest?apikey={key}&depotid={depotid}&manifestid={manifestid}",
             Type = ManifestSourceType.MHub, RequiresToken = true, Priority = 1, PerDepotFetch = true
+        },
+        new()
+        {
+            // 单份生成（点播腿）：直接让站点去 Steam 取这一份，返回内层清单（magic 0x71F617D0）。
+            // 2026-10-30 实测：当前 gid 与旧分支 gid 都能取（CS2 1.40.8.8、BG3 patch6_hf9 字节数与 MHub 一致）。
+            // 额度：单份生成 1500/日（/api/v1/generate/usage），与整包/ lua 的 25/日 是两个独立桶。
+            // key 走 api_key 查询参数即可（也接受 Authorization / X-API-Key 头，模板只需查询参数）。
+            Id = "hubcap", Name = "Hubcap", Description = "清单源|单份生成 1500/日，整包 25/日",
+            BaseUrl = "https://hubcapmanifest.com/api/v1/generate/manifest?depot_id={depotid}&manifest_id={manifestid}&api_key={key}",
+            Type = ManifestSourceType.MHub, RequiresToken = true, Priority = 2, PerDepotFetch = true
         },
         new()
         {
