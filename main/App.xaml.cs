@@ -80,7 +80,6 @@ public partial class App : Application
             if (failure.Length == 0) failure = LuaHighlighter.SelfCheck();
             if (failure.Length == 0) failure = LuaTextCodec.SelfCheck();
             if (failure.Length == 0) failure = EditorHistory.SelfCheck();
-            if (failure.Length == 0) failure = SourceQuota.SelfCheck();
             if (failure.Length == 0) failure = ManifestSource.SelfCheck();
             if (failure.Length == 0) failure = ConfigService.SelfCheck();
             LogService.Diag(failure.Length == 0 ? "自检通过" : $"自检失败：{failure}");

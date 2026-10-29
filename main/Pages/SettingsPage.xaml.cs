@@ -52,7 +52,6 @@ public sealed partial class SettingsPage : Page
             // 每次进入页面同步一次当前日志：仅在无新日志事件时，日志栏不依赖事件也有内容
             VM.LogsText = LogService.GetText();
             VM.RefreshSudamaCacheAge();
-            VM.RefreshQuotaText();
             VM.RefreshPaths();
             VM.RefreshDenuvoModeFromKernel();
             VM.RefreshManifestLuaStateQuiet();   // 只读回显 manifest.lua 状态，不写盘

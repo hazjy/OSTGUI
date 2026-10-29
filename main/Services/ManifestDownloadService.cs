@@ -223,7 +223,7 @@ public class ManifestDownloadService
     /// 入库的逐 depot 循环与「清单按需投喂」共用这一条路径。
     ///
     /// 多源级联（2026-10-24 加）：按 <see cref="ManifestSource.Priority"/> 依次尝试所有
-    /// **已启用 + 已接入 + 能按 depot+gid 点播**的源（当前是 MHub、Ryuu），任一成功即返回。
+    /// **已启用 + 已接入 + 能按 depot+gid 点播**的源，任一成功即返回。
     /// 落地前必须校验内层清单 magic（<c>0x71F617D0</c>）——投喂 zip 外壳或错误页会被 Steam
     /// 当损坏清单删掉，看起来像"投喂完全没生效"（见 REF-清单与版本.md）。
     ///
@@ -256,23 +256,11 @@ public class ManifestDownloadService
         {
             ct.ThrowIfCancellationRequested();
 
-            var isRyuu = string.Equals(source.Id, "ryuu", StringComparison.OrdinalIgnoreCase);
-            if (isRyuu && _ryuuRejectedThisSession)
-            {
-                Log($"清单源「{source.Name}」本次运行已被拒绝过（密钥无效或额度用尽），跳过：Depot {depotId}");
-                continue;
-            }
-
             // ⚠️ URL 里带密钥：任何日志都不要打完整 URL
             var url = source.BuildUrl(null, depotId, manifestGid);
             try
             {
                 using var response = await client.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
-
-                if (isRyuu)
-                {
-                    await RecordRyuuUsageAsync(response.IsSuccessStatusCode, (int)response.StatusCode, ct);
-                }
 
                 if (!response.IsSuccessStatusCode)
                 {
@@ -318,7 +306,6 @@ public class ManifestDownloadService
 
     /// <summary>
     /// 设置页「测活」：只打**这一家**源，用实测可用的 depot+gid 拿一份清单，看状态码与 magic。
-    /// ⚠️ 对有限额的源（Ryuu）这算一次真实请求，会消耗 1 次额度——界面按钮的提示里要写明。
     /// </summary>
     public async Task<(bool ok, string text)> ProbeSourceAsync(ManifestSource source, CancellationToken ct = default)
     {
@@ -326,20 +313,12 @@ public class ManifestDownloadService
         if (source.RequiresToken && string.IsNullOrEmpty(source.ApiKey)) return (false, "未填密钥");
         if (!source.PerDepotFetch) return (false, "该源不支持按 depot 取清单");
 
-        var isRyuu = string.Equals(source.Id, "ryuu", StringComparison.OrdinalIgnoreCase);
-        if (isRyuu && _ryuuRejectedThisSession) return (false, "本次运行已被拒绝（密钥无效或额度用尽）");
-
         var tmp = Path.Combine(Path.GetTempPath(), "ostgui_probe_" + Guid.NewGuid().ToString("N") + ".manifest");
         try
         {
             using var client = new HttpClient { Timeout = TimeSpan.FromSeconds(Math.Max(30, _configService.Config.DownloadTimeout)) };
             using var response = await client.GetAsync(source.BuildUrl(null, ProbeDepotId, ProbeManifestGid),
                 HttpCompletionOption.ResponseHeadersRead, ct);
-
-            if (isRyuu)
-            {
-                await RecordRyuuUsageAsync(response.IsSuccessStatusCode, (int)response.StatusCode, ct);
-            }
 
             if (!response.IsSuccessStatusCode)
                 return (false, $"否（HTTP {(int)response.StatusCode}）");
@@ -366,11 +345,11 @@ public class ManifestDownloadService
         }
     }
 
-    // 实测可用的探针配对：CS2(730) 的 depot 731 与其当前 gid（2026-10-24 Ryuu 实测 200、内层 magic 正确）
+    // 探针配对：CS2(730) 的 depot 731 与其固定 gid（2026-10-24 实测 MHub 200、内层 magic 正确）
     private const string ProbeDepotId = "731";
     private const string ProbeManifestGid = "1914580569200573996";
 
-    /// <summary>取可点播的清单源，按优先级升序（MHub 在前、Ryuu 兜底）。</summary>
+    /// <summary>取可点播的清单源，按优先级升序。</summary>
     private List<ManifestSource> GetPerDepotSources()
     {
         var all = _configService.Config.ManifestSources;
@@ -388,34 +367,6 @@ public class ManifestDownloadService
             .Where(s => s.IsEnabled && ManifestSource.IsImplementedSource(s.Id) && s.PerDepotFetch)
             .OrderBy(s => s.Priority)
             .ToList();
-    }
-
-    /// <summary>Ryuu 本次运行里被明确拒绝过（401/403/429）就不再打它，免得一个入库流程把额度全烧在失败请求上。</summary>
-    private bool _ryuuRejectedThisSession;
-
-    /// <summary>
-    /// 记一次 Ryuu 用量。口径："每 24 小时 50 次，从第一次请求起算"（不是自然日），
-    /// 所以存窗口起点、只用 <see cref="SourceQuota"/> 推进；上限不落盘也不展示（服务器头与站点显示不符）。
-    /// 写盘失败不影响下载。
-    /// </summary>
-    private async Task RecordRyuuUsageAsync(bool success, int statusCode, CancellationToken ct)
-    {
-        if (!success && statusCode is 401 or 403 or 429)
-            _ryuuRejectedThisSession = true;
-
-        try
-        {
-            await _configService.UpdateAndSaveAsync(c =>
-            {
-                var (start, used) = SourceQuota.Normalize(DateTime.Now, c.RyuuQuotaWindowStart, c.RyuuQuotaUsed);
-                c.RyuuQuotaWindowStart = start.ToString("o");
-                c.RyuuQuotaUsed = used + 1;
-            });
-        }
-        catch (Exception ex)
-        {
-            Log($"记录 Ryuu 用量失败（不影响本次下载）：{ex.Message}");
-        }
     }
 
     /// <summary>文件头 4 字节是否为内层清单 magic（0x71F617D0，小端即 d0 17 f6 71）。</summary>

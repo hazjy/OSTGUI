@@ -50,14 +50,13 @@ public partial class ManifestSource
     public string ApiKeyUpdatedAtText { get; set; } = "";
 
     /// <summary>
-    /// 「API Key / Token」输入框的占位说明。各家对密钥的依赖不同（MHub 没 key 就不能用，
-    /// Ryuu 的路径式点播没 key 也能取），别再共用一个含糊的"留空则不使用"。
+    /// 「API Key / Token」输入框的占位说明。各家对密钥的依赖不同（MHub 没 key 就不能用），
+    /// 别再共用一个含糊的"留空则不使用"。
     /// </summary>
     [System.Text.Json.Serialization.JsonIgnore]
     public string ApiKeyPlaceholder => Id switch
     {
         "mhub" => "未配置密钥则不使用",
-        "ryuu" => "可选，无密钥也可使用",
         _ => "可选，留空则不使用"
     };
 
@@ -70,7 +69,6 @@ public partial class ManifestSource
     public static string? GetTokenPageUrl(string sourceId) => sourceId switch
     {
         "mhub" => "https://manifesthub2.filegear-sg.me/",
-        "ryuu" => "https://generator.ryuu.lol/login",
         "github_auiowu" => "https://github.com/settings/tokens",
         _ => null
     };
@@ -80,7 +78,7 @@ public partial class ManifestSource
     /// </summary>
     public static bool IsImplementedSource(string sourceId) => sourceId switch
     {
-        "mhub" or "sudama" or "ryuu" => true,
+        "mhub" or "sudama" => true,
         _ => false
     };
 
@@ -103,23 +101,15 @@ public partial class ManifestSource
 
     /// <summary>
     /// 这个源是不是"按 depot+gid 点播"的清单源。预置里显式写死：
-    /// MHub / Ryuu = true，Sudama（密钥源，只有全量文件下载）= false。
+    /// MHub = true，Sudama（密钥源，只有全量文件下载）= false。
     /// 级联下载按它筛，「测活」按钮与连通性也按它显示——不做模板字符串嗅探。
     /// </summary>
     public bool PerDepotFetch { get; set; }
 
     /// <summary>
-    /// 是否显示"上次更新"时间。密钥永久的源（Ryuu 的 auth code）不必显示，否则只会误导。
+    /// 是否显示"上次更新"时间。密钥长期有效的源不必显示，否则只会误导。
     /// </summary>
     public bool ShowKeyUpdatedAt { get; set; } = true;
-
-    /// <summary>卡片上的额度文案（目前只有 Ryuu 用；空串则不显示）。打开设置页时按 RyuuQuota* 重算，不落盘。</summary>
-    [System.Text.Json.Serialization.JsonIgnore]
-    public string QuotaText { get; set; } = string.Empty;
-
-    /// <summary>是否显示额度行（只在有文案时显示）。派生自 <see cref="QuotaText"/>。</summary>
-    [System.Text.Json.Serialization.JsonIgnore]
-    public bool ShowQuota => !string.IsNullOrEmpty(QuotaText);
 
     /// <summary>「测活」结果文案（未测 / 测试中… / 是 / 否）。只显示，不落盘。</summary>
     [System.Text.Json.Serialization.JsonIgnore]
@@ -160,26 +150,16 @@ public partial class ManifestSource
             BaseUrl = "https://api.993499094.xyz/depotkeys.json",
             Type = ManifestSourceType.KeyOnly, Priority = 0
         },
-        new()
-        {
-            // 点播腿：按 depot+gid 取单份清单（返回内层格式，实测 magic 0x71F617D0）。
-            // 排在 MHub 之后当兜底：它有限额，MHub 能拿到就不该消耗额度。
-            // key = 站点登录后的永久 auth code（也接受 X-Auth-Key 头，这里走查询参数）。
-            // ⚠️ 只能用**路径式**端点 `/api/manifest/<depot>_<gid>.manifest`：查询式
-            // `/api/manifest?depot_id=&manifest_id=` 已下线，带不带 key 都恒回 404 `{"error":"Not Found"}`
-            // （2026-10-27 实测，连 10-24 记的那组可用配对 731/1914580569200573996 也 404）。
-            // 该腿不带 key 也能取（实测 200）；限流/额度口径未测试。
-            Id = "ryuu", Name = "Ryuu's Manifests", Description = "清单源|每 24 小时 50 次，从第一次请求起算",
-            BaseUrl = "https://generator.ryuu.lol/api/manifest/{depotid}_{manifestid}.manifest?auth_key={key}",
-            Type = ManifestSourceType.MHub, RequiresToken = true, Priority = 5, PerDepotFetch = true,
-            ShowKeyUpdatedAt = false,   // auth code 是固定的，不显示"上次更新"
-        },
+        // Ryuu's Manifests 已于 2026-10-30 下架：站点把"按 depot+gid 点播"的接口整体移除，
+        // 只剩整包下载（/api/download/{appid}?file_type=lua|manifest，需要 auth code），
+        // 现在的点播请求一律回 404 {"error":"Manifest not found."}。接入整包腿的计划见
+        // doc/TODO/待办/261030-Ryuu整包腿接入.md。
     };
 
     /// <summary>
     /// 自检（挂 <c>OSTGUI.exe --trainer-selftest</c> 链）：内置源的接口地址是**死写在这里**的，
-    /// 站点一改端点就整条静默失效——2026-10-27 Ryuu 的查询式端点下线后，入库的每个 depot 都 404，
-    /// 界面上却只显示"下载失败"，看不出是接口形态变了。全通过返回空串。
+    /// 站点一改端点就整条静默失效（2026-10-27 与 10-30 各发生过一次，都表现为"下载失败"）。
+    /// 全通过返回空串。
     /// </summary>
     public static string SelfCheck()
     {
@@ -198,12 +178,6 @@ public partial class ManifestSource
             if (s.PerDepotFetch &&
                 (!s.BaseUrl.Contains(PlaceholderDepotId) || !s.BaseUrl.Contains(PlaceholderManifestId)))
                 return $"点播源「{s.Name}」的地址缺少 {PlaceholderDepotId} / {PlaceholderManifestId} 占位符";
-
-            // 查询式 `/api/manifest?depot_id=&manifest_id=` 已下线（带不带 key 都恒 404 `Not Found`），
-            // 路径式 `/api/manifest/<depot>_<gid>.manifest` 才是可用的那条。改回查询式不会报错，
-            // 只会让每个 depot 静默 404，故在此拦下。
-            if (s.Id == "ryuu" && s.BaseUrl.Contains("depot_id="))
-                return "Ryuu 必须用路径式端点 /api/manifest/{depotid}_{manifestid}.manifest：查询式端点已于 2026-10-27 下线（恒 404）";
         }
         return string.Empty;
     }

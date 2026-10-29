@@ -172,7 +172,7 @@
                                                         <Button Content="测活" Tag="{Binding}"
                                                                 Click="OnManifestSourceTestClick" VerticalAlignment="Center"
                                                                 Visibility="{Binding PerDepotFetch, Converter={StaticResource BoolToVis}}"
-                                                                ToolTipService.ToolTip="用一组实测可用的 depot+gid 单独请求这家源；有限额的源（Ryuu）会消耗 1 次额度" />
+                                                                ToolTipService.ToolTip="用一组实测可用的 depot+gid 单独请求这家源，只打这一家" />
                                                         <Button Content="刷新缓存" Click="RefreshSudamaCache_Click"
                                                                 Tag="{Binding}"
                                                                 Visibility="{Binding ShowRefreshCacheButton, Converter={StaticResource BoolToVis}}" />
@@ -185,10 +185,7 @@
                                                 <TextBlock Text="{Binding SudamaCacheAgeText}" FontSize="12"
                                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                                            Visibility="{Binding ShowRefreshCacheButton, Converter={StaticResource BoolToVis}}" />
-                                                <!-- 有限额源的本地额度计数（Ryuu）：它没有额度查询端点，只能自己按日记 -->
-                                                <TextBlock Text="{Binding QuotaText}" FontSize="12"
-                                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                                           Visibility="{Binding ShowQuota, Converter={StaticResource BoolToVis}}" />
+
                                                 <StackPanel Spacing="4"
                                                             Visibility="{Binding RequiresToken, Converter={StaticResource BoolToVis}}">
                                                     <TextBlock Text="API Key / Token" FontSize="12" />

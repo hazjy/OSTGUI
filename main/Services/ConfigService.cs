@@ -208,7 +208,7 @@ public class ConfigService
         // 派生字段不该写进 config：序列化一遍看有没有它们
         var ctx = new AppJsonConfigContext(new System.Text.Json.JsonSerializerOptions());
         var manifestJson = System.Text.Json.JsonSerializer.Serialize(ManifestSource.GetPresetSources()[0], ctx.ManifestSource);
-        foreach (var noise in new[] { "ShowQuota", "ShowRefreshCacheButton", "ShowApiKeyUpdatedAt", "QuotaText" })
+        foreach (var noise in new[] { "ShowRefreshCacheButton", "ShowApiKeyUpdatedAt" })
             if (manifestJson.Contains(noise)) return $"序列化自检：派生字段 {noise} 仍会写进 config.json";
         var codeJson = System.Text.Json.JsonSerializer.Serialize(RequestCodeSource.GetPresetSources()[0], ctx.RequestCodeSource);
         if (codeJson.Contains("NeedsDepotId")) return "序列化自检：派生字段 NeedsDepotId 仍会写进 config.json";

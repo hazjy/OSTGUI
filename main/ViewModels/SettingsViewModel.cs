@@ -498,28 +498,8 @@ public partial class SettingsViewModel : ObservableObject
         return true;
     }
 
-    /// <summary>
-    /// 依据配置里的本地计数刷新有限额源（Ryuu）的用量文案。
-    /// 它没有额度查询端点，限额口径是"每 24 小时 50 次、从第一次请求起算"，所以只报"已使用：N 次"
-    ///（上限服务器头与站点显示不一致，不展示）——见 Services/SourceQuota.cs。
-    /// </summary>
-    public void RefreshQuotaText()
-    {
-        var c = _configService.Config;
-        var (_, used) = SourceQuota.Normalize(DateTime.Now, c.RyuuQuotaWindowStart, c.RyuuQuotaUsed);
-        var text = SourceQuota.Describe(used);
 
-        for (var i = 0; i < VisibleSources.Count; i++)
-        {
-            if (VisibleSources[i].Id == "ryuu")
-            {
-                VisibleSources[i].QuotaText = text;
-                VisibleSources[i] = VisibleSources[i];   // 整项替换触发该行重绑定
-            }
-        }
-    }
-
-    /// <summary>设置页「测活」：只打这一家源，结果写进该行文案（Ryuu 会消耗 1 次额度）。</summary>
+    /// <summary>设置页「测活」：只打这一家源，结果写进该行文案。</summary>
     public async Task TestManifestSourceAsync(ManifestSource source)
     {
         source.ConnectivityText = "测试中…";
@@ -529,7 +509,6 @@ public partial class SettingsViewModel : ObservableObject
 
         source.ConnectivityText = text;
         RefreshManifestSourceItem(source);
-        RefreshQuotaText();
         LogService.Event($"清单源「{source.Name}」测活：{text}");
     }
 
@@ -642,7 +621,7 @@ public partial class SettingsViewModel : ObservableObject
             }
         }
 
-        // 列表顺序 = Priority（Sudama 0 在最上，其后 MHub 1、Ryuu 5）：
+        // 列表顺序 = Priority（Sudama 0 在最上，其后 MHub 1）：
         // 旧配置里存的是历史序，这里统一排一次，免得"加了新源却排在老源后面"看起来像没生效。
         sources = sources.OrderBy(s => s.Priority).ToList();
 
