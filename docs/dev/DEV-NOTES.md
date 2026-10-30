@@ -17,7 +17,7 @@
 
 每条只写入口与落点，机制见对应 REF。
 
-- **搜索 → 入库**：Steam 官方 API 搜索 → `SteamGameInfoService` 取 depot / gid / DLC → 清单双写 `config\depotcache` 与 Steam 根 `depotcache` → `SudamaKeyCache` 补密钥与令牌 → `LuaBuilder` 生成 Lua。点播源没拿全时先退**整包源**（Ryuu 一次下整个 app 的 zip，解出 `<depot>_<gid>.manifest`）再落盘。全链可取消，两处原子写不可打断。见 `REF-入库与Lua.md`、`SOURCES.md`。
+- **搜索 → 入库**：Steam 官方 API 搜索 → `SteamGameInfoService` 取 depot / gid / DLC → 清单双写 `config\depotcache` 与 Steam 根 `depotcache` → `SudamaKeyCache` 补密钥与令牌 → `LuaBuilder` 生成 Lua。点播源没拿全的 depot 交给内核运行时补。全链可取消，两处原子写不可打断。见 `REF-入库与Lua.md`、`SOURCES.md`。
 - **清单按需投喂**：`ManifestLogWatcher` 尾随 `<Steam>\logs\content_log.txt`，见"取不到请求码"才补一份，串行 1 份/秒，失败下次随 Steam 重试；设置页开关控制。
 - **请求码源**：设置页勾选经 `ManifestLuaService` 渲染成 `<lua 目录>\manifest.lua`，内核每次取码逐源级联（顺序即勾选顺序，全关写短路版）。该文件存在时旁路内核 `[manifest] url`，勾选一变即覆盖。见 `SOURCES.md`。
 - **固定版本**：GUI 只写注释形式 `--setManifestid(...)`，锁版本在内核 hook；库页锁定模式与「补齐版本配置」见 `REF-清单与版本.md`。

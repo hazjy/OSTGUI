@@ -57,7 +57,6 @@ public partial class ManifestSource
     public string ApiKeyPlaceholder => Id switch
     {
         "mhub" or "hubcap" => "未配置密钥则不使用",
-        "ryuu" => "整包下载需要，请填 auth code",
         _ => "可选，留空则不使用"
     };
 
@@ -71,7 +70,6 @@ public partial class ManifestSource
     {
         "mhub" => "https://manifesthub2.filegear-sg.me/",
         "hubcap" => "https://hubcapmanifest.com/",
-        "ryuu" => "https://generator.ryuu.lol/login",
         "github_auiowu" => "https://github.com/settings/tokens",
         _ => null
     };
@@ -81,7 +79,7 @@ public partial class ManifestSource
     /// </summary>
     public static bool IsImplementedSource(string sourceId) => sourceId switch
     {
-        "mhub" or "hubcap" or "sudama" or "ryuu" => true,
+        "mhub" or "hubcap" or "sudama" => true,
         _ => false
     };
 
@@ -160,7 +158,7 @@ public partial class ManifestSource
             // 2026-10-30 实测：当前 gid 与旧分支 gid 都能取（CS2 1.40.8.8、BG3 patch6_hf9 字节数与 MHub 一致）。
             // 额度：单份生成 1500/日（/api/v1/generate/usage），与整包/ lua 的 25/日 是两个独立桶。
             // key 走 api_key 查询参数即可（也接受 Authorization / X-API-Key 头，模板只需查询参数）。
-            Id = "hubcap", Name = "Hubcap", Description = "清单源|单份生成 1500/日，整包 25/日",
+            Id = "hubcap", Name = "Hubcap", Description = "清单源|单份生成 1500/日",
             BaseUrl = "https://hubcapmanifest.com/api/v1/generate/manifest?depot_id={depotid}&manifest_id={manifestid}&api_key={key}",
             Type = ManifestSourceType.MHub, RequiresToken = true, Priority = 2, PerDepotFetch = true
         },
@@ -171,18 +169,11 @@ public partial class ManifestSource
             BaseUrl = "https://api.993499094.xyz/depotkeys.json",
             Type = ManifestSourceType.KeyOnly, Priority = 0
         },
-        new()
-        {
-            // 整包腿（2026-10-30 起站点唯一可用的清单接口）：GET /api/download/{appid}?file_type=manifest
-            // 返回 zip，内含 <appid>.lua 与 <depot>_<gid>.manifest；必须带 auth code。
-            // 点播腿 /api/manifest/<depot>_<gid>.manifest 已被站点移除（任何配对恒 404
-            // {"error":"Manifest not found."}），故 PerDepotFetch = false、不再参与按 depot 的级联。
-            Id = "ryuu", Name = "Ryuu's Manifests", Description = "清单源|整包，需 auth code",
-            BaseUrl = "https://generator.ryuu.lol/api/download/{appid}?file_type=manifest&auth_key={key}",
-            Type = ManifestSourceType.MHub, RequiresToken = true, Priority = 5,
-            PerDepotFetch = false, WholeAppFetch = true,
-            ShowKeyUpdatedAt = false,   // auth code 长期有效，不显示"上次更新"
-        },
+        // 整包源目前没有启用的：Ryuu 的点播腿被站点移除后只剩整包，而清单侧已有 Hubcap
+        // （直接去 Steam 取单份）覆盖，密钥侧有 Sudama，运行时还有请求码兜底，整包收益不足。
+        // 能力保留在 ManifestSource.WholeAppFetch + ManifestDownloadService.DownloadWholeAppAsync，
+        // 供将来只提供 zip 的源（Walftech / lua.tools）复用。理由与重开条件见
+        // doc/TODO/挂起/261030-Ryuu整包腿接入.md。
     };
 
     /// <summary>
