@@ -5,7 +5,7 @@
 ## 新增
 
 - 清单源 Hubcap：按 depot+gid 取单份清单，旧分支版本也能取。额度 1500 次/日。
-- API key 获取：<https://hubcapmanifest.com/>，Discord：<https://discord.gg/hubcapsmanifest>
+- API key 获取：<https://hubcapmanifest.com/>，Discord：<https://discord.gg/hubcapsmanifest>。需要加入服务器并完成认证才能获取下载权限。
 
 ## 变更
 
