@@ -64,7 +64,7 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
         RootGrid.AddHandler(UIElement.PointerPressedEvent, new PointerEventHandler(Root_PointerPressed), true);
 
         ExtendsContentIntoTitleBar = true;
-        // 拖拽区 = 顶部那条 48px（2026-09-23 试过 12px / 整窗拖拽，都不如这条好看 → 已恢复）
+        // 拖拽区 = 顶部那条透明横带，高度在 XAML 的 AppTitleBar 上（2026-11-02 由 48 调薄到 32）
         SetTitleBar(AppTitleBar);
 
         // ⚠️ 内容延伸到标题栏后，系统仍按 caption 的颜色画顶上那一条。这里把"背景"设透明，

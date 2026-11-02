@@ -43,11 +43,11 @@
         <Grid x:Name="GlobalFocusAnchor" IsTabStop="True" TabIndex="0" Width="1" Height="1"
               HorizontalAlignment="Left" VerticalAlignment="Top" Opacity="0" />
 
-        <!-- 顶部 48 逻辑像素的透明拖拽区（`SetTitleBar` 挂在它上面）。
-             2026-09-23 试过改成 12px、以及"完全去掉改整窗拖拽"，结论：**留着更好看** ——
-             去掉后内容贴到最上沿反而更丑（12px 那种还会把系统 caption 色的横带贴近内容而露馅）。
-             横带本身已由 MainWindow.xaml.cs 里"标题栏背景设透明"解决，不必靠留白了 -->
-        <Grid x:Name="AppTitleBar" Grid.Row="0" Height="48"
+        <!-- 顶部透明拖拽区（`SetTitleBar` 挂在它上面），高度即窗口上方的留白。
+             2026-09-23 试过 12px 与"完全去掉改整窗拖拽"，判断是留着更好看，当时定为 48；
+             2026-11-02 按用户要求调薄：改为 32（与系统 caption 按钮的高度对齐）。
+             调这个值只需改这里一行，试 28 / 24 也可以，别低于 caption 按钮高度 -->
+        <Grid x:Name="AppTitleBar" Grid.Row="0" Height="40"
               Background="Transparent" VerticalAlignment="Top" />
 
         <NavigationView
