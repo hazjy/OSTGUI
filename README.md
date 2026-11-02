@@ -30,9 +30,11 @@ depot 解密密钥与清单请求；OSTGUI 负责搜索入库、生成 Lua 配�
 
 1. 按 ZSteamTool 的说明部署内核三个 DLL（覆盖前先备份原文件）。
 2. 下载发布包 `OSTGUI-v<版本>.zip`，解压到任意目录，运行 `OSTGUI.exe`。
-3. 在设置页「清单源」填入 MHub API Key——不填只能拿到密钥与令牌，下载不到清单。
+3. 在设置页「清单源」填入 MHub 或 Hubcap 的 API Key——不填只能拿到密钥与令牌，下载不到清单。
 
 配置与缓存位于 `%LOCALAPPDATA%\OSTGUI`，升级时解压覆盖程序目录即可。
+
+每一步的细节、各勾选项的含义、出错时先看哪份日志，见 **[用户手册](docs/guide/README.md)**：安装、入库、库与启动、免 Steam 部署、联机、成就与修改器、设置、故障排查、文件位置。
 
 ## 构建
 
@@ -61,14 +63,14 @@ VS 的 MSBuild 路径自动探测（VS 18 / 17 × Community / Professional / Ent
 main/                WinUI 3 主程序（Pages / Views / ViewModels / Services / Models / SteamApi）
 NoSteamLauncher/     免 Steam 部署类库，第三方二进制以 EmbeddedResource 内嵌
 OnlineHost/          联机宿主，独立 exe，随 GUI 发布
-docs/                changelog（逐版本更新说明）与 dev（开发文档）
+docs/                guide（用户手册）、changelog（逐版本更新说明）、dev（开发文档）
 ```
 
 ## 文档
 
 | 内容 | 位置 |
 |---|---|
-| 用户手册（安装、入库、联机、排查） | `docs/guide/` |
+| **用户手册（安装 / 入库 / 联机 / 排查）** | [`docs/guide/`](docs/guide/README.md) |
 | 架构、服务索引、已知限制 | `docs/dev/DEV-NOTES.md` |
 | 各领域机制与实测结论 | `docs/dev/REF-*.md` |
 | 逐版本改动 | `docs/changelog/` |
