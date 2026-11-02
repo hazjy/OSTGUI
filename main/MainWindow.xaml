@@ -4,7 +4,6 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    xmlns:animatedvisuals="using:Microsoft.UI.Xaml.Controls.AnimatedVisuals"
     Title="OSTGUI - OpenSteamTool 可视化管理">
 
     <!-- 显示效果（无 / 云母 / 亚克力）由代码按配置设置，见 ApplyBackdrop -->
@@ -59,6 +58,7 @@
             IsPaneToggleButtonVisible="True"
             OpenPaneLength="200"
             SelectionChanged="NavView_SelectionChanged"
+            ItemInvoked="MainNavView_ItemInvoked"
             PaneOpening="MainNavView_PaneOpening"
             PaneClosing="MainNavView_PaneClosing">
 
@@ -68,15 +68,7 @@
                     <NavigationViewItem.Content>主页</NavigationViewItem.Content>
                 </NavigationViewItem>
                 <NavigationViewItem x:Name="NavSearch" Tag="search">
-                    <!-- 官方内置动画源（放大镜）：NavigationViewItem 会自动给 AnimatedIcon 喂
-                         Normal/PointerOver/Pressed/Selected 等状态，悬停与选中即有动效，无需代码。
-                         FallbackIconSource 保证系统关掉动画时仍有静态字形。 -->
-                    <NavigationViewItem.Icon>
-                        <AnimatedIcon>
-                            <AnimatedIcon.Source><animatedvisuals:AnimatedFindVisualSource /></AnimatedIcon.Source>
-                            <AnimatedIcon.FallbackIconSource><FontIconSource Glyph="&#xE721;" /></AnimatedIcon.FallbackIconSource>
-                        </AnimatedIcon>
-                    </NavigationViewItem.Icon>
+                    <NavigationViewItem.Icon><FontIcon Glyph="&#xE721;" /></NavigationViewItem.Icon>
                     <NavigationViewItem.Content>搜索入库</NavigationViewItem.Content>
                 </NavigationViewItem>
                 <NavigationViewItem x:Name="NavLibrary" Tag="library">
@@ -111,14 +103,7 @@
                     <NavigationViewItem.Content>重启 Steam</NavigationViewItem.Content>
                 </NavigationViewItem>
                 <NavigationViewItem x:Name="NavSettings" Tag="settings">
-                    <!-- 官方内置动画源（齿轮）：悬停/按下/选中由 NavigationViewItem 驱动。
-                         原来的点击旋转（RotateIcon）在这里撤掉，避免两种动效叠在一起。 -->
-                    <NavigationViewItem.Icon>
-                        <AnimatedIcon>
-                            <AnimatedIcon.Source><animatedvisuals:AnimatedSettingsVisualSource /></AnimatedIcon.Source>
-                            <AnimatedIcon.FallbackIconSource><FontIconSource Glyph="&#xE713;" /></AnimatedIcon.FallbackIconSource>
-                        </AnimatedIcon>
-                    </NavigationViewItem.Icon>
+                    <NavigationViewItem.Icon><FontIcon x:Name="SettingsGlyphIcon" Glyph="&#xE713;" /></NavigationViewItem.Icon>
                     <NavigationViewItem.Content>设置</NavigationViewItem.Content>
                 </NavigationViewItem>
                 <!-- 「关于」不切页：点开弹窗（写法同上面的 NavRestartSteam） -->

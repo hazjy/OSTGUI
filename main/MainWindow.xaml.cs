@@ -532,6 +532,13 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
         }
     }
 
+    private void MainNavView_ItemInvoked(NavigationView sender, NavigationViewItemInvokedEventArgs args)
+    {
+        // 每次点击设置项（含重复点击当前项）都触发齿轮旋转
+        if (args.InvokedItemContainer == NavSettings)
+            RotateIcon(SettingsGlyphIcon);
+    }
+
     private void NavRestartSteam_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
     {
         if (sender is not NavigationViewItem item) return;
@@ -586,7 +593,6 @@ public sealed partial class MainWindow : Microsoft.UI.Xaml.Window
 
     /// <summary>
     /// 图标点击旋转动效（Composition 动画，0 → 360 度）
-    /// 目前只有「重启 Steam」在用；「设置」与「搜索入库」已改用官方 AnimatedIcon。
     /// </summary>
     private void RotateIcon(Microsoft.UI.Xaml.Controls.FontIcon icon)
     {
