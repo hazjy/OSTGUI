@@ -58,71 +58,50 @@
             padding: 1px 5px;
             border-radius: 4px;
         }
-        .highlight {
-            background: color-mix(in srgb, var(--accent) 10%, transparent);
-            border-left: 3px solid var(--accent);
-            padding: 8px 12px;
-            border-radius: 4px;
-            margin: 10px 0;
-        }
+
         .muted { color: var(--text-secondary); }
     </style>
 </head>
 <body>
     <h1>重要说明</h1>
-    <p class="subtitle">关于 OSTGUI 授权格式与导入导出授权的说明</p>
+    <p class="subtitle">.ost 授权文件格式与导入导出步骤</p>
 
-    <h2>为什么 OSTGUI 不兼容 .cw / .shiki？</h2>
-    <p>它们是闭源的私有格式。.cw 是私有的授权文件格式，内部用 AES 加密，格式规范从未公开，核心提取模块也从未开源。.shiki 及类似的加密授权文件同理——格式定义权在作者手里。</p>
-    <p>闭源格式有三个实际问题：</p>
+    <h2>.ost 是什么</h2>
+    <p>.ost 是 OSTGUI 的授权文件格式，内容是明文 JSON，不加密。字段：</p>
     <ul>
-        <li><strong>无法审计</strong>：文件不透明，你没法自己验证、校验、排查问题。</li>
-        <li><strong>随时可能作废</strong>：作者改一版封装，旧文件可能全部失效。</li>
-        <li><strong>生态越用越依赖</strong>：格式用的人越多，作者定价权越大。</li>
-    </ul>
-    <p>所以 OSTGUI 自己定义了一套<strong>开放格式</strong>。</p>
-
-    <h2>.ost 到底是什么？</h2>
-    <p>.ost 是 OSTGUI 的授权文件格式，<strong>明文 JSON，无加密</strong>，无黑盒，里面装什么一眼就能看到：</p>
-    <ul>
-        <li><code>AppTicket / ETicket</code>：授权数据本身（hex 文本）</li>
-        <li><code>Source</code>：来源（提取者的 Steam 用户名，方便追溯分享者）</li>
-        <li><code>CreatedAt / ExpiresAt</code>：生成时间和失效时间</li>
+        <li><code>AppTicket</code> / <code>ETicket</code>：授权数据（hex 文本）</li>
+        <li><code>Source</code>：提取该授权的 Steam 用户名</li>
+        <li><code>CreatedAt</code> / <code>ExpiresAt</code>：生成时间与失效时间</li>
         <li><code>UseCount</code>：已使用次数</li>
-        <li><code>ExporterVersion</code>：导出者用的 OSTGUI 版本</li>
+        <li><code>ExporterVersion</code>：导出时使用的 OSTGUI 版本</li>
     </ul>
-    <p>格式开放、结构透明，任何人拿到文件都能读懂、校验，也都能实现兼容。</p>
 
-    <h2>为什么授权文件有 30 分钟有效期？</h2>
-    <p>因为里面的 <strong>ETicket 是 Steam 服务器实时签发的动态口令，Steam 规定 30 分钟过期</strong>——这不是 .ost 或 OSTGUI 的规定，是 Steam/Denuvo 的机制。</p>
-    <ul>
-        <li>到期后 Denuvo 验票失败（报错 <code>88500005</code>），重新提取一张新票就行。</li>
-        <li>所以导出的 .ost 要"趁热用"：提取后 30 分钟内导入。</li>
-    </ul>
-    <div class="highlight">
-        顺带说明：Denuvo 还有"每个账号每天最多 5 台新机器激活"的额度，已激活过的机器不消耗；这两条是所有授权方式都绕不开的规则。
-    </div>
+    <h2>与 .cw / .shiki 的关系</h2>
+    <p>.cw 与 .shiki 是其他工具的私有授权格式，没有公开的格式文档。OSTGUI 不读取也不生成这两种文件；需要它们的场合请使用对应工具。</p>
 
-    <h2>到底怎么用导入导出授权？</h2>
-    <p><strong>导出（正版机）：</strong></p>
+    <h2>有效期为什么是 30 分钟</h2>
+    <p>授权里的 ETicket 由 Steam 服务器签发，有效期为 30 分钟。过期后 Denuvo 验票失败，报错码 <code>88500005</code>，重新提取一张即可。</p>
+    <p>Denuvo 另有一条限制：每个账号每天最多在 5 台新机器上激活，已激活过的机器不重复计数。</p>
+
+    <h2>导出（正版机）</h2>
     <ol>
-        <li>Steam 运行中，登录<strong>拥有该游戏的正版账号</strong></li>
-        <li>输入 AppID → 点导出授权</li>
-        <li>生成 <code>{AppID}.ost</code>，30 分钟内发给目标机器</li>
+        <li>Steam 保持运行，登录拥有该游戏的账号</li>
+        <li>填写 AppID，点「导出授权」</li>
+        <li>得到 <code>{AppID}.ost</code>，交给目标机器</li>
     </ol>
-    <p><strong>导入（目标机）：</strong></p>
-    <ol>
-        <li>选 .ost 文件，下方会显示元数据（来源、有效期、使用次数）</li>
-        <li>点 Go 导入</li>
-        <li>已过期会警告，但允许强制导入；游戏未入库会询问是否补全（含全部 DLC）</li>
-        <li>写入成功后，这台机器上<strong>任意 Steam 账号</strong>都能玩（OST 内核会自动匹配票据身份），无需重启 Steam</li>
-    </ol>
-    <p><strong>两个提醒：</strong></p>
-    <ul>
-        <li>部分游戏的 DLC 也受 D 加密保护，.ost 只带主游戏授权时，这些 DLC 可能无法解锁。</li>
-        <li>授权数据写在本机注册表，属于本机所有 Steam 账号；分享 .ost 等于分享一次动态口令，注意控制范围。</li>
-    </ul>
 
-    <p class="muted" style="margin-top:28px; font-size:12px;">— OSTGUI 开源授权格式说明</p>
+    <h2>导入（目标机）</h2>
+    <ol>
+        <li>选择 .ost 文件，界面会显示来源、生成时间、失效时间与使用次数</li>
+        <li>点「Go」</li>
+        <li>文件已过期时会提示，仍可选择强制导入；游戏未入库时会询问是否入库（含 DLC）</li>
+        <li>导入后本机任意 Steam 账号都可启动该游戏，无需重启 Steam</li>
+    </ol>
+
+    <h2>注意</h2>
+    <ul>
+        <li>部分游戏的 DLC 也受 D 加密保护；.ost 只含主游戏授权时，这些 DLC 无法解锁</li>
+        <li>授权写入本机注册表，对本机所有 Steam 账号生效</li>
+    </ul>
 </body>
 </html>
