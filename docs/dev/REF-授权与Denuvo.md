@@ -4,7 +4,7 @@
 
 ## Denuvo / 授权
 
-- 需 **AppTicket + ETicket 双票**，不可本地伪造；ETicket 由 Steam 实时签发，**30 分钟有效**（报错 88500005）。
+- 需 **AppTicket + ETicket 双票**，不可本地伪造；ETicket 由 Steam 实时签发，**30 分钟时效**，仅"需要重新激活"时才校验（设备许可在则不重复验票）。⚠️ 不要把 `88500005` 当成票据过期：它是 Denuvo 的反篡改/滥用处罚族（约 2 周），陈旧票据多表现为 `88500012`——勘误见 `ZSteamTool/docs/dev/REF-内核-Denuvo与授权.md` §授权窗口。
 - 提取授权存在"本地缓存的过时授权"假象，且无法程序化验证账号正伪（ETicket 请求会被内核拦截）→ 采用导出时弹窗提醒策略。
 - `.ost` 为明文 JSON：AppTicket / ETicket / Source(Steam 用户名) / CreatedAt / ExpiresAt / UseCount / ExporterVersion。
 - 导入写注册表（`HKCU\Software\Valve\Steam\Apps\<appid>` 的 `AppTicket` / `ETicket`；**GUI 不写 `SteamID`**），本机任意 Steam 账号可用；部分游戏 DLC 也受 D 加密，只带主游戏票时 DLC 可能解锁失败。
