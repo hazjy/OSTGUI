@@ -68,6 +68,7 @@ docs/                changelog（逐版本更新说明）与 dev（开发文档�
 
 | 内容 | 位置 |
 |---|---|
+| 用户手册（安装、入库、联机、排查） | `docs/guide/` |
 | 架构、服务索引、已知限制 | `docs/dev/DEV-NOTES.md` |
 | 各领域机制与实测结论 | `docs/dev/REF-*.md` |
 | 逐版本改动 | `docs/changelog/` |
