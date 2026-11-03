@@ -28,6 +28,10 @@ public class DepotInfo
     public string DlcAppId { get; set; } = string.Empty;
     public List<string> Manifests { get; set; } = new();
     public string DecryptionKey { get; set; } = string.Empty;
+    /// <summary>平台位（appinfo 的 config.oslist：windows / linux / macos，可能为空）</summary>
+    public string OsList { get; set; } = string.Empty;
+    /// <summary>共享安装 depot（appinfo 的 sharedinstall）：属于别的 app 的公共库</summary>
+    public bool SharedInstall { get; set; }
 }
 
 [WinRT.GeneratedBindableCustomProperty]

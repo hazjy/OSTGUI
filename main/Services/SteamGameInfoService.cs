@@ -143,6 +143,9 @@ public class SteamGameInfoService
                     if (depotData.TryGetProperty("name", out var depotName))
                         depot.Name = depotName.GetString() ?? "";
 
+                    depot.OsList = ReadNestedString(depotData, "config", "oslist");
+                    depot.SharedInstall = ReadBoolFlag(depotData, "sharedinstall");
+
                     if (depotData.TryGetProperty("manifests", out var manifestsObj) &&
                         manifestsObj.TryGetProperty("public", out var publicManifest))
                     {
@@ -203,6 +206,30 @@ public class SteamGameInfoService
         return 0;
     }
 
+    /// <summary>读嵌套一层的字符串字段（appinfo 的 <c>config.oslist</c> 这类），缺字段返回空串</summary>
+    private static string ReadNestedString(JsonElement obj, string parent, string name)
+    {
+        return obj.TryGetProperty(parent, out var p) && p.ValueKind == JsonValueKind.Object &&
+               p.TryGetProperty(name, out var v) && v.ValueKind == JsonValueKind.String
+            ? v.GetString() ?? string.Empty
+            : string.Empty;
+    }
+
+    /// <summary>
+    /// 读 appinfo 的开关字段（<c>sharedinstall</c>）：Valve 有时给 <c>true</c>，有时给 <c>"1"</c>/<c>1</c>
+    /// </summary>
+    private static bool ReadBoolFlag(JsonElement obj, string name)
+    {
+        if (!obj.TryGetProperty(name, out var v)) return false;
+        return v.ValueKind switch
+        {
+            JsonValueKind.True => true,
+            JsonValueKind.Number => v.TryGetInt64(out var n) && n != 0,
+            JsonValueKind.String => long.TryParse(v.GetString(), out var s) && s != 0,
+            _ => false
+        };
+    }
+
     /// <summary>
     /// 从 Steam 官方 Store API 获取游戏详情（含 depot 和 manifest）
     /// </summary>
@@ -260,6 +287,9 @@ public class SteamGameInfoService
 
                     var depotData = prop.Value;
                     var depot = new DepotInfo { DepotId = depotId };
+
+                    depot.OsList = ReadNestedString(depotData, "config", "oslist");
+                    depot.SharedInstall = ReadBoolFlag(depotData, "sharedinstall");
 
                     if (depotData.TryGetProperty("manifests", out var manifestsObj) &&
                         manifestsObj.TryGetProperty("public", out var publicManifest))

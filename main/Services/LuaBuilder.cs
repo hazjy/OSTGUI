@@ -38,7 +38,7 @@ public class LuaBuilder
         var keyCount = 0;
 
         // 补全全部 depot（SteamCMD 列表），避免缺失 depot 下载时无密钥报"内容加密"
-        var allDepots = await MergeAllDepotsAsync(appId, depots, ct);
+        var (allDepots, keyCheckExempt) = await MergeAllDepotsAsync(appId, depots, ct);
 
         // 先算出"这次入库要哪些 id"（appId + 各 depot + 各 DLC），再去缓存取键：
         // 缓存 22 万条，流式扫描只留命中的那几百条（见 SudamaKeyCache.LoadLookupAsync）。
@@ -85,8 +85,9 @@ public class LuaBuilder
             var hasKey = keys.TryGet(depotId, out var key) && key.Length == 64;
 
             // 无 manifest 的壳型 depot（纯所有权声明，如部分 DLC 占位）没有可解密的内容，
-            // 本就不需要密钥，不计入缺失警告
-            var requiresKey = !string.IsNullOrEmpty(manifestGid);
+            // 本就不需要密钥，不计入缺失警告；
+            // 非 Windows 平台与 sharedinstall 的 depot 一并在 keyCheckExempt 里排除（见 MergeAllDepotsAsync）。
+            var requiresKey = !string.IsNullOrEmpty(manifestGid) && !keyCheckExempt.Contains(depotId);
             if (requiresKey && !hasKey)
                 missingKeyDepots.Add(depotId);
 
@@ -164,13 +165,16 @@ public class LuaBuilder
     /// <summary>
     /// 合并 SteamCMD 返回的全部 depot，补全缺失项。
     /// 没有清单 GID 的 depot 不固定版本，下载时由 OST 内核自动获取 manifest 请求码。
+    /// 同时返回"不参与缺密钥判断"的 depot 集合（非 Windows 平台 / sharedinstall）。
     /// </summary>
-    private async Task<List<(string depotId, string manifestGid, long manifestSize)>> MergeAllDepotsAsync(
+    private async Task<(List<(string depotId, string manifestGid, long manifestSize)> depots,
+                        HashSet<string> keyCheckExempt)> MergeAllDepotsAsync(
         string appId,
         List<(string depotId, string manifestGid, long manifestSize)> known,
         CancellationToken ct = default)
     {
         var merged = new Dictionary<string, (string gid, long size)>();
+        var exempt = new HashSet<string>(StringComparer.Ordinal);
         foreach (var (id, gid, size) in known)
             merged[id] = (gid, size);
 
@@ -181,6 +185,7 @@ public class LuaBuilder
             {
                 foreach (var depot in game.Depots.Values)
                 {
+                    if (IsKeyCheckExempt(depot)) exempt.Add(depot.DepotId);
                     if (merged.ContainsKey(depot.DepotId)) continue;
                     var gid = depot.Manifests.Count > 0 ? depot.Manifests[0] : "";
                     merged[depot.DepotId] = (gid, depot.MaxSize);
@@ -198,9 +203,20 @@ public class LuaBuilder
             Log($"补全 depot 失败：{ex.Message}");
         }
 
-        return merged
+        return (merged
             .Select(kv => (kv.Key, kv.Value.gid, kv.Value.size))
-            .ToList();
+            .ToList(), exempt);
+    }
+
+    /// <summary>
+    /// 该 depot 是否不参与「缺密钥」判断：非 Windows 平台（<c>config.oslist</c> 有值且不含 windows）
+    /// 和 sharedinstall（别的 app 的公共共享库）在 Windows 上根本不会挂载，报警只会是误报。
+    /// </summary>
+    private static bool IsKeyCheckExempt(DepotInfo depot)
+    {
+        if (depot.SharedInstall) return true;
+        var osList = depot.OsList?.Trim() ?? "";
+        return osList.Length > 0 && !osList.Contains("windows", StringComparison.OrdinalIgnoreCase);
     }
 
     /// <summary>
