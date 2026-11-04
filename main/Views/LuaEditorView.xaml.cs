@@ -54,6 +54,50 @@ public sealed partial class LuaEditorView : UserControl
         Editor.SelectionChanged += (_, _) => UpdateStatus();
         Editor.KeyDown += Editor_KeyDown;
         Editor.ActualThemeChanged += (_, _) => HighlightAll();
+
+        Loaded += (_, _) => HookWindowSize();
+    }
+
+    // ── 尺寸自适应 ──────────────────────────────────────────────
+
+    /// <summary>宽窗时的舒适尺寸（原来写死在 XAML 里的值）。</summary>
+    private const double PreferredWidth = 820;
+    private const double PreferredHeight = 480;
+
+    /// <summary>
+    /// 对话框自身占位：标题行 + 按钮行 + 内容内边距 + 行间距。
+    /// 用来把"窗口高度"换算成"内容区能拿到的可用高度"。
+    /// </summary>
+    private const double DialogChromeHeight = 176;
+    private const double DialogChromeWidth = 72;
+
+    /// <summary>
+    /// 跟随窗口尺寸给自身设上下限。
+    ///
+    /// 原因：对话框的内容板不会因为窗口变矮而收窄，内容比内容区高时就直接裁掉
+    /// （实测：窗口缩到 800×560 时底部状态行与编辑框下边框消失）。
+    /// 所以下限也不能是常量，要跟着窗口一起缩；上限则让 <c>*</c> 行真正吃到剩余高度，
+    /// 溢出交给 RichEditBox 自己的竖向滚动条。
+    /// </summary>
+    private void HookWindowSize()
+    {
+        if (XamlRoot is null) return;
+        ApplyWindowSizeCaps();
+        XamlRoot.Changed += (_, _) => ApplyWindowSizeCaps();
+    }
+
+    private void ApplyWindowSizeCaps()
+    {
+        var root = XamlRoot;
+        if (root is null) return;
+
+        var availableH = root.Size.Height - DialogChromeHeight;
+        var availableW = root.Size.Width - DialogChromeWidth;
+
+        MinWidth = Math.Min(PreferredWidth, Math.Max(320, availableW));
+        MinHeight = Math.Min(PreferredHeight, Math.Max(200, availableH));
+        MaxWidth = Math.Max(320, availableW);
+        MaxHeight = Math.Max(200, availableH);
     }
 
     // ── 载入 / 保存 ─────────────────────────────────────────────
