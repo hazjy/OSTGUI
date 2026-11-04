@@ -56,103 +56,13 @@ public sealed partial class LuaEditorView : UserControl
         Editor.KeyDown += Editor_KeyDown;
         Editor.ActualThemeChanged += (_, _) => HighlightAll();
 
-        Loaded += (_, _) =>
-        {
-            HookWindowSize();
-            HookSmoothWheel();
-        };
+        Loaded += (_, _) => HookWindowSize();
     }
 
-    // ── 滚动（滚轮手感 + 不让重上色把视口拽回光标行）───────────────
+    // ── 重上色时保住视口 ────────────────────────────────────────
 
-    /// <summary>RichEditBox 模板内部那个 ScrollViewer。</summary>
+    /// <summary>RichEditBox 模板内部那个 ScrollViewer，只用来在重上色后把视口放回原处。</summary>
     private Microsoft.UI.Xaml.Controls.ScrollViewer? _innerScroll;
-
-    /// <summary>最近一次"停稳"的竖向偏移（纠正完成后才更新）。</summary>
-    private double _settledOffset;
-
-    /// <summary>这一格滚轮想停的位置；非空表示还在等文本控件的滚动落地。</summary>
-    private double? _pendingTarget;
-
-    /// <summary>滚轮诊断只记一行。</summary>
-    private bool _wheelLogged;
-
-    /// <summary>
-    /// 每格滚轮滚几个**视觉行**。默认是 3 个"逻辑行"，而 lua 里超长行会折行，
-    /// 一格实际跨 6 个视觉行 —— 实测就是 6 行，所以这里压到 2 行。
-    /// </summary>
-    private const double WheelLinesPerNotch = 2;
-
-    /// <summary>单行高度 ≈ 字号 × 1.35（13px 字体实测约 17.6px）。</summary>
-    private const double LineHeightFactor = 1.35;
-
-    private void HookSmoothWheel()
-    {
-        // handledEventsToo: true —— 文本控件自己先处理过滚轮，不这样拿不到这次事件
-        Editor.AddHandler(PointerWheelChangedEvent, new PointerEventHandler(Editor_PointerWheelChanged), true);
-        EnsureScroll();   // 先把 ViewChanged 挂上，之后每一次真实滚动都会喂给 _settledOffset
-    }
-
-    /// <summary>
-    /// WinUI 没有暴露滚轮步进，滚多少由文本控件自己的滚动逻辑决定，我们的处理只能跑在它**之后**。
-    /// 所以改成"设目标 + 落地纠正"：这里只登记目标位置，等它滚完在 <see cref="OnEditorViewChanged"/>
-    /// 里把视口摆回目标，最终一格就是 2 个视觉行。
-    /// </summary>
-    private void Editor_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
-    {
-        var scroll = EnsureScroll();
-        if (scroll is null) return;
-
-        var delta = e.GetCurrentPoint(Editor).Properties.MouseWheelDelta;
-        if (delta == 0) return;
-
-        var step = Editor.FontSize * LineHeightFactor * WheelLinesPerNotch;
-        _pendingTarget = Math.Clamp(_settledOffset - delta / 120.0 * step, 0, scroll.ScrollableHeight);
-
-        if (!_wheelLogged)
-        {
-            _wheelLogged = true;
-            LogService.Event($"滚轮：ScrollableHeight={scroll.ScrollableHeight:F0} 停稳位置={_settledOffset:F0} 目标={_pendingTarget:F0} 每格={step:F0}px");
-        }
-
-        scroll.ChangeView(null, _pendingTarget, null, true);
-        e.Handled = true;
-    }
-
-    /// <summary>文本控件滚完（带动画）后把视口纠正到目标位置；稳定后记下新的停稳位置。</summary>
-    private void OnEditorViewChanged(object? sender, ScrollViewerViewChangedEventArgs e)
-    {
-        if (sender is not Microsoft.UI.Xaml.Controls.ScrollViewer sv) return;
-
-        if (_pendingTarget is not double target)
-        {
-            if (!e.IsIntermediate) _settledOffset = sv.VerticalOffset;
-            return;
-        }
-
-        if (Math.Abs(sv.VerticalOffset - target) < 0.5)
-        {
-            _pendingTarget = null;
-            _settledOffset = target;
-        }
-        else
-        {
-            sv.ChangeView(null, target, null, true);
-        }
-    }
-
-    private Microsoft.UI.Xaml.Controls.ScrollViewer? EnsureScroll()
-    {
-        if (_innerScroll is not null) return _innerScroll;
-
-        _innerScroll = FindScrollingView(Editor);
-        if (_innerScroll is not null)
-        {
-            _settledOffset = _innerScroll.VerticalOffset;
-            _innerScroll.ViewChanged += OnEditorViewChanged;
-        }
-        return _innerScroll;
-    }
 
     /// <summary>
     /// 取"真正在滚"的那个 ScrollViewer。模板里有好几个，能滚的那个 ScrollableHeight 才有值；
@@ -314,7 +224,7 @@ public sealed partial class LuaEditorView : UserControl
 
         // 上色是"整篇重设前景色"，RichEdit 会顺手把视口滚回光标所在行 —— 用户往上翻着看代码时
         // 只要命中一次重上色就被拽回去。记下当前位置，画完再放回。
-        var scroll = EnsureScroll();
+        var scroll = _innerScroll ??= FindScrollingView(Editor);
         var restoreOffset = scroll?.VerticalOffset ?? 0;
 
         Editor.Document.BatchDisplayUpdates();
