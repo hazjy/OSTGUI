@@ -163,19 +163,29 @@ public sealed partial class SettingsPage : Page
     /// 旧实现是"聚焦时记一份旧值、失焦时比对"，只靠 <c>GotFocus</c> 那一次快照 —— 任何让快照错位的时序
     /// （页面重建 / 程序化聚焦 / 绑定晚于聚焦才写进框里 / 焦点落到模板回收后的新实例）都会算错，
     /// 而且是两个方向都错：**没改也会刷新时间**（切页、走人时顺手补一次），改了也可能不刷新。
-    /// 现在改成两条硬条件：① 这次聚焦期间用户在框里真的动过内容（<c>PasswordChanged</c> + 框有焦点，
-    /// 绑定回写发生在未聚焦时，不会被算进来）；② 内容与"已保存内容"不同。
+    /// 现在三条硬条件：① 这次聚焦期间用户在框里真的动过内容（<c>PasswordChanged</c> + 框有焦点，
+    /// 绑定回写发生在未聚焦时，不会被算进来）；② 内容与"已保存内容"不同；
+    /// ③ **右键菜单粘贴**是例外：那时候焦点在菜单上，框已是 Unfocused，之后也不会再有那次失焦，
+    /// 所以在 <c>PasswordChanged</c> 里当场比对一次（详见下面那句注释）。
     /// </summary>
     private readonly HashSet<string> _editedTokenSourceIds = new();
 
     private void OnTokenPasswordChanged(object sender, RoutedEventArgs e)
     {
-        // 键入 / 粘贴 / 清除都算"动过"；绑定把配置里的值写进框时框没有焦点，不会记
-        if (sender is PasswordBox { DataContext: ManifestSource ms } pb
-            && pb.FocusState != FocusState.Unfocused)
+        if (sender is not PasswordBox { DataContext: ManifestSource ms } pb) return;
+
+        // 键入 / Ctrl+V：框有焦点，先记一笔，等失焦时统一比对写入（避免每敲一个字符都落盘）
+        if (pb.FocusState != FocusState.Unfocused)
         {
             _editedTokenSourceIds.Add(ms.Id);
+            return;
         }
+
+        // 框没有焦点、内容却变了 —— 只有**右键菜单里的粘贴/剪切**会这样（焦点在菜单上）。
+        // 这种操作之后不会再出现"用户动过"的那次失焦，所以当场比对一次；
+        // 绑定把模型值回写进框时也走这里，但内容与已保存值相同，是空操作。
+        _editedTokenSourceIds.Remove(ms.Id);
+        VM.MarkManifestKeyUpdatedIfChanged(ms, pb.Password);
     }
 
     private void OnTokenLostFocus(object sender, RoutedEventArgs e)
