@@ -65,47 +65,48 @@ public sealed partial class LuaEditorView : UserControl
 
     // ── 滚动（滚轮手感 + 不让重上色把视口拽回光标行）───────────────
 
-    /// <summary>RichEditBox 模板内部那个 ScrollViewer，滚轮和视口都归它管。</summary>
+    /// <summary>RichEditBox 模板内部那个 ScrollViewer。</summary>
     private Microsoft.UI.Xaml.Controls.ScrollViewer? _innerScroll;
 
+    /// <summary>上一次（默认滚动还没发生时的）竖向偏移，滚轮按它算目标位置。</summary>
+    private double _lastOffset;
+
     /// <summary>
-    /// 每格滚轮滚几个**视觉行**。
-    /// 系统默认是按"逻辑行"滚 3 行，而 lua 里大量超长行会折行，一格实际跨过 6~9 个视觉行，
-    /// 所以显得一跳一大截。这里改成按视觉行算，并且只要 2 行。
+    /// 每格滚轮滚几个**视觉行**。默认是 3 个"逻辑行"，而 lua 里超长行会折行，
+    /// 一格实际跨 6 个视觉行 —— 实测就是 6 行，所以这里压到 2 行。
     /// </summary>
     private const double WheelLinesPerNotch = 2;
 
-    /// <summary>行高估算：13px 字体的单行高度实测约 1.35 倍字号。</summary>
+    /// <summary>单行高度 ≈ 字号 × 1.35（13px 字体实测约 17.6px）。</summary>
     private const double LineHeightFactor = 1.35;
 
     private void HookSmoothWheel()
     {
         _innerScroll = FindInnerScrollViewer(Editor);
-        // handledEventsToo: true —— 文本控件自己先处理了滚轮，不这样拿不到这次事件
+        if (_innerScroll is null) return;
+
+        _lastOffset = _innerScroll.VerticalOffset;
+        _innerScroll.ViewChanged += (_, _) => _lastOffset = _innerScroll.VerticalOffset;
+        // handledEventsToo: true —— 文本控件自己先处理过滚轮，不这样拿不到这次事件
         Editor.AddHandler(PointerWheelChangedEvent, new PointerEventHandler(Editor_PointerWheelChanged), true);
     }
 
+    /// <summary>
+    /// 我们的处理跑在文本控件默认滚动**之后**，拦不住它，所以改成"整个顶掉"：
+    /// 用滚之前记下的偏移算目标，ChangeView 覆盖掉默认那次，最终一格只走 2 个视觉行。
+    /// </summary>
     private void Editor_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
     {
-        var scroll = _innerScroll ??= FindInnerScrollViewer(Editor);
-        if (scroll is null) return;   // 摸不到内部 ScrollViewer 就交回默认行为
+        if (_innerScroll is null) return;
 
         var delta = e.GetCurrentPoint(Editor).Properties.MouseWheelDelta;
         if (delta == 0) return;
-        if (scroll.ScrollableHeight <= 0) return;   // 内容没超出一屏，别拦事件
 
         var step = Editor.FontSize * LineHeightFactor * WheelLinesPerNotch;
+        var target = Math.Clamp(_lastOffset - delta / 120.0 * step, 0, _innerScroll.ScrollableHeight);
 
-        try
-        {
-            var target = Math.Clamp(
-                scroll.VerticalOffset - delta / 120.0 * step,
-                0, Math.Max(0, scroll.ScrollableHeight));
-            // 第四参数 true = 不做动画：滚轮要跟手，动画反而拖
-            scroll.ChangeView(null, target, null, true);
-            e.Handled = true;   // 拦下来，避免默认的行级滚动再叠一次
-        }
-        catch { /* 布局没就绪时跳过，交给默认行为 */ }
+        _lastOffset = target;
+        _innerScroll.ChangeView(null, target, null, true);
     }
 
     private static Microsoft.UI.Xaml.Controls.ScrollViewer? FindInnerScrollViewer(DependencyObject root)
