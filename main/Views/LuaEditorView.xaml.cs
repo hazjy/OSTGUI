@@ -4,6 +4,7 @@ using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 using OSTGUI.Services;
 using Windows.System;
 using Windows.UI;
@@ -55,7 +56,63 @@ public sealed partial class LuaEditorView : UserControl
         Editor.KeyDown += Editor_KeyDown;
         Editor.ActualThemeChanged += (_, _) => HighlightAll();
 
-        Loaded += (_, _) => HookWindowSize();
+        Loaded += (_, _) =>
+        {
+            HookWindowSize();
+            HookSmoothWheel();
+        };
+    }
+
+    // ── 滚动（滚轮手感 + 不让重上色把视口拽回光标行）───────────────
+
+    /// <summary>RichEditBox 模板内部那个 ScrollViewer，滚轮和视口都归它管。</summary>
+    private Microsoft.UI.Xaml.Controls.ScrollViewer? _innerScroll;
+
+    /// <summary>
+    /// 每格滚轮滚多少像素。默认是按"逻辑行"滚的：13px 字体、lua 里又有大量超长行会折行，
+    /// 一格里实际跨过了好几个视觉行，看起来一格一大跳。改成固定像素会让手感细很多。
+    /// </summary>
+    private const double WheelStepPixels = 56;
+
+    private void HookSmoothWheel()
+    {
+        _innerScroll = FindInnerScrollViewer(Editor);
+        // handledEventsToo: true —— 文本控件自己先处理了滚轮，不这样拿不到这次事件
+        Editor.AddHandler(PointerWheelChangedEvent, new PointerEventHandler(Editor_PointerWheelChanged), true);
+    }
+
+    private void Editor_PointerWheelChanged(object sender, PointerRoutedEventArgs e)
+    {
+        var scroll = _innerScroll ??= FindInnerScrollViewer(Editor);
+        if (scroll is null) return;   // 摸不到内部 ScrollViewer 就交回默认行为
+
+        var delta = e.GetCurrentPoint(Editor).Properties.MouseWheelDelta;
+        if (delta == 0) return;
+        if (scroll.ScrollableHeight <= 0) return;   // 内容没超出一屏，别拦事件
+
+        try
+        {
+            var target = Math.Clamp(
+                scroll.VerticalOffset - delta / 120.0 * WheelStepPixels,
+                0, Math.Max(0, scroll.ScrollableHeight));
+            // 第四参数 true = 不做动画：滚轮要跟手，动画反而拖
+            scroll.ChangeView(null, target, null, true);
+            e.Handled = true;   // 拦下来，避免默认的行级滚动再叠一次
+        }
+        catch { /* 布局没就绪时跳过，交给默认行为 */ }
+    }
+
+    private static Microsoft.UI.Xaml.Controls.ScrollViewer? FindInnerScrollViewer(DependencyObject root)
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+            if (child is Microsoft.UI.Xaml.Controls.ScrollViewer sv) return sv;
+            var found = FindInnerScrollViewer(child);
+            if (found is not null) return found;
+        }
+        return null;
     }
 
     // ── 尺寸自适应 ──────────────────────────────────────────────
@@ -192,6 +249,11 @@ public sealed partial class LuaEditorView : UserControl
         var spans = LuaHighlighter.Tokenize(model);
         var palette = CurrentPalette;
 
+        // 上色是"整篇重设前景色"，RichEdit 会顺手把视口滚回光标所在行 —— 用户往上翻着看代码时
+        // 只要命中一次重上色就被拽回去。记下当前位置，画完再放回。
+        var scroll = _innerScroll ??= FindInnerScrollViewer(Editor);
+        var restoreOffset = scroll?.VerticalOffset ?? 0;
+
         Editor.Document.BatchDisplayUpdates();
         try
         {
@@ -206,6 +268,16 @@ public sealed partial class LuaEditorView : UserControl
         finally
         {
             Editor.Document.ApplyDisplayUpdates();
+            if (scroll is not null)
+            {
+                // 立刻放回一次；RichEdit 的"滚到光标"常常发生在下一次布局，
+                // 所以再排一次到队列里补一刀，避免视口被拽走。
+                try { scroll.ChangeView(null, restoreOffset, null, true); } catch { }
+                DispatcherQueue.TryEnqueue(() =>
+                {
+                    try { scroll.ChangeView(null, restoreOffset, null, true); } catch { }
+                });
+            }
         }
     }
 
