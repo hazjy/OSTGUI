@@ -69,10 +69,14 @@ public sealed partial class LuaEditorView : UserControl
     private Microsoft.UI.Xaml.Controls.ScrollViewer? _innerScroll;
 
     /// <summary>
-    /// 每格滚轮滚多少像素。默认是按"逻辑行"滚的：13px 字体、lua 里又有大量超长行会折行，
-    /// 一格里实际跨过了好几个视觉行，看起来一格一大跳。改成固定像素会让手感细很多。
+    /// 每格滚轮滚几个**视觉行**。
+    /// 系统默认是按"逻辑行"滚 3 行，而 lua 里大量超长行会折行，一格实际跨过 6~9 个视觉行，
+    /// 所以显得一跳一大截。这里改成按视觉行算，并且只要 2 行。
     /// </summary>
-    private const double WheelStepPixels = 56;
+    private const double WheelLinesPerNotch = 2;
+
+    /// <summary>行高估算：13px 字体的单行高度实测约 1.35 倍字号。</summary>
+    private const double LineHeightFactor = 1.35;
 
     private void HookSmoothWheel()
     {
@@ -90,10 +94,12 @@ public sealed partial class LuaEditorView : UserControl
         if (delta == 0) return;
         if (scroll.ScrollableHeight <= 0) return;   // 内容没超出一屏，别拦事件
 
+        var step = Editor.FontSize * LineHeightFactor * WheelLinesPerNotch;
+
         try
         {
             var target = Math.Clamp(
-                scroll.VerticalOffset - delta / 120.0 * WheelStepPixels,
+                scroll.VerticalOffset - delta / 120.0 * step,
                 0, Math.Max(0, scroll.ScrollableHeight));
             // 第四参数 true = 不做动画：滚轮要跟手，动画反而拖
             scroll.ChangeView(null, target, null, true);
