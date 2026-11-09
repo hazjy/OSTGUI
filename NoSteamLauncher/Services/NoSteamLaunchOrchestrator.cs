@@ -60,20 +60,17 @@ namespace NoSteamLauncher.Services;
             var gameDir = GameRootResolver.ResolveFromExe(originalExe);
             if (!string.Equals(gameDir, exeDir, StringComparison.OrdinalIgnoreCase))
                 Report(progress, $"Detected engine layout: deploying from game root {gameDir} (Steamworks DLL sits outside the exe folder)");
-            var backupExe = options.BackupOriginalExe ? originalExe + ".bak" : null;
-
-            // 1. 备份原 EXE（已存在则保留，不覆盖：二次部署时当前 EXE 已是脱壳版，覆盖会毁掉唯一原件）
-            if (!options.DryRun && options.BackupOriginalExe && backupExe != null)
+            // 1. 备份原 EXE（无条件执行；已存在则保留，不覆盖：二次部署时当前 EXE 已是脱壳版，
+            //    覆盖会毁掉唯一原件）。这份 .bak 是一键还原的唯一依据。
+            var backupExe = originalExe + ".bak";
+            if (File.Exists(backupExe))
             {
-                if (File.Exists(backupExe))
-                {
-                    Report(progress, $"Original EXE backup already exists, keeping it: {backupExe} (delete it first to re-capture the current EXE)");
-                }
-                else
-                {
-                    File.Copy(originalExe, backupExe);
-                    Report(progress, $"Backed up original EXE to {backupExe}");
-                }
+                Report(progress, $"Original EXE backup already exists, keeping it: {backupExe} (delete it first to re-capture the current EXE)");
+            }
+            else
+            {
+                File.Copy(originalExe, backupExe);
+                Report(progress, $"Backed up original EXE to {backupExe}");
             }
 
             SteamlessResult steamlessResult;
@@ -89,19 +86,16 @@ namespace NoSteamLauncher.Services;
                     Report(progress, $"Steamless succeeded: {steamlessResult.UnpackedExePath}");
 
                     // 替换原 EXE 为解包后的版本，并清理 Steamless 遗留的临时产物
-                    if (!options.DryRun)
+                    File.Copy(steamlessResult.UnpackedExePath, originalExe, true);
+                    Report(progress, "Replaced original EXE with unpacked version");
+                    try
                     {
-                        File.Copy(steamlessResult.UnpackedExePath, originalExe, true);
-                        Report(progress, "Replaced original EXE with unpacked version");
-                        try
-                        {
-                            File.Delete(steamlessResult.UnpackedExePath);
-                        }
-                        catch (Exception cleanupEx)
-                        {
-                            _logger.LogWarning(cleanupEx, "Failed to delete leftover unpacked temp file: {File}",
-                                steamlessResult.UnpackedExePath);
-                        }
+                        File.Delete(steamlessResult.UnpackedExePath);
+                    }
+                    catch (Exception cleanupEx)
+                    {
+                        _logger.LogWarning(cleanupEx, "Failed to delete leftover unpacked temp file: {File}",
+                            steamlessResult.UnpackedExePath);
                     }
                 }
                 else if (steamlessResult.ExitCode != 0 && !steamlessResult.NotPacked)
@@ -131,7 +125,7 @@ namespace NoSteamLauncher.Services;
 
             GBEDeployResult gbeResult;
             // 3. GBE 部署
-            if (!options.DryRun && !options.SkipGBE)
+            if (!options.SkipGBE)
             {
                 Report(progress, "Step 2/3: Deploying GBE (Goldberg Steam Emulator)...");
                 var gbeStopwatch = Stopwatch.StartNew();
@@ -183,14 +177,9 @@ namespace NoSteamLauncher.Services;
                     _gbeDeploy.DeploySteamAPICheckBypass(gameDir, originalExe);
                 }
             }
-            else if (options.SkipGBE)
-            {
-                Report(progress, "Skipping GBE deployment (--skip-gbe)");
-                gbeResult = new GBEDeployResult { Success = true, Duration = TimeSpan.Zero };
-            }
             else
             {
-                Report(progress, "Skipping GBE deployment (--dry-run)");
+                Report(progress, "Skipping GBE deployment (--skip-gbe)");
                 gbeResult = new GBEDeployResult { Success = true, Duration = TimeSpan.Zero };
             }
 

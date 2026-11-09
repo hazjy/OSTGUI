@@ -4,8 +4,6 @@ public sealed class LaunchOptions
 {
     public required string GameExePath { get; init; }
     public required string AppId { get; init; }
-    public bool BackupOriginalExe { get; init; } = true;
-    public bool DryRun { get; init; } = false;
     public bool Verbose { get; init; } = false;
 
     // Steamless options

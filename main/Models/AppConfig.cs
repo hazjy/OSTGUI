@@ -30,10 +30,8 @@ public class AppConfig
     public bool StDownloadManifestDefault { get; set; } = true;
 
     // === 免Steam运行设置 ===
-    public bool DefaultBackupOriginalExe { get; set; } = true;
     public bool SkipSteamlessDefault { get; set; }
     public bool SkipGBEDefault { get; set; }
-    public bool DryRunDefault { get; set; }
     public int SteamlessTimeoutMinutesDefault { get; set; } = 5;
 
     // === 免Steam高级配置 (GBE steam_settings) ===
@@ -139,10 +137,8 @@ public class AppConfig
         RequestCodeSources = RequestCodeSource.GetPresetSources(),
         Extensions = new(),
         // NoSteam options
-        DefaultBackupOriginalExe = true,
         SkipSteamlessDefault = false,
         SkipGBEDefault = false,
-        DryRunDefault = false,
         SteamlessTimeoutMinutesDefault = 5,
         // Advanced GBE config
         AdvancedAccountName = string.Empty,

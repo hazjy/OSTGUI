@@ -52,20 +52,6 @@ public partial class NoSteamViewModel : ObservableObject
         set => SetProperty(ref _appId, value);
     }
 
-    private bool _backupOriginalExe = true;
-
-    public bool BackupOriginalExe
-    {
-        get => _backupOriginalExe;
-        set
-        {
-            if (SetProperty(ref _backupOriginalExe, value))
-            {
-                OnBackupOriginalExeChanged(value);
-            }
-        }
-    }
-
     private bool _skipSteamless;
 
     public bool SkipSteamless
@@ -94,19 +80,6 @@ public partial class NoSteamViewModel : ObservableObject
         }
     }
 
-    private bool _dryRun;
-
-    public bool DryRun
-    {
-        get => _dryRun;
-        set
-        {
-            if (SetProperty(ref _dryRun, value))
-            {
-                OnDryRunChanged(value);
-            }
-        }
-    }
     private int _steamlessTimeoutMinutes = 5;
 
     public int SteamlessTimeoutMinutes
@@ -273,10 +246,8 @@ public partial class NoSteamViewModel : ObservableObject
         try
         {
             var c = _configService.Config;
-            BackupOriginalExe = c.DefaultBackupOriginalExe;
             SkipSteamless = c.SkipSteamlessDefault;
             SkipGBE = c.SkipGBEDefault;
-            DryRun = c.DryRunDefault;
             SteamlessTimeoutMinutes = c.SteamlessTimeoutMinutesDefault;
 
             AdvancedAccountName = c.AdvancedAccountName;
@@ -298,10 +269,8 @@ public partial class NoSteamViewModel : ObservableObject
     {
         _configService.Update(c =>
         {
-            c.DefaultBackupOriginalExe = BackupOriginalExe;
             c.SkipSteamlessDefault = SkipSteamless;
             c.SkipGBEDefault = SkipGBE;
-            c.DryRunDefault = DryRun;
             c.SteamlessTimeoutMinutesDefault = SteamlessTimeoutMinutes;
         });
     }
@@ -321,12 +290,6 @@ public partial class NoSteamViewModel : ObservableObject
         });
     }
 
-    private void OnBackupOriginalExeChanged(bool value)
-    {
-        if (_configService.IsLoaded)
-            SaveOptionsToConfig();
-    }
-
     private void OnSkipSteamlessChanged(bool value)
     {
         if (_configService.IsLoaded)
@@ -334,12 +297,6 @@ public partial class NoSteamViewModel : ObservableObject
     }
 
     private void OnSkipGBEChanged(bool value)
-    {
-        if (_configService.IsLoaded)
-            SaveOptionsToConfig();
-    }
-
-    private void OnDryRunChanged(bool value)
     {
         if (_configService.IsLoaded)
             SaveOptionsToConfig();
@@ -355,23 +312,15 @@ public partial class NoSteamViewModel : ObservableObject
     {
         if (App.MainWindow is Window window)
         {
-            var cbBackup = new CheckBox { Content = "备份原 EXE", IsChecked = BackupOriginalExe };
-            ToolTipService.SetToolTip(cbBackup, "部署前将原 EXE 备份为 .bak");
-
             var cbSkipSteamless = new CheckBox { Content = "跳过 Steamless 脱壳", IsChecked = SkipSteamless };
             ToolTipService.SetToolTip(cbSkipSteamless, "跳过 SteamStub 脱壳步骤（适用于无 Stub 的游戏）");
 
             var cbSkipGBE = new CheckBox { Content = "跳过 GBE 部署", IsChecked = SkipGBE };
             ToolTipService.SetToolTip(cbSkipGBE, "仅运行 Steamless，不部署 Goldberg 模拟器");
 
-            var cbDryRun = new CheckBox { Content = "仅试运行（不修改文件）", IsChecked = DryRun };
-            ToolTipService.SetToolTip(cbDryRun, "模拟部署流程，不实际写入文件，用于预览与调试");
-
             var panel = new StackPanel { Spacing = 16, MinWidth = 360 };
-            panel.Children.Add(cbBackup);
             panel.Children.Add(cbSkipSteamless);
             panel.Children.Add(cbSkipGBE);
-            panel.Children.Add(cbDryRun);
 
             var dialog = new ContentDialog
             {
@@ -388,10 +337,8 @@ public partial class NoSteamViewModel : ObservableObject
 
             if (result == ContentDialogResult.Primary)
             {
-                BackupOriginalExe = cbBackup.IsChecked ?? false;
                 SkipSteamless = cbSkipSteamless.IsChecked ?? false;
                 SkipGBE = cbSkipGBE.IsChecked ?? false;
-                DryRun = cbDryRun.IsChecked ?? false;
             }
         }
     }
@@ -682,10 +629,8 @@ public partial class NoSteamViewModel : ObservableObject
             {
                 GameExePath = GameExePath,
                 AppId = AppId,
-                BackupOriginalExe = BackupOriginalExe,
                 SkipSteamless = SkipSteamless,
                 SkipGBE = SkipGBE,
-                DryRun = DryRun,
                 SteamlessTimeout = TimeSpan.FromMinutes(Math.Max(1, SteamlessTimeoutMinutes)),
 
                 // 高级配置映射
@@ -719,9 +664,7 @@ public partial class NoSteamViewModel : ObservableObject
 
             if (result.Success)
             {
-                var msg = DryRun
-                    ? $"试运行完成，将部署 {result.GBEDeploy.DeployedFiles.Length} 个文件，耗时 {result.TotalDuration.TotalSeconds:F1}s"
-                    : $"部署成功，已部署 {result.GBEDeploy.DeployedFiles.Length} 个文件，耗时 {result.TotalDuration.TotalSeconds:F1}s";
+                var msg = $"部署成功，已部署 {result.GBEDeploy.DeployedFiles.Length} 个文件，耗时 {result.TotalDuration.TotalSeconds:F1}s";
                 ProgressLog += $"[SUCCESS] {msg}\n";
             }
             else
