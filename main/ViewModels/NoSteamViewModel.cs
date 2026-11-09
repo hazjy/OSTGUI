@@ -610,12 +610,14 @@ public partial class NoSteamViewModel : ObservableObject
         if (string.IsNullOrWhiteSpace(GameExePath) || !File.Exists(GameExePath))
         {
             ProgressLog += "[ERROR] 请选择有效的游戏 EXE 文件\n";
+            Notify("部署", "请先选择游戏 EXE 文件", InfoBarSeverity.Warning);
             return;
         }
 
         if (string.IsNullOrWhiteSpace(AppId) || !int.TryParse(AppId, out _))
         {
             ProgressLog += "[ERROR] 请输入有效的 Steam AppID（数字）\n";
+            Notify("部署", "请先填写有效的 AppID", InfoBarSeverity.Warning);
             return;
         }
 
@@ -652,6 +654,7 @@ public partial class NoSteamViewModel : ObservableObject
             catch (Exception ex)
             {
                 ProgressLog += $"[ERROR] 配置验证失败：{ex.Message}\n";
+                Notify("部署失败", "配置有误，请查看下方日志", InfoBarSeverity.Error);
                 IsRunning = false;
                 return;
             }
@@ -664,18 +667,21 @@ public partial class NoSteamViewModel : ObservableObject
 
             if (result.Success)
             {
-                var msg = $"部署成功，已部署 {result.GBEDeploy.DeployedFiles.Length} 个文件，耗时 {result.TotalDuration.TotalSeconds:F1}s";
-                ProgressLog += $"[SUCCESS] {msg}\n";
+                var fileCount = result.GBEDeploy.DeployedFiles.Length;
+                ProgressLog += $"[SUCCESS] 部署成功，已部署 {fileCount} 个文件，耗时 {result.TotalDuration.TotalSeconds:F1}s\n";
+                Notify("部署完成", $"已写入 {fileCount} 个文件");
             }
             else
             {
                 ProgressLog += $"[ERROR] 部署失败：{result.ErrorMessage}\n";
+                Notify("部署失败", "请查看下方日志", InfoBarSeverity.Error);
             }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Deploy failed");
             ProgressLog += $"[ERROR] 异常：{ex.Message}\n";
+            Notify("部署失败", "请查看下方日志", InfoBarSeverity.Error);
         }
         finally
         {
@@ -691,12 +697,14 @@ public partial class NoSteamViewModel : ObservableObject
         if (IsRunning)
         {
             ProgressLog += "[WARN] 正在部署中，请稍后再试\n";
+            Notify("还原", "正在部署，请稍后再试", InfoBarSeverity.Warning);
             return;
         }
 
         if (string.IsNullOrWhiteSpace(GameExePath) || !File.Exists(GameExePath))
         {
             ProgressLog += "[ERROR] 请先选择有效的游戏 EXE 文件\n";
+            Notify("还原", "请先选择游戏 EXE 文件", InfoBarSeverity.Warning);
             return;
         }
 
@@ -712,20 +720,36 @@ public partial class NoSteamViewModel : ObservableObject
             foreach (var failure in result.Failures)
                 ProgressLog += $"[WARN] {failure}\n";
 
-            ProgressLog += result.Success
-                ? "[SUCCESS] 还原完成，游戏目录已回到部署前状态\n"
-                : "[WARN] 还原未完成：请关闭游戏后重试（文件被占用时无法替换）\n";
+            if (result.Success)
+            {
+                ProgressLog += "[SUCCESS] 还原完成，游戏目录已回到部署前状态\n";
+                Notify("还原完成", "游戏目录已回到部署前状态");
+            }
+            else
+            {
+                ProgressLog += "[WARN] 还原未完成：请关闭游戏后重试（文件被占用时无法替换）\n";
+                Notify("还原未完成", "请关闭游戏后重试，详情见下方日志", InfoBarSeverity.Warning);
+            }
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Restore failed");
             ProgressLog += $"[ERROR] 异常：{ex.Message}\n";
+            Notify("还原失败", "请查看下方日志", InfoBarSeverity.Error);
         }
         finally
         {
             IsRunning = false;
         }
     }
+
+    /// <summary>
+    /// 窗口右上角的应用内通知（走 <see cref="MainWindow.Notify"/>，几秒后自动收起）。
+    /// 不用系统 Toast：管理员权限下系统会拦掉，而部署经常需要提权。
+    /// </summary>
+    private static void Notify(string title, string message,
+        Microsoft.UI.Xaml.Controls.InfoBarSeverity severity = Microsoft.UI.Xaml.Controls.InfoBarSeverity.Success)
+        => (App.MainWindow as MainWindow)?.Notify(title, message, severity);
 
     private void ClearLog()
     {
