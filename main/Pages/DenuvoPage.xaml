@@ -38,7 +38,7 @@
                     <StackPanel Spacing="24" MaxWidth="920" HorizontalAlignment="Center" Padding="0,16,0,40">
 
                         <StackPanel Spacing="4">
-                            <TextBlock Text="我该怎么做？" FontSize="30" FontWeight="Bold" />
+                            <TextBlock Text="正版账号授权" FontSize="30" FontWeight="Bold" />
                             <TextBlock Text="正版账号授权使用说明" FontSize="14"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                         </StackPanel>
@@ -61,10 +61,10 @@
                                     </Border>
                                     <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
                                         <TextBlock Text="获得一个拥有正版游戏的账户" FontSize="16" FontWeight="SemiBold" />
-                                        <TextBlock Text="买或租/借，购买价格不应超过 5 元，低价优先"
+                                        <TextBlock Text="买或租/借，低价优先。"
                                                    FontSize="13" TextWrapping="Wrap"
                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                        <TextBlock Text="--注意辨别是不是假入库的所谓“激活码”"
+                                        <TextBlock Text="--注意辨别假入库"
                                                    FontSize="12" TextWrapping="Wrap"
                                                    Foreground="{ThemeResource SystemFillColorCautionBrush}" />
                                     </StackPanel>
@@ -102,8 +102,8 @@
                                                    FontWeight="Bold" Foreground="White" />
                                     </Border>
                                     <StackPanel Grid.Column="1" Spacing="6" VerticalAlignment="Center">
-                                        <TextBlock Text="用自己的账号启动游戏，即可开玩" FontSize="16" FontWeight="SemiBold" />
-                                        <TextBlock Text="--想省心就锁定游戏版本，否则更新后要重新授权"
+                                        <TextBlock Text="在授权窗口（30分钟）内用自己的账号启动一次游戏，即可授权" FontSize="16" FontWeight="SemiBold" TextWrapping="Wrap" />
+                                        <TextBlock Text="--授权有30分钟有效期，请及时使用"
                                                    FontSize="13" TextWrapping="Wrap"
                                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                                     </StackPanel>
@@ -115,47 +115,70 @@
                                 Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                                 BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                             <StackPanel Spacing="20">
-                                <TextBlock Text="常见问题" FontSize="20" FontWeight="SemiBold" />
+                                <TextBlock Text="注意事项" FontSize="20" FontWeight="SemiBold" />
 
-                                <StackPanel Spacing="6">
-                                    <TextBlock Text="Q：如何辨别购物平台账号的真假？" FontSize="15" FontWeight="SemiBold"
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="•" FontSize="13" FontWeight="Bold"
                                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
-                                    <TextBlock Text="低价“激活码 / CDK”一律忽略"
-                                               FontSize="13" TextWrapping="Wrap"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                </StackPanel>
+                                    <TextBlock Grid.Column="1" FontSize="13" TextWrapping="Wrap"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}">
+                                        <Run Text="低价的 " />
+                                        <Run Text="激活码/CDK" FontWeight="SemiBold" />
+                                        <Run Text=" 都是假入库，不要购买。买之前确认是正版账号。红信账号也可以授权" />
+                                    </TextBlock>
+                                </Grid>
 
-                                <StackPanel Spacing="6">
-                                    <TextBlock Text="Q：红信账号影响授权吗？" FontSize="15" FontWeight="SemiBold"
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="•" FontSize="13" FontWeight="Bold"
                                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
-                                    <TextBlock Text="不影响"
-                                               FontSize="13" TextWrapping="Wrap"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                </StackPanel>
+                                    <TextBlock Grid.Column="1" FontSize="13" TextWrapping="Wrap"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               Text="如果正版账号无法正常授权，你可以根据游戏启动的报错弹窗（855/885开头的错误码）确认原因。" />
+                                </Grid>
 
-                                <StackPanel Spacing="6">
-                                    <TextBlock Text="Q：正版账号授权不了怎么办？" FontSize="15" FontWeight="SemiBold"
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="•" FontSize="13" FontWeight="Bold"
                                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
-                                    <TextBlock Text="触发了账户的机器激活限制，可尝试联系卖家更换账户"
-                                               FontSize="13" TextWrapping="Wrap"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                </StackPanel>
+                                    <TextBlock Grid.Column="1" FontSize="13" TextWrapping="Wrap"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               Text="每个正版账号每24小时只能激活5台不同设备" />
+                                </Grid>
 
-                                <StackPanel Spacing="6">
-                                    <TextBlock Text="Q：锁定版本要开吗？" FontSize="15" FontWeight="SemiBold"
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="•" FontSize="13" FontWeight="Bold"
                                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
-                                    <TextBlock Text="在乎新内容就关，想省心就锁定"
-                                               FontSize="13" TextWrapping="Wrap"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                </StackPanel>
+                                    <TextBlock Grid.Column="1" FontSize="13" TextWrapping="Wrap"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               Text="更新游戏版本后需要重新授权，你可以锁定游戏版本" />
+                                </Grid>
 
-                                <StackPanel Spacing="6">
-                                    <TextBlock Text="Q：授权不了会不会是 OSTGUI 的问题？" FontSize="15" FontWeight="SemiBold"
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="•" FontSize="13" FontWeight="Bold"
                                                Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}" />
-                                    <TextBlock Text="不会。授权功能由 OST 内核提供，不由 GUI 实现，GUI 仅提供说明"
-                                               FontSize="13" TextWrapping="Wrap"
-                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                                </StackPanel>
+                                    <TextBlock Grid.Column="1" FontSize="13" TextWrapping="Wrap"
+                                               Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                               Text="授权不了不会是GUI的问题。大多数时候是操作或账号的问题，有时也可能是内核的问题" />
+                                </Grid>
                             </StackPanel>
                         </Border>
 
