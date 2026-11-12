@@ -59,7 +59,7 @@
                 <Border Padding="20" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                         CornerRadius="8" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
                     <StackPanel Spacing="16">
-                        <TextBlock Text="D 加密模式" FontSize="16" FontWeight="SemiBold" />
+                        <TextBlock Text="D 加密身份模式" FontSize="16" FontWeight="SemiBold" />
                         <StackPanel Orientation="Horizontal" Spacing="16">
                             <RadioButton GroupName="DenuvoMode" Content="普通模式（推荐）"
                                          IsChecked="{Binding IsDenuvoNormalMode, Mode=TwoWay}" />
