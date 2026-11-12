@@ -279,7 +279,7 @@
                                  IsReadOnly="True" AcceptsReturn="True"
                                  TextWrapping="Wrap" ScrollViewer.VerticalScrollBarVisibility="Auto"
                                  FontFamily="Cascadia Code, Consolas" FontSize="12"
-                                 Height="600"
+                                 Height="300"
                                  Background="{ThemeResource TextControlBackgroundFocused}" />
                     </StackPanel>
                 </Border>
