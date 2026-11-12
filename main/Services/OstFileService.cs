@@ -47,12 +47,18 @@ public class OstFileService
         {
             var appIdTrimmed = appId.Trim();
             if (string.IsNullOrEmpty(appIdTrimmed))
+            {
+                CleanupEmptyFile(outputPath);
                 return (false, "AppID 不能为空", "");
+            }
 
             var appTicketTrimmed = appTicket?.Trim() ?? "";
             var eTicketTrimmed = eTicket?.Trim() ?? "";
             if (string.IsNullOrEmpty(appTicketTrimmed) && string.IsNullOrEmpty(eTicketTrimmed))
+            {
+                CleanupEmptyFile(outputPath);
                 return (false, "无可导出的授权数据", "");
+            }
 
             var ost = new OstFile
             {
@@ -66,13 +72,41 @@ public class OstFileService
             };
 
             var json = JsonSerializer.Serialize(ost, AppJsonIndentedContext.Default.OstFile);
-            await File.WriteAllTextAsync(outputPath, json, new System.Text.UTF8Encoding(false));
+
+            // 先写临时文件再覆盖：保存对话框已经建出目标文件，直接写一半失败会留下残缺内容
+            var tempPath = outputPath + ".tmp";
+            try
+            {
+                await File.WriteAllTextAsync(tempPath, json, new System.Text.UTF8Encoding(false));
+                File.Move(tempPath, outputPath, overwrite: true);
+            }
+            catch
+            {
+                try { if (File.Exists(tempPath)) File.Delete(tempPath); } catch { }
+                throw;
+            }
+
             return (true, $"已导出 {appIdTrimmed}.ost", outputPath);
         }
         catch (Exception ex)
         {
+            CleanupEmptyFile(outputPath);
             return (false, $"导出失败：{ex.Message}", "");
         }
+    }
+
+    /// <summary>
+    /// 保存对话框（FileSavePicker）在选好路径时就建出了目标文件；导出没写成就把它删掉，
+    /// 只删 0 字节的，避免误删用户原本就有内容的同名文件。
+    /// </summary>
+    private static void CleanupEmptyFile(string path)
+    {
+        try
+        {
+            if (!string.IsNullOrEmpty(path) && File.Exists(path) && new FileInfo(path).Length == 0)
+                File.Delete(path);
+        }
+        catch { }
     }
 
     /// <summary>
@@ -106,6 +140,50 @@ public class OstFileService
         {
             return (false, $"读取失败：{ex.Message}", null);
         }
+    }
+
+    /// <summary>
+    /// 自检：失败路径不能留下 0 字节的 .ost，也不能误删用户已有内容的同名文件。
+    /// ⚠️ 自检跑在 UI 线程（带 DispatcherQueueSynchronizationContext），直接
+    /// <c>GetAwaiter().GetResult()</c> 阻塞异步调用会死锁 —— 必须放到线程池里跑。
+    /// </summary>
+    public static string SelfCheck()
+    {
+        return Task.Run(() =>
+        {
+            var dir = Path.Combine(Path.GetTempPath(), "ostgui-ostcheck-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(dir);
+            var svc = new OstFileService();
+            var ticket = new string('a', 128);
+            try
+            {
+                // 1) 正常导出：写出文件，内容可解析
+                var okPath = Path.Combine(dir, "ok.ost");
+                var (ok, _, _) = svc.ExportAsync("730", "tester", ticket, ticket, okPath).GetAwaiter().GetResult();
+                if (!ok) return "OstFileService：正常导出失败";
+                if (!File.Exists(okPath)) return "OstFileService：正常导出没有产出文件";
+                if (new FileInfo(okPath).Length == 0) return "OstFileService：正常导出写成了空文件";
+
+                // 2) 无授权数据 + 保存对话框预先建出的空文件 → 必须被清掉
+                var emptyPath = Path.Combine(dir, "empty.ost");
+                File.WriteAllText(emptyPath, "");
+                var (ok2, _, _) = svc.ExportAsync("730", "tester", "", "", emptyPath).GetAwaiter().GetResult();
+                if (ok2) return "OstFileService：无授权数据却报导出成功";
+                if (File.Exists(emptyPath)) return "OstFileService：导出失败后残留了 0 字节文件";
+
+                // 3) 失败时不能误删用户已有内容的同名文件
+                var keepPath = Path.Combine(dir, "keep.ost");
+                File.WriteAllText(keepPath, "user-data");
+                _ = svc.ExportAsync("730", "tester", "", "", keepPath).GetAwaiter().GetResult();
+                if (!File.Exists(keepPath)) return "OstFileService：失败时误删了用户原有文件";
+                if (File.ReadAllText(keepPath) != "user-data") return "OstFileService：失败时改动了用户原有文件";
+            }
+            finally
+            {
+                try { Directory.Delete(dir, true); } catch { }
+            }
+            return "";
+        }).GetAwaiter().GetResult();
     }
 
     /// <summary>

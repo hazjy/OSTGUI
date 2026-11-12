@@ -109,15 +109,17 @@ public partial class DenuvoViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 导出 .ost 授权文件：优先在线提取，失败回退本机注册表缓存
+    /// 提取授权（不落盘）。
+    /// ⚠️ 必须在弹保存对话框**之前**调用：FileSavePicker 选好路径那一刻就会创建空文件，
+    /// 提取放在后面时，提取失败也会在磁盘上留一个 0 字节的 .ost。
     /// </summary>
-    public async Task<(bool success, string message)> ExportAsync(string outputPath)
+    public async Task<(bool success, string message, SteamTicketExtractor.ExtractResult? result)> ExtractAsync()
     {
         var appId = ExportAppId.Trim();
         if (string.IsNullOrEmpty(appId))
         {
             (App.MainWindow as MainWindow)?.Notify("导出授权", "请先填写游戏 AppID", Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning);
-            return (false, "AppID 为空");
+            return (false, "AppID 为空", null);
         }
 
         IsExporting = true;
@@ -128,29 +130,45 @@ public partial class DenuvoViewModel : ObservableObject
             if (!extract.Success)
             {
                 ToastService.ShowError("导出授权", $"AppID {appId} 提取失败：{extract.Message}");
-                return (false, extract.Message);
+                return (false, extract.Message, null);
             }
 
-            var account = _steamService.GetCurrentSteamAccount();
-            var sourceName = !string.IsNullOrEmpty(account?.PersonaName)
-                ? account.Value.PersonaName
-                : !string.IsNullOrEmpty(account?.AccountName)
-                    ? account.Value.AccountName
-                    : "本地账号";
+            // 两手都空时不生成文件（理论上 extract.Success 已保证非空，这里兜底）
+            if (string.IsNullOrWhiteSpace(extract.AppTicketHex) && string.IsNullOrWhiteSpace(extract.ETicketHex))
+            {
+                ToastService.ShowError("导出授权", $"AppID {appId} 未取到授权数据");
+                return (false, "未取到授权数据", null);
+            }
 
-            var (ok, msg, filePath) = await _ostFileService.ExportAsync(
-                appId, sourceName, extract.AppTicketHex, extract.ETicketHex, outputPath);
-
-            if (ok)
-                ToastService.ShowSuccess("导出成功", $"{filePath}\n授权有效期至 {DateTime.Now.Add(OstFileService.DefaultValidity):HH:mm}，请尽快使用");
-            else
-                ToastService.ShowError("导出失败", msg);
-            return (ok, msg);
+            return (true, extract.Message, extract);
         }
         finally
         {
             IsExporting = false;
         }
+    }
+
+    /// <summary>把已提取的授权写成 .ost；保存对话框可能已建出空文件，失败时由服务层清掉。</summary>
+    public async Task<(bool success, string message)> WriteOstAsync(
+        string outputPath, SteamTicketExtractor.ExtractResult extract)
+    {
+        var appId = ExportAppId.Trim();
+
+        var account = _steamService.GetCurrentSteamAccount();
+        var sourceName = !string.IsNullOrEmpty(account?.PersonaName)
+            ? account.Value.PersonaName
+            : !string.IsNullOrEmpty(account?.AccountName)
+                ? account.Value.AccountName
+                : "本地账号";
+
+        var (ok, msg, filePath) = await _ostFileService.ExportAsync(
+            appId, sourceName, extract.AppTicketHex, extract.ETicketHex, outputPath);
+
+        if (ok)
+            ToastService.ShowSuccess("导出成功", $"{filePath}\n授权有效期至 {DateTime.Now.Add(OstFileService.DefaultValidity):HH:mm}，请尽快使用");
+        else
+            ToastService.ShowError("导出失败", msg);
+        return (ok, msg);
     }
 
     /// <summary>

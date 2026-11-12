@@ -54,6 +54,10 @@ public sealed partial class DenuvoPage : Page
         if (confirmResult != ContentDialogResult.Primary)
             return;
 
+        // 先提取：这一步失败就结束，不弹保存对话框（否则会在磁盘上留下空文件）
+        var (extractOk, extractMessage, extract) = await VM.ExtractAsync();
+        if (!extractOk || extract is null) return;
+
         var picker = new FileSavePicker
         {
             SuggestedFileName = $"{appId}.ost"
@@ -64,7 +68,7 @@ public sealed partial class DenuvoPage : Page
         var file = await picker.PickSaveFileAsync();
         if (file == null) return;
 
-        await VM.ExportAsync(file.Path);
+        await VM.WriteOstAsync(file.Path, extract);
     }
 
     private async void ImportOst_Click(object sender, RoutedEventArgs e)

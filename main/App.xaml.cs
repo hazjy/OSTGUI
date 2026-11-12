@@ -83,6 +83,7 @@ public partial class App : Application
             if (failure.Length == 0) failure = ManifestSource.SelfCheck();
             if (failure.Length == 0) failure = ManifestDownloadService.SelfCheck();
             if (failure.Length == 0) failure = ConfigService.SelfCheck();
+            if (failure.Length == 0) failure = OstFileService.SelfCheck();
             LogService.Diag(failure.Length == 0 ? "自检通过" : $"自检失败：{failure}");
             Environment.Exit(failure.Length == 0 ? 0 : 1);
             return;
