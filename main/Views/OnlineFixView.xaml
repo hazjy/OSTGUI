@@ -84,9 +84,10 @@
             <!-- 使用说明弹窗（本页唯一的 XAML 内联弹窗，其余弹窗都是 C# 动态创建） -->
             <ContentDialog x:Name="OnlineGuideDialog"
                            Title="使用说明"
-                           SecondaryButtonText=" "
-                           CloseButtonText="关闭"
-                           DefaultButton="Close">
+                           PrimaryButtonText="好的"
+                           PrimaryButtonStyle="{StaticResource AccentButtonStyle}"
+                           CloseButtonText="退出"
+                           DefaultButton="Primary">
                 <ScrollViewer MaxHeight="460" VerticalScrollBarVisibility="Auto">
                     <StackPanel Spacing="14">
                         <StackPanel Spacing="6">
