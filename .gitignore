@@ -5,6 +5,11 @@ obj/
 *.user
 *.suo
 
+# IDE 与编辑器状态（.vs 曾被 git add -A 带进仓库一次）
+.vs/
+.idea/
+.vscode/
+
 # 日志与用户数据
 crash.log
 WindowStateSaveData.json
