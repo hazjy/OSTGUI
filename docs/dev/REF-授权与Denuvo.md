@@ -1,16 +1,18 @@
 # REF-授权与Denuvo（GUI 侧）
 
-> 只收 Denuvo 授权（.ost 导入导出）与 D 加密模式读写；分工与文档地图见工作区根 `README.md`。
+> 何时读：改 `.ost` 导入导出、D 加密身份模式读写，或排查 88500xxx 报错时。
+> 管什么：Denuvo 授权（`.ost` 导入导出）与 D 加密身份模式读写。
+> 不写什么：身份模式语义与协议层边界见 `ZSteamTool/docs/dev/REF-内核-Denuvo与授权.md`。
 
 ## Denuvo / 授权
 
-- 需 **AppTicket + ETicket 双票**，不可本地伪造；ETicket 由 Steam 实时签发，**30 分钟时效**，仅"需要重新激活"时才校验（设备许可在则不重复验票）。⚠️ 不要把 `88500005` 当成票据过期：它是 Denuvo 的反篡改/滥用处罚族（约 2 周），陈旧票据多表现为 `88500012`——勘误见 `ZSteamTool/docs/dev/REF-内核-Denuvo与授权.md` §授权窗口。
+- 需 **AppTicket + ETicket 双票**，不可本地伪造；ETicket 由 Steam 实时签发，**30 分钟时效**，仅"需要重新激活"时才校验（设备许可在则不重复验票）。注意：`88500005` 属 Denuvo 的反篡改 / 滥用处罚族（约 2 周），票据过期多表现为 `88500012`；勘误见 `ZSteamTool/docs/dev/REF-内核-Denuvo与授权.md` §授权窗口。
 - 提取授权存在"本地缓存的过时授权"假象，且无法程序化验证账号正伪（ETicket 请求会被内核拦截）→ 采用导出时弹窗提醒策略。
 - `.ost` 为明文 JSON：AppTicket / ETicket / Source(Steam 用户名) / CreatedAt / ExpiresAt / UseCount / ExporterVersion。
 - 导入写注册表（`HKCU\Software\Valve\Steam\Apps\<appid>` 的 `AppTicket` / `ETicket`；**GUI 不写 `SteamID`**），本机任意 Steam 账号可用；部分游戏 DLC 也受 D 加密，只带主游戏票时 DLC 可能解锁失败。
 - 每账号每天最多 5 台新机器激活；已激活机器不消耗。
 - 与 .cw/.shiki（流畅入库私有格式）不兼容是刻意选择。
-- 身份模式（`[denuvo] mode`）的两种语义、切换后果与协议层边界见 `REF-内核-Denuvo与授权.md`；GUI 侧读写实现见本文件 §D 加密模式读写。
+- 身份模式（`[denuvo] mode`）的两种语义、切换后果与协议层边界见 `ZSteamTool/docs/dev/REF-内核-Denuvo与授权.md`；GUI 侧读写实现见本文件 §D 加密模式读写。
 
 ## D 加密模式读写（GUI 侧事实）
 

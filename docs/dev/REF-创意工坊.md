@@ -1,6 +1,8 @@
 # REF-创意工坊（GUI 侧）
 
-> 只收创意工坊下载（Phase 1）；分工与文档地图见工作区根 `README.md`。
+> 何时读：改创意工坊（workshop depot）下载、主游戏行密钥注入，或排查「内容仍处于加密」时。
+> 管什么：创意工坊下载（Phase 1）的实现事实与限制。
+> 不写什么：清单源、密钥缓存与级联见 `SOURCES.md`；manifest code / 密钥注入的内核实现见 `ZSteamTool/docs/dev/REF-内核-客户端适配.md`。
 
 ## 创意工坊下载（Phase 1，GUI 侧实现事实）
 

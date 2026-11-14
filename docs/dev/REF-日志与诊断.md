@@ -1,6 +1,8 @@
 # REF-日志与诊断（GUI 侧）
 
-> 只收日志流、文件侧时序与崩溃钩子；分工与文档地图见工作区根 `README.md`。
+> 何时读：改日志写入 / 裁剪 / 崩溃钩子，或排查「没有日志」「下载失败」时。
+> 管什么：单一日志流、文件侧时序、崩溃钩子。
+> 不写什么：环境侧绕法与代理对下载链路的影响见 `doc/开发经验.md` §五；清单 / 请求码链路见 `SOURCES.md`。
 
 ## 日志系统（单一日志流）
 
@@ -20,5 +22,5 @@
 
 ## 读日志的坑
 
-- **`Get-ChildItem` 报的大小不可信**：被进程持有的文件（内核 `opensteamtool\*.log`、Steam 的 `logs\*.txt`）目录项长度不刷新——实测 `package.log` 显示 0 字节实际 9 KB、`main.log` 显示 2335 实际 12 KB。判"日志空不空"必须 `(Get-Content $p -Raw).Length` 真读，否则会得出"一条日志都没写"的错误结论。
-- **"下载失败"的诊断顺序**：先看 Steam 自己的 `logs\connection_log.txt`（连通性测试，`Got HTTP 502` / `ConnectFailed` 都在这）与 `logs\content_log.txt`（`Failed to get manifest request code` 之类原文），再看内核 `opensteamtool\*.log` 与脚本。代理抽风的表现就是"下载失败"，不是"网络错误"。
+- **`Get-ChildItem` 报的大小不可信**：被进程持有的文件（内核 `opensteamtool\*.log`、Steam 的 `logs\*.txt`）目录项长度不刷新：实测 `package.log` 显示 0 字节实际 9 KB、`main.log` 显示 2335 实际 12 KB。判"日志空不空"必须 `(Get-Content $p -Raw).Length` 真读，否则会得出"一条日志都没写"的错误结论。
+- **"下载失败"的诊断顺序**：先看 Steam 自己的 `logs\connection_log.txt`（连通性测试，`Got HTTP 502` / `ConnectFailed` 都在这）与 `logs\content_log.txt`（`Failed to get manifest request code` 之类原文），再看内核 `opensteamtool\*.log` 与脚本。代理抽风在日志里的表现是「下载失败」，容易误判成网络错误。
