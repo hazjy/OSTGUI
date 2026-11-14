@@ -17,6 +17,7 @@
 ### 直接改清单 ID 不能锁版本（查证）
 - 改 depotcache 文件：只是缓存，不触发更新决策。
 - 改 `.acf` gid 为旧值：Steam 判定落后反而强制更到最新；社区做法是改成最新值骗过防更新，不是锁旧版。
+- 改 `.acf` 的 `StateFlags`：它是**状态位**、不是版本输入（SteamKit `EAppState`：`2`=UpdateRequired、`4`=FullyInstalled、`32`=FilesMissing、`2048`=Uninstalling，余位见该枚举），由 Steam 拿 `buildid` 与 `InstalledDepots/*/manifest` 跟服务器 PICS 比对后写出 → 强改只能骗过一时，一次比对即改回，还可能被判 `FilesCorrupt` 触发重下。本机现状可对照：`6` = 已安装+需更新、`2086` = 需更新+已安装+文件缺失+卸载中。
 - 锁版本唯一正道：内核 hook（见本文件 §固定版本体系对应实现）。
 
 ## 清单投喂位置：两级 depotcache（查证）

@@ -8,13 +8,14 @@
 addappid(2001760)                                  -- 解锁主游戏（假装拥有）
 addappid(2001761, 1, "64位hex")                   -- 解锁 depot + 注入解密密钥
 addappid(2827030)                                  -- DLC：只解锁不带密钥（多数复用本体 key）
-addtoken(2001760, "令牌")                          -- 受限 app 获取 appinfo 需要
+addtoken(2001760, "令牌")                          -- 受限 app 获取 appinfo 需要（缺失见下方"后果"）
 setManifestid(2001761, "gid", 大小)               -- 固定版本（锁 depot 的 manifest）
 ```
 
 - `addappid` 第二参数内核实际忽略（源码只读第 1、3 参数）；密钥必须恰好 64 字符否则不生效。
 - `--` 开头是注释，内核忽略；函数名不区分大小写；文件放 `config\lua\{AppId}.lua`，内核热重载。
 - `setManifestid` 有则锁版本，无则自动更新；大小可省略（内核实际把 size 强制为 0）。
+- **缺 `addtoken` 的后果**：内核只在 Lua 里有该 appid 的 `addtoken` 时才往 `CMsgClientPICSProductInfoRequest` 注入 token（`Hooks_NetPacket.cpp` 的 `Hooks_NetPacket_AccessToken`，未注入时打 `skip appid=… in depot, no token configured`），受限 app 因此拿不到 appinfo。**下载**靠 manifest + depot key + 请求码，可以正常完成；**安装/启动**需要 appinfo 给出 depot 列表与 `installdir`，社区反馈此时会报"安装路径无效"，本机尚未复现、未坐实。排查顺序：Lua 有无 `addtoken` → 内核 Debug 版 `opensteamtool\pics.log` 的 `skip appid=` → 同机装一个普通免费游戏是否同样报错（区分 app 侧与库路径侧）。Release 内核不带日志。
 - **`steamtools.lua` 不由本程序维护**：入库 / 补全入库只写 `<AppId>.lua`（两个入口都如此）；只有删除入库时会清理该文件里**旧版留下**的 `addappid` 引用。
 
 ## 搜索与入库链路（GUI 侧实现事实）
