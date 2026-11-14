@@ -478,7 +478,7 @@ item.DlcList = dlcInfo;
         var url = $"https://store.steampowered.com/app/{item.AppId}";
         try
         {
-            await Windows.System.Launcher.LaunchUriAsync(new Uri(url));
+            await OSTGUI.Services.UrlLauncher.OpenAsync(url);
         }
         catch { }
     }

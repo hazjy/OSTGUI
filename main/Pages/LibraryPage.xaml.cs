@@ -397,12 +397,12 @@ public sealed partial class LibraryPage : Page
         if (result == ContentDialogResult.Primary)
         {
             var url = $"https://store.steampowered.com/app/{item.AppId}";
-            _ = Windows.System.Launcher.LaunchUriAsync(new System.Uri(url));
+            OSTGUI.Services.UrlLauncher.Open(url);
         }
         else if (result == ContentDialogResult.Secondary)
         {
             var url = $"https://steamdb.info/app/{item.AppId}/";
-            _ = Windows.System.Launcher.LaunchUriAsync(new System.Uri(url));
+            OSTGUI.Services.UrlLauncher.Open(url);
         }
     }
 }

@@ -249,7 +249,7 @@ public static class UpdateService
     {
         try
         {
-            System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = url, UseShellExecute = true });
+            UrlLauncher.Open(url);
             LogService.Event($"检查更新：已打开{what}");
         }
         catch (Exception ex)

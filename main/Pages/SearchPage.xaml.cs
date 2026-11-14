@@ -207,12 +207,12 @@ public sealed partial class SearchPage : Page
         if (resultDialog == ContentDialogResult.Primary)
         {
             var url = $"https://store.steampowered.com/app/{result.AppId}";
-            _ = Windows.System.Launcher.LaunchUriAsync(new System.Uri(url));
+            OSTGUI.Services.UrlLauncher.Open(url);
         }
         else if (resultDialog == ContentDialogResult.Secondary)
         {
             var url = $"https://steamdb.info/app/{result.AppId}/";
-            _ = Windows.System.Launcher.LaunchUriAsync(new System.Uri(url));
+            OSTGUI.Services.UrlLauncher.Open(url);
         }
     }
 }

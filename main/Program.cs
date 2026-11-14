@@ -31,6 +31,12 @@ public static class Program
             }
         }
 
+        // 诊断：--trace-exceptions 时记录所有首次机会异常（含被 catch 的）。
+        // 给 WinUI stowed exception 用：这类崩溃以 FailFastWithStowedExceptions 结束，
+        // 托管的 UnhandledException 不会触发，只能靠 FirstChance 看到抛出点。
+        if (Array.Exists(args, a => a.Equals("--trace-exceptions", StringComparison.OrdinalIgnoreCase)))
+            Services.FirstChanceTracer.Install();
+
         WinRT.ComWrappersSupport.InitializeComWrappers();
 
         // 系统通知注册：必须早于 Application.Start（早于任何 Show），且**只在这里**——

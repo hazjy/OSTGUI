@@ -35,32 +35,13 @@ public sealed partial class HomePage : Page
     private void FreeVip_Click(object sender, RoutedEventArgs e)
     {
         // 你被骗了 🎵 Never gonna give you up 🎵
-        var url = "https://www.bilibili.com/video/BV1GJ411x7h7";
-        try
-        {
-            var psi = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = url,
-                UseShellExecute = true
-            };
-            System.Diagnostics.Process.Start(psi);
-        }
-        catch { }
+        UrlLauncher.Open("https://www.bilibili.com/video/BV1GJ411x7h7");
     }
 
     private void SteamPP_Click(Microsoft.UI.Xaml.Documents.Hyperlink sender,
                                Microsoft.UI.Xaml.Documents.HyperlinkClickEventArgs args)
     {
-        try
-        {
-            var psi = new System.Diagnostics.ProcessStartInfo
-            {
-                FileName = "https://steampp.net/",
-                UseShellExecute = true
-            };
-            System.Diagnostics.Process.Start(psi);
-        }
-        catch { }
+        UrlLauncher.Open("https://steampp.net/");
     }
 
     private void NavigateMain(string tag)

@@ -135,8 +135,10 @@ public sealed partial class AboutView : UserControl
         {
             try
             {
-                System.Diagnostics.Process.Start(
-                    new System.Diagnostics.ProcessStartInfo { FileName = local, UseShellExecute = true });
+                // 本地文件交给 shell 打开，放后台线程，别让 Explorer/关联程序把 UI 线程卡住
+                var file = local;
+                _ = Task.Run(() => System.Diagnostics.Process.Start(
+                    new System.Diagnostics.ProcessStartInfo { FileName = file, UseShellExecute = true }));
                 return;
             }
             catch (Exception ex)
@@ -153,8 +155,7 @@ public sealed partial class AboutView : UserControl
     {
         try
         {
-            System.Diagnostics.Process.Start(
-                new System.Diagnostics.ProcessStartInfo { FileName = url, UseShellExecute = true });
+            OSTGUI.Services.UrlLauncher.Open(url);
         }
         catch (Exception ex)
         {

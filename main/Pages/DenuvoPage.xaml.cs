@@ -103,12 +103,13 @@ public sealed partial class DenuvoPage : Page
             var htmlPath = Path.Combine(AppContext.BaseDirectory, "Assets", "important.html");
             if (!File.Exists(htmlPath)) return;
 
-            var psi = new System.Diagnostics.ProcessStartInfo
+            // 交给默认浏览器的同时不阻塞 UI 线程
+            var html = htmlPath;
+            _ = Task.Run(() => System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
-                FileName = htmlPath,
+                FileName = html,
                 UseShellExecute = true
-            };
-            System.Diagnostics.Process.Start(psi);
+            }));
         }
         catch { }
     }
