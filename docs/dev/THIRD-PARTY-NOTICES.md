@@ -37,9 +37,10 @@
 
 ## 4. 仅作参考、未随仓库分发的项目
 
-以下项目的源码仅在本机作为实现参考阅读，不包含在本仓库及其发布物中：
+以下项目的源码只在本机作参考阅读，不包含在本仓库及其发布物中；本机现有 clone 仅 FSL、两个 OpenSteamTool fork、SAC，清单见工作区 `RefProjects/README.md`：
 [OpenSteamTool](https://github.com/OpenSteam001/OpenSteamTool)、
-[FluentInstall](https://github.com/Files-community/FluentInstaller) 等见 `RefProjects/`（按优先级分 `1-在用`/`2-挂起`/`3-可清暂留` 三层存放，不纳入版本控制）。
+[FluentInstall](https://github.com/Files-community/FluentInstaller)、
+[SteamAutoCrack](https://github.com/SteamAutoCracks/Steam-auto-crack)。
 
 ## 5. Goldberg R2 模拟器（免育碧）
 
@@ -49,7 +50,7 @@
 | 上游 | https://github.com/Detanup01/Goldberg_r2_extended |
 | 许可证 | GNU LGPL-3.0 |
 | 用途 | 替换育碧游戏的 uplay loader（`uplay_r2_loader64.dll` / `uplaypc_r2_loader64.dll`），无需运行 Ubisoft Connect 即可启动游戏 |
-| 构建说明 | 自 `RefProjects/1-在用/Goldberg_r2_extended`（latest main）源码编译：`cl /std:c++20 /LD /DEMU_RELEASE_BUILD /DNDEBUG emu.cpp User32.lib Shell32.lib Ole32.lib /EHsc /Ox /link /OUT:upc_r2_loader64.dll`；相对最新 release 含 UPC_StorageFileOpen 存档修复 |
+| 构建说明 | 自上游 latest main 源码编译（本机 clone 2026-11-17 已删，重建先重拉）：`cl /std:c++20 /LD /DEMU_RELEASE_BUILD /DNDEBUG emu.cpp User32.lib Shell32.lib Ole32.lib /EHsc /Ox /link /OUT:upc_r2_loader64.dll`；相对最新 release 含 UPC_StorageFileOpen 存档修复 |
 
 > ⚠️ 与 GSE 同样采用 **LGPL-3.0**。本项目以自编译的本体 DLL 形式集成本组件，仅供非商业的学习与研究用途。
 
