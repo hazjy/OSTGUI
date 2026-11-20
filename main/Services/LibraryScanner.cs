@@ -1,4 +1,4 @@
-﻿using System.Text.RegularExpressions;
+using System.Text.RegularExpressions;
 using OSTGUI.Models;
 
 namespace OSTGUI.Services;
@@ -40,7 +40,15 @@ public class LibraryScanner
 
         await Task.Run(() =>
         {
-            var luaFiles = Directory.GetFiles(luaDir, "*.lua");
+            // 显式分流：*.lua 是启用、*.lua.disabled 是被禁用解锁的（Windows 的 *.lua 通配
+            // 会把 .lua.disabled 一起匹配进来，所以不能靠 GetFiles 的通配）
+            var allFiles = Directory.GetFiles(luaDir);
+            var luaFiles = allFiles
+                .Where(f => f.EndsWith(".lua", StringComparison.OrdinalIgnoreCase))
+                .ToList();
+            var disabledFiles = allFiles
+                .Where(f => f.EndsWith(".lua" + LuaConfigService.DisabledSuffix, StringComparison.OrdinalIgnoreCase))
+                .ToList();
 
             // 先解析普通游戏 lua（真实状态），最后处理 steamtools.lua，
             // 否则 steamtools 引用会先登记 AppID，导致游戏 lua 被 seenAppIds 跳过、错误检测失效
@@ -55,6 +63,10 @@ public class LibraryScanner
                 Path.GetFileName(f).Equals("steamtools.lua", StringComparison.OrdinalIgnoreCase));
             if (steamToolsFile != null)
                 ParseSteamToolsLua(steamToolsFile, items, seenAppIds);
+
+            // 被禁用解锁的排在最后：同一 app 两份都在时，以启用那份的状态为准
+            foreach (var file in disabledFiles)
+                ParseGameLua(file, items, seenAppIds);
         });
 
         // 按 AppID 排序
@@ -114,6 +126,7 @@ public class LibraryScanner
                 UnlockerType = "ost",
                 InstalledAppIds = installedIds,
                 VersionMode = versionMode,
+                UnlockDisabled = fileName.EndsWith(LuaConfigService.DisabledSuffix, StringComparison.OrdinalIgnoreCase),
                 LastModified = File.GetLastWriteTime(filePath)
             };
 

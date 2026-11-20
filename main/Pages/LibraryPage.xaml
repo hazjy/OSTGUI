@@ -25,6 +25,7 @@
             <MenuFlyoutItem Text="复制游戏名称" Click="CopyGameName_Click" />
             <MenuFlyoutSeparator />
             <MenuFlyoutItem Text="补齐版本配置" Click="RepairVersionConfig_Click" />
+            <MenuFlyoutItem Tag="toggle-unlock" Text="禁用解锁" Click="ToggleUnlock_Click" Foreground="White" />
             <MenuFlyoutItem Text="删除" Click="Delete_Click"
                             Foreground="{ThemeResource SystemFillColorCriticalBrush}" />
         </MenuFlyout>
@@ -176,6 +177,16 @@
                                         <FontIcon Glyph="&#xE712;" FontSize="16" />
                                     </Button>
                                 </StackPanel>
+
+                                <!-- 解锁被禁用时给整张卡片蒙一层灰：负 margin 抵消 Border 的 Padding，
+                                     让蒙版盖满卡片；IsHitTestVisible=False 保证按钮还能点 -->
+                                <Border Grid.ColumnSpan="3" Margin="-15,-12" CornerRadius="6"
+                                        Background="#B3000000" IsHitTestVisible="False"
+                                        Visibility="{Binding UnlockDisabled, Converter={StaticResource BoolToVis}}">
+                                    <TextBlock Text="已禁用解锁" FontSize="13" FontWeight="SemiBold"
+                                               Foreground="White"
+                                               HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                </Border>
                             </Grid>
                         </Border>
                     </DataTemplate>
@@ -223,6 +234,7 @@
                         <Border.RenderTransform>
                             <ScaleTransform />
                         </Border.RenderTransform>
+                        <Grid>
                         <StackPanel>
                             <!-- 封面框 198×92（卡片有 1px 描边，内容宽 200−2=198）= 比例 2.152，**必须 ≥ 素材比例
                                  （header.jpg 460×215 = 2.1395）**，否则 UniformToFill 会左右各裁一点：素材四边只有
@@ -277,6 +289,15 @@
                                 </StackPanel>
                             </StackPanel>
                         </StackPanel>
+
+                            <!-- 解锁被禁用时的灰蒙版（与列表卡片同一套观感） -->
+                            <Border CornerRadius="6" Background="#B3000000" IsHitTestVisible="False"
+                                    Visibility="{Binding UnlockDisabled, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="已禁用解锁" FontSize="13" FontWeight="SemiBold"
+                                           Foreground="White"
+                                           HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                        </Grid>
                     </Border>
                 </DataTemplate>
             </GridView.ItemTemplate>

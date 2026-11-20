@@ -42,6 +42,12 @@ public partial class LibraryItem : ObservableObject
 
     public string FileName { get; set; } = string.Empty;
 
+    /// <summary>
+    /// 解锁是否被禁用（文件是 <c>&lt;appid&gt;.lua.disabled</c>）。
+    /// 禁用后内核不解析该文件，也就不会给这个 app 注入许可。
+    /// </summary>
+    public bool UnlockDisabled { get; set; }
+
     /// <summary>卡片次级行（WinUI 的 {Binding} 不支持 StringFormat，故在此拼好）</summary>
     public string AppIdDisplay => $"AppID: {AppId}";
 

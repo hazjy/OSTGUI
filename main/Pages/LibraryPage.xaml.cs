@@ -137,9 +137,41 @@ public sealed partial class LibraryPage : Page
         if (sender is Button btn && btn.Tag is LibraryItem item)
         {
             VM.LastRightClickedItem = item;
+
             var menu = Resources["MoreMenu"].As<MenuFlyout>();
+
+            // 菜单项文案随条目状态翻转。这里不能给 MenuFlyoutItem 起 x:Name：
+            // 它定义在 Page.Resources 里，x:Name 生成的是 null 字段，赋值会抛 NRE、
+            // 整个菜单都打不开（2026-11-20 踩过）。改成按 Tag 现找。
+            var toggle = menu.Items.OfType<MenuFlyoutItem>()
+                .FirstOrDefault(i => i.Tag as string == "toggle-unlock");
+            if (toggle is not null)
+                toggle.Text = item.UnlockDisabled ? "启用解锁" : "禁用解锁";
+
             menu.ShowAt(btn, new Windows.Foundation.Point(0, btn.ActualHeight));
         }
+    }
+
+    /// <summary>
+    /// 「禁用解锁 / 启用解锁」：改名 &lt;appid&gt;.lua ↔ &lt;appid&gt;.lua.disabled。
+    /// 内核只解析 .lua 结尾的文件，改名即让它不再为这个 app 注入许可（D 加密走
+    /// 导出/导入授权的场景要的就是这个）。watcher 会热重载，不用重启 Steam。
+    /// </summary>
+    private async void ToggleUnlock_Click(object sender, RoutedEventArgs e)
+    {
+        if (VM.LastRightClickedItem is not { } item) return;
+
+        var luaService = App.Services.GetRequiredService<LuaConfigService>();
+        var currentlyDisabled = item.UnlockDisabled;
+        var (ok, message) = luaService.SetUnlockDisabled(item.AppId, !currentlyDisabled);
+
+        (App.MainWindow as MainWindow)?.Notify(
+            ok ? (currentlyDisabled ? "已启用解锁" : "已禁用解锁") : "操作失败",
+            message,
+            ok ? Microsoft.UI.Xaml.Controls.InfoBarSeverity.Success
+               : Microsoft.UI.Xaml.Controls.InfoBarSeverity.Warning);
+
+        if (ok) await VM.LoadLibraryCommand.ExecuteAsync(null);
     }
 
     /// <summary>

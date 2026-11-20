@@ -55,6 +55,65 @@ public class LuaConfigService
     /// </summary>
     public async Task<List<LibraryItem>> ScanLibraryAsync() => await _scanner.ScanLibraryAsync();
 
+    /// <summary>禁用解锁时给 lua 文件名加的后缀</summary>
+    public const string DisabledSuffix = ".disabled";
+
+    /// <summary>
+    /// 这个 app 的解锁是否已被禁用（存在 <c>&lt;appid&gt;.lua.disabled</c> 且没有 <c>.lua</c>）
+    /// </summary>
+    public bool IsUnlockDisabled(string appId)
+    {
+        var luaDir = _steamService.GetLuaConfigDir();
+        if (string.IsNullOrEmpty(luaDir)) return false;
+
+        var lua = Path.Combine(luaDir, $"{appId}.lua");
+        return !File.Exists(lua) && File.Exists(lua + DisabledSuffix);
+    }
+
+    /// <summary>
+    /// 禁用 / 启用某个 app 的解锁。
+    ///
+    /// 禁用 = 把 <c>&lt;appid&gt;.lua</c> 改名成 <c>&lt;appid&gt;.lua.disabled</c>。内核的
+    /// LuaFileWatcher 只认 <c>.lua</c> 结尾的文件（见 ZSteamTool/src/Utils/Config/LuaFileWatcher.cpp），
+    /// 改名就等于把它从解析集合里摘掉，watcher 会热重载，不用重启 Steam。
+    ///
+    /// 用途：D 加密游戏走「导出/导入授权」时，lua 会让内核去伪造票据，和真实授权冲突
+    /// （88500005）。临时禁用解锁即可让内核完全不碰这个游戏。
+    /// </summary>
+    public (bool success, string message) SetUnlockDisabled(string appId, bool disabled)
+    {
+        var luaDir = _steamService.GetLuaConfigDir();
+        if (string.IsNullOrEmpty(luaDir))
+            return (false, "未找到 Lua 配置目录。");
+
+        var lua = Path.Combine(luaDir, $"{appId}.lua");
+        var off = lua + DisabledSuffix;
+
+        try
+        {
+            if (disabled)
+            {
+                if (!File.Exists(lua))
+                    return (false, $"{appId}.lua 不存在，无需禁用。");
+
+                if (File.Exists(off)) File.Delete(off);
+                File.Move(lua, off);
+                return (true, $"已禁用 {appId} 的解锁：内核将不再为它注入许可（{appId}.lua → {appId}.lua.disabled）");
+            }
+
+            if (!File.Exists(off))
+                return (false, $"{appId}.lua.disabled 不存在，无需启用。");
+
+            if (File.Exists(lua)) File.Delete(lua);
+            File.Move(off, lua);
+            return (true, $"已启用 {appId} 的解锁：内核会重新为它注入许可");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"操作失败：{ex.Message}");
+        }
+    }
+
 /// <summary>
     /// 补齐版本配置：根据 CDN 返回的 depot / GID 写入（或更新）注释形式的 setManifestid 对应关系。
     /// 只写配置，不下载清单。
@@ -145,6 +204,13 @@ public class LuaConfigService
         try
         {
             var filePath = Path.Combine(luaDir, $"{appId}.lua");
+
+            // 启用态的文件不存在、只有 .lua.disabled 时，写回禁用态那份：
+            // 编辑内容不该顺带把解锁重新打开（启用是「更多」菜单里单独的显式操作）
+            var disabledPath = filePath + DisabledSuffix;
+            if (!File.Exists(filePath) && File.Exists(disabledPath))
+                filePath = disabledPath;
+
             await WriteFileAtomicallyAsync(filePath, content);
 
             // 这里以前还会往 steamtools.lua 追一行 addappid(appId)：同一个"入库"动作，走本方法会改第三方配置、
@@ -178,6 +244,13 @@ public class LuaConfigService
                 if (File.Exists(filePath))
                 {
                     await Task.Run(() => File.Delete(filePath));
+                }
+
+                // 解锁被禁用的条目文件名带后缀，一并清掉，否则"删除"对它无效
+                var disabledPath = Path.Combine(luaDir, new DirectoryInfo(filePath).Name + DisabledSuffix);
+                if (File.Exists(disabledPath))
+                {
+                    await Task.Run(() => File.Delete(disabledPath));
                 }
             }
 
@@ -294,7 +367,14 @@ else
         if (string.IsNullOrEmpty(luaDir)) return null;
 
         var filePath = Path.Combine(luaDir, $"{appId}.lua");
-        if (!File.Exists(filePath)) return null;
+
+        // 解锁被禁用时文件叫 <appid>.lua.disabled，编辑照样要能打开（不然禁用后就没法改内容）
+        if (!File.Exists(filePath))
+        {
+            var disabledPath = filePath + DisabledSuffix;
+            if (!File.Exists(disabledPath)) return null;
+            filePath = disabledPath;
+        }
 
         return await File.ReadAllTextAsync(filePath);
     }
