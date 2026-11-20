@@ -195,6 +195,46 @@ public partial class SettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(IsDenuvoCompatMode));
     }
 
+    // === 好友显示 ===
+    // 同样以内核 <Steam>\opensteamtool.toml 的 [presence] display 为唯一数据源：
+    // spacewar = 改写好友广播、显示真实游戏名；none = 按服务器原始状态广播。
+    private bool _presenceBroadcastEnabled = true;
+
+    /// <summary>「向好友显示正在玩的游戏」：开启写 spacewar，关闭写 none；不写进应用配置</summary>
+    public bool PresenceBroadcastEnabled
+    {
+        get => _presenceBroadcastEnabled;
+        set
+        {
+            if (!SetProperty(ref _presenceBroadcastEnabled, value)) return;
+            if (_isLoading) return;
+            ApplyPresenceDisplay(value ? "spacewar" : "none");
+        }
+    }
+
+    private void ApplyPresenceDisplay(string display)
+    {
+        var (ok, message) = _steamDllService.SetPresenceDisplay(display);
+        if (!ok)
+        {
+            SetStatus(message, "Error");
+            ToastService.ShowError("好友显示设置写入失败", message);
+            RefreshPresenceFromKernel();
+            return;
+        }
+
+        LogService.Event(message);
+        SetStatus(message, "Success");
+        (App.MainWindow as MainWindow)?.Notify("好友显示设置已更新", message);
+    }
+
+    /// <summary>从内核配置文件读回 [presence] display（进入设置页时调用，可覆盖外部手改）</summary>
+    public void RefreshPresenceFromKernel()
+    {
+        _presenceBroadcastEnabled = _steamDllService.GetPresenceDisplay() != "none";
+        OnPropertyChanged(nameof(PresenceBroadcastEnabled));
+    }
+
     // === 日志显示 ===
     private string _logsText = "";
 
@@ -573,6 +613,7 @@ public partial class SettingsViewModel : ObservableObject
 
             RefreshOstStatus();
             RefreshDenuvoModeFromKernel();
+            RefreshPresenceFromKernel();
             RefreshManifestLuaStateQuiet();
         }
         finally

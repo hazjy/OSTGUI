@@ -104,17 +104,22 @@ rem else means the host is broken again (e.g. a stub got copied over it).
 echo [4/4] Self-checking the host...
 start /wait "" "%OUT%\OnlineHost.exe"
 set "HC=%ERRORLEVEL%"
-if not "%HC%"=="2" goto hostbroken
+rem 无参数且没有 session-request.json 时，宿主按设计退 6（见 OnlineHost/Program.cs）；
+rem 2 = 参数校验失败，6 = 缺会话请求，两者都说明宿主已正常启动并走到校验分支。
+if "%HC%"=="2" goto hostok
+if "%HC%"=="6" goto hostok
+goto hostbroken
 
+:hostok
 echo.
 echo [OK] exit=0
-echo      host self-check: exit=2 (args rejected, as expected)
+echo      host self-check: exit=%HC% (args rejected, as expected)
 echo      output: %OUT%
 exit /b 0
 
 :hostbroken
 echo.
-echo [FAIL] host self-check returned %HC%, expected 2.
+echo [FAIL] host self-check returned %HC%, expected 2 or 6.
 echo        The online feature (DLL inject / AppID Changer) would fail silently.
 exit /b 1
 

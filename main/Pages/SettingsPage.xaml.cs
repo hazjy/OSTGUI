@@ -54,6 +54,7 @@ public sealed partial class SettingsPage : Page
             VM.RefreshSudamaCacheAge();
             VM.RefreshPaths();
             VM.RefreshDenuvoModeFromKernel();
+            VM.RefreshPresenceFromKernel();
             VM.RefreshManifestLuaStateQuiet();   // 只读回显 manifest.lua 状态，不写盘
         };
 

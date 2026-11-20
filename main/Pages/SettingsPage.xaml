@@ -53,6 +53,13 @@
                             <CheckBox Content="版本状态更改通知" IsChecked="{Binding ShowVersionChangeNotifications, Mode=TwoWay}"
                                       Checked="OnSettingChanged" Unchecked="OnSettingChanged" />
                         </StackPanel>
+                        <CheckBox Content="向好友显示正在玩的游戏"
+                                  IsChecked="{Binding PresenceBroadcastEnabled, Mode=TwoWay}">
+                            <ToolTipService.ToolTip>
+                                <TextBlock TextWrapping="Wrap" MaxWidth="360"
+                                           Text="开启后，好友在好友列表与个人资料中看到实际启动的游戏名，未拥有的入库游戏同样可见。关闭后按服务器原始状态广播：未拥有的游戏对好友不可见，480 联机会话显示为 Spacewar。此项写入内核 opensteamtool.toml 的 [presence] display，改动即时生效；只影响好友侧显示，不影响成就与联机。" />
+                            </ToolTipService.ToolTip>
+                        </CheckBox>
                     </StackPanel>
                 </Border>
 

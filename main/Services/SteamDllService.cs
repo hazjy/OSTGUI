@@ -13,6 +13,7 @@ public class SteamDllService
     public const string ConfigFileName = "opensteamtool.toml";
 
     private const string DefaultDenuvoMode = "normal";
+    private const string DefaultPresenceDisplay = "spacewar";
 
     public SteamDllService(SteamService steamService)
     {
@@ -92,6 +93,85 @@ public class SteamDllService
 
             File.WriteAllText(path, string.Join(newline, lines) + newline);
             return (true, $"已写入 {ConfigFileName}：mode = \"{mode}\"（内核立即热重载）");
+        }
+        catch (Exception ex)
+        {
+            return (false, $"写入 {ConfigFileName} 失败：{ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 读取内核 [presence] display（spacewar / none）。
+    /// 缺文件、缺段、缺键或值非法时按内核默认值 spacewar 处理。
+    /// </summary>
+    public string GetPresenceDisplay() => ReadPresenceDisplayAt(GetConfigPath());
+
+    /// <summary>
+    /// 写入内核 [presence] display。保留文件其余内容与注释，只改 display 行；段/键缺失时按需追加。
+    /// 内核 ConfigFileWatcher 监听整文件变更并热重载，因此无需重启 Steam。
+    /// </summary>
+    public (bool success, string message) SetPresenceDisplay(string display) =>
+        WritePresenceDisplayAt(GetConfigPath(), display);
+
+    internal static string ReadPresenceDisplayAt(string? path)
+    {
+        if (path == null || !File.Exists(path)) return DefaultPresenceDisplay;
+
+        try
+        {
+            var lines = File.ReadAllLines(path).ToList();
+            var (start, end) = SectionRange(lines, "presence");
+            if (start < 0) return DefaultPresenceDisplay;
+
+            for (var i = start + 1; i < end; i++)
+            {
+                if (TryParseKeyLine(lines[i], "display", out var value)
+                    && (value == "spacewar" || value == "none"))
+                    return value;
+            }
+        }
+        catch { }
+        return DefaultPresenceDisplay;
+    }
+
+    internal static (bool success, string message) WritePresenceDisplayAt(string? path, string display)
+    {
+        if (display != "spacewar" && display != "none")
+            return (false, $"未知的好友显示模式：{display}");
+
+        if (path == null)
+            return (false, "Steam 路径未设置，无法定位 opensteamtool.toml");
+
+        try
+        {
+            var text = File.Exists(path) ? File.ReadAllText(path) : "";
+            var newline = text.Contains("\r\n") ? "\r\n" : "\n";
+            var lines = text.Length == 0 ? new List<string>() : text.Split(newline).ToList();
+            while (lines.Count > 0 && lines[^1].Trim().Length == 0) lines.RemoveAt(lines.Count - 1);
+
+            var line = $"display = \"{display}\"";
+            var (start, end) = SectionRange(lines, "presence");
+            if (start < 0)
+            {
+                lines.Add("[presence]");
+                lines.Add(line);
+            }
+            else
+            {
+                var replaced = false;
+                for (var i = start + 1; i < end && !replaced; i++)
+                {
+                    if (TryParseKeyLine(lines[i], "display", out _))
+                    {
+                        lines[i] = line;
+                        replaced = true;
+                    }
+                }
+                if (!replaced) lines.Insert(start + 1, line);
+            }
+
+            File.WriteAllText(path, string.Join(newline, lines) + newline);
+            return (true, $"已写入 {ConfigFileName}：[presence] display = \"{display}\"（内核立即热重载）");
         }
         catch (Exception ex)
         {
@@ -240,6 +320,82 @@ public class SteamDllService
         if (value != "normal" && value != "compat") return false;
         mode = value;
         return true;
+    }
+
+    /// <summary>匹配段内的 `key = "值"` 行（跳过注释，容忍行内注释与空白，值去掉引号）</summary>
+    private static bool TryParseKeyLine(string line, string key, out string value)
+    {
+        value = "";
+        var trimmed = line.Trim();
+        if (trimmed.Length == 0 || trimmed.StartsWith('#')) return false;
+
+        var eq = trimmed.IndexOf('=');
+        if (eq < 0) return false;
+        if (trimmed[..eq].Trim() != key) return false;
+
+        var raw = trimmed[(eq + 1)..];
+        var hash = raw.IndexOf('#');
+        if (hash >= 0) raw = raw[..hash];
+        value = raw.Trim().Trim('"').Trim('\'');
+        return value.Length > 0;
+    }
+
+    /// <summary>
+    /// 自检（挂 <c>OSTGUI.exe --trainer-selftest</c> 链）：[presence] display 的读写往返。
+    /// 覆盖只改 display 行、段内与相邻段注释/键不动、缺段追加、非法值拒写四条。全通过返回空串。
+    /// </summary>
+    public static string SelfCheck()
+    {
+        var path = Path.Combine(Path.GetTempPath(),
+            "ostgui-presence-selftest-" + Environment.ProcessId + ".toml");
+        try
+        {
+            File.WriteAllText(path, string.Join("\n", new[]
+            {
+                "# 顶部注释",
+                "[denuvo]",
+                "mode = \"compat\"",
+                "",
+                "[presence]",
+                "# 保留这行注释",
+                "display = \"none\"  # 行内注释",
+                "",
+                "[lua]",
+                "paths = [\"config/lua\"]",
+                "",
+            }));
+
+            if (ReadPresenceDisplayAt(path) != "none")
+                return "presence 自检：已有 display 没读到";
+
+            if (!WritePresenceDisplayAt(path, "spacewar").success)
+                return "presence 自检：写入已有段失败";
+            if (ReadPresenceDisplayAt(path) != "spacewar")
+                return "presence 自检：写入后回读不匹配";
+
+            var text = File.ReadAllText(path);
+            if (!text.Contains("# 保留这行注释")) return "presence 自检：段内注释被删";
+            if (!text.Contains("mode = \"compat\"")) return "presence 自检：denuvo 段被改";
+            if (!text.Contains("paths = [\"config/lua\"]")) return "presence 自检：lua 段被改";
+
+            File.WriteAllText(path, "[lua]\npaths = []\n");
+            if (!WritePresenceDisplayAt(path, "none").success)
+                return "presence 自检：缺段追加失败";
+            if (ReadPresenceDisplayAt(path) != "none")
+                return "presence 自检：追加后回读不匹配";
+
+            var before = File.ReadAllText(path);
+            if (WritePresenceDisplayAt(path, "hidden").success)
+                return "presence 自检：非法值未被拒绝";
+            if (File.ReadAllText(path) != before)
+                return "presence 自检：拒写后文件被改";
+
+            return "";
+        }
+        finally
+        {
+            try { File.Delete(path); } catch { }
+        }
     }
 
     /// <summary>
