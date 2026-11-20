@@ -60,7 +60,7 @@
                 </StackPanel>
                 <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Bottom">
                     <AutoSuggestBox Width="240" QueryIcon="Find"
-                                    PlaceholderText="搜索游戏 / AppID"
+                                    PlaceholderText="搜索名称/appid"
                                     Text="{Binding SearchFilter, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" />
                     <Button Click="RefreshButton_Click">
                         <ToolTipService.ToolTip><ToolTip Content="刷新" /></ToolTipService.ToolTip>
