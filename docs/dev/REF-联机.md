@@ -10,6 +10,23 @@
 - **前提**：DLL 注入类工具只在客户端层伪造所有权，匹配由服务端按账号校验，假入库无法联机；通用解是在拥有许可的 AppID（480 Spacewar）下做"一致世界"。
 - **会话身份**：默认 480，`-onlinefix=<appid>` 可指定；内核侧的 8 处一致化清单见 `ZSteamTool/docs/dev/REF-内核-联机会话.md`。
 
+## 选哪条（2026-11-17 实测修正）
+
+| 场景 | 走哪条 | 依据 |
+|---|---|---|
+| 客户端已经认成本 appid、游戏自带 Steam 大厅（Terraria 105600） | 直接启动，不套会话 | 叠加层、邀请弹窗、建厅都正常；套 480 会被游戏自己的 appid 自检掐掉 |
+| 建厅撞 `AccessDenied`、需要换成本就拥有的 appid（BOXHEAD 2795640） | 命令行会话 | 经 `steam.exe -applaunch` 启动，叠加层与会话都齐 |
+| 需要自定义 exe、绕开 Steam 启动链 | 宿主会话（降级） | 2026-11-13 客户端之后，宿主拉起的进程没有叠加层 UI（`gameoverlayui64.exe` 不起来），邀请弹窗随之失效 |
+
+## 宿主会话 · 由 Steam 启动（2026-11-17 实测可行）
+
+- 做法：把 `OnlineHost.exe` 注册成非 Steam 游戏快捷方式，启动选项写 `"<游戏 exe>" <会话身份>`，从库里启动。Steam 拉起 OnlineHost，OnlineHost 再拉起游戏。
+- 效果：叠加层回来了，而且注入到**游戏进程**而不是宿主：`console_log` 为 `GameOverlay: started ... for game process 19104`（19104 = 游戏 pid），`gameoverlay_ui` 里 `Got gameid on commandline: 480`，说明叠加层按会话身份 480 工作。
+- 为什么行：Steam 对自己启动的进程树整棵认领，孙进程照样跟踪。报文里 `parent_is_steam` 依旧缺失、`launch_source` 仍是 0，但叠加层照起。判定依据是进程树归属，不是那个上报字段。
+- 结论：宿主会话的兼容性（纯环境变量身份、内核不碰客户端内部）与叠加层可以同时拿到，代价是多一步「由 Steam 启动」。
+- **两条路都留**：登记了 OnlineHost 快捷方式就走 Steam（有叠加层）；没登记就走 CreateProcess（无叠加层，但用户在 Steam 里什么都不用配）。降级时界面明说「未检测到把 OnlineHost.exe 添加为自定义游戏，将以 CreateProcess 方式启动游戏」，避免被当成叠加层坏了。
+- 换机器/换安装目录后快捷方式的 Exe 会对不上，同样落到 CreateProcess；程序不自动登记快捷方式（Steam 只在启动时读 shortcuts.vdf，自动写要用户重启一次 Steam，不如让人自己选）。
+
 ## 宿主会话（v4，当前路线）
 
 - 起点：以 `SteamAppId` / `SteamGameId` = 480 直接启动游戏 exe 即可形成全一致世界，叠加层照常注入（推翻了早先"叠加层必丢"的判断）；带自检的游戏改用"宿主先注册成同一身份"解决。
@@ -17,7 +34,7 @@
 - 实测：进程日志两条 `AppID 480 adding PID …`；`GameOverlay: started 'gameoverlayui64.exe' … for game process`；内核侧抓到 `ClientMMSUserJoinedLobby` 与 `LobbyChatMsg`，走的是真大厅；PEAK 好友邀请进房成功。
 - 实现坑：现代 `steam_api64.dll` 只导出 `SteamAPI_InitFlat` / `SteamAPI_InitSafe` / `SteamInternal_SteamAPI_Init`，按 `SteamAPI_Init` 找会全部落空；回退链 InitFlat → InitSafe（部分垫片只导出后者）；`steam_appid.txt` 不再从 CWD 生效，要用环境变量或放在 exe 同目录。
 - 游戏 exe 解析：`libraryfolders.vdf` 找库 → `appmanifest_<appid>.acf` 的 `installdir` → 目录同名 exe，否则取目录里最大的 exe（排除 CrashHandler / vcredist / unins）。
-- 停止链：从宿主命令行取最后一个带引号的 `.exe`（第一个可能是宿主自身）→ 按进程名结束游戏 → 再结束宿主（给 3 秒收尾再强杀）。
+- 停止链：先结束游戏、再结束宿主（给 3 秒收尾再强杀）。游戏进程三路取并集：宿主的子孙进程、环境变量 `SteamAppId=480` 的进程、宿主命令行里带引号的 `.exe`（老路径才有）。经 Steam 启动后宿主不带参数，只靠命令行会漏掉游戏（2026-11-17 修）。
 - 日志：`%LOCALAPPDATA%\OSTGUI\logs\onlinehost.log`，每次会话写会话头（身份 + 游戏 exe）、垫片路径、自注册结果。`SteamAPI_InitFlat` 已传 `SteamErrMsg` 缓冲区，失败打印结果码：0 = OK / 1 = FailedGeneric / 2 = NoSteamClient（Steam 未运行或未登录）/ 3 = VersionMismatch（垫片与客户端版本不匹配）。"联机点了没反应"先看这行。
 
 ## 文件会话（原 AppID Changer）
