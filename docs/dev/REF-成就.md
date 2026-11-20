@@ -5,9 +5,9 @@
 > 不写什么：内核 819 / CloudRedirect 侧实现见 `ZSteamTool/docs/dev/DEV-NOTES.md` 与内核 `REF-内核-*`；UI 偏好不记。
 
 ## 为什么假入库游戏的成就显示不出来
-- **服务端拒答**：客户端拉成就走 818 → 819（旧路径 `Player.GetUserStats#1`，151 → 147）。未拥有的 app，Valve 回 `eresult: 2` + 空 body：没有 schema，也没有任何解锁数据。
+- **服务端拒答**：未拥有的 app，Valve 对 stats 读取回 `eresult: 2` + 空 body：没有 schema，也没有任何解锁数据。2026-11-14 起客户端改走 `Player.GetUserStats#1`（151 → 147），`achievement.log` 里不再出现 818/819。
 - **客户端本地不留**：现代客户端 `userdata\<id>\<appid>\` 下没有 `stats` 目录（旧版 `achievements.bin` 已消失）；成就完全服务端权威，SAM 式"改本地文件"因此不通。
-- **内核的 819 兜底会遮住显示**：对配置里命中该 depot 的 app（`LuaConfig::HasDepot`），内核会 `clear_stats()` + `clear_achievement_blocks()` 并置 `eresult=OK`，随后用 CloudRedirect 的云端成就覆盖；CR 没数据就是"清空 + 盖空"。客户端拿成就只走这条 819，所以刚改过成就的游戏下次启动会看不到（下一次往返或内存态又会盖回来）。实现见内核侧 `REF-内核-*`。
+- **内核的兜底会遮住显示**：对配置里命中该 depot 的 app（`LuaConfig::HasDepot`），内核会 `clear_stats()` + `clear_achievement_blocks()` 并置 `eresult=OK`，819 随后用 CloudRedirect 的云端成就覆盖；CR 没数据就是"清空 + 盖空"。147 路径只 `clear_stats()`、不回填，且带 `sha_schema` 的请求会跳过捐赠号改写（`Hooks_NetPacket.cpp:274`）。
 - **写入有效，服务端也存**：`SetAchievement` + `StoreStats` 走 5466 → Valve 回 821，重启 Steam 后成就仍在；所以"假入库的成就留不住"只对**显示层**成立。
 
 ## 成就页实现
@@ -24,4 +24,4 @@
 - **GUI 目前不读写它**：留底与恢复都还没做。
 
 ## 待办
-- 显示层要稳需从内核侧下手：CR 无数据时不要清空 819，或改成叠加我们自己的留底；也可走已由内核托管的 CloudRedirect（其 `config.json` 有 `sync_achievements` / `sync_playtime`）。
+- 显示层修复已立项：见 `doc/TODO/待办/261120-CR成就接入.md`（147 回填、恢复 CR 部署、补齐 8-18 之后的解锁）。
