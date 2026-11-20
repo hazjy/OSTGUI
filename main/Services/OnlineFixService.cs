@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
+using OSTGUI.Utils;
 
 namespace OSTGUI.Services;
 
@@ -62,6 +63,42 @@ public class OnlineFixService
     }
 
     /// <summary>
+    /// 宿主经 Steam 启动：写会话请求 → <c>steam://rungameid/&lt;CGameID&gt;</c>。
+    ///
+    /// CGameID 是快捷方式的 64 位 id（appid &lt;&lt; 32）。用改命令行的办法不行：<c>-applaunch</c>
+    /// 会把 id 截成低 24 位当成真实 appid（4243696773 → 15838341），直接报
+    /// 「游戏配置文件不可用」（2026-11-17 实测 AppError_9）。
+    ///
+    /// 没有登记 OnlineHost 快捷方式时返回 null，调用方回退到自己的 CreateProcess（无叠加层）。
+    /// </summary>
+    private (bool success, string message)? TryStartHostViaSteam(string gameExe, string sessionAppId, bool viaAppIdFile)
+    {
+        var steamPath = _steamService.GetSteamPath();
+        if (string.IsNullOrEmpty(steamPath)) return null;
+
+        var host = Path.Combine(AppContext.BaseDirectory, "OnlineHost.exe");
+        if (!File.Exists(host)) return null;
+
+        var shortcut = ShortcutsVdf.FindByExe(steamPath, host);
+        if (shortcut is null) return null;
+
+        if (!uint.TryParse(sessionAppId, out var appId) || appId == 0)
+            return (false, $"会话身份无效：{sessionAppId}");
+
+        if (!SessionRequest.Write(gameExe, appId, viaAppIdFile))
+            return (false, "写会话请求文件失败，未启动（详情见日志）");
+
+        var gameId = ShortcutsVdf.ToGameId(shortcut.Value.AppId);
+        UrlLauncher.Open($"steam://rungameid/{gameId}");
+        LogService.Diag($"宿主经 Steam 启动：快捷方式 {shortcut.Value.AppName}（{gameId}），" +
+                        $"游戏 {gameExe}，身份 {sessionAppId}，文件法 {viaAppIdFile}");
+
+        return (true, viaAppIdFile
+            ? $"已由 Steam 以 {sessionAppId} 身份启动 {Path.GetFileName(gameExe)}（文件会话）"
+            : $"已由 Steam 以 {sessionAppId} 身份启动 {Path.GetFileName(gameExe)}");
+    }
+
+    /// <summary>
     /// 是否已有 480 联机游戏在运行（内核限制同一时间只能一个）
     /// </summary>
     public bool IsRunning()
@@ -106,6 +143,19 @@ public class OnlineFixService
         if (!_steamService.IsSteamRunning())
             return (false, "Steam 未运行，请先启动并登录 Steam（需在线模式）");
 
+        // 优先由 Steam 启动宿主：只有 Steam 拉起的进程树才拿得到叠加层（2026-11-17 实测，
+        // 见 docs/dev/REF-联机.md）。没有登记快捷方式时返回 null，落到下面的老路径。
+        var viaSteam = TryStartHostViaSteam(gameExe, sessionAppId, viaAppIdFile);
+        if (viaSteam is not null)
+            return viaSteam.Value;
+
+        // 两条路都保留：登记了快捷方式就走 Steam（有叠加层），没登记就走 CreateProcess
+        // （无叠加层但不需要用户在 Steam 里做任何配置）。这里把降级如实说出来，别让用户
+        // 以为叠加层坏了。
+        var fallbackNotice = "未检测到把 OnlineHost.exe 添加为自定义游戏，将以 CreateProcess 方式启动游戏" +
+                             "（无 Steam 叠加层；需要叠加层的话，在 Steam 库里添加一次 OnlineHost.exe 即可）。";
+        LogService.Diag("宿主会话未找到 OnlineHost 快捷方式，回退 CreateProcess 启动：" + gameExe);
+
         var host = Path.Combine(AppContext.BaseDirectory, "OnlineHost.exe");
         if (!File.Exists(host))
             return (false, $"未找到 OnlineHost.exe: {host}");
@@ -131,7 +181,7 @@ public class OnlineFixService
                                $"详情见日志 {OnlineHostLogPath}");
 
             if (!viaAppIdFile)
-                return (true, $"已以 {sessionAppId} 身份启动 {Path.GetFileName(gameExe)}");
+                return (true, $"{fallbackNotice}已以 {sessionAppId} 身份启动 {Path.GetFileName(gameExe)}");
 
             // 文件法的成败全在这个文件上：目录只读/被占时宿主会立刻失败退出，
             // 这里等最多 1.5 秒确认真的写上了，免得报了成功其实没启动
@@ -139,7 +189,8 @@ public class OnlineFixService
             for (var i = 0; i < 6; i++)
             {
                 if (File.Exists(target) && File.ReadAllText(target).Trim() == sessionAppId)
-                    return (true, $"已写入 AppID {sessionAppId} 并启动 {Path.GetFileName(gameExe)}（退出后自动还原）");
+                    return (true, $"{fallbackNotice}已写入 AppID {sessionAppId} 并启动 " +
+                                   $"{Path.GetFileName(gameExe)}（退出后自动还原）");
                 Thread.Sleep(250);
             }
             return (false, $"无法写入 {target}（目录只读或被占用），游戏未启动");
@@ -329,7 +380,14 @@ public class OnlineFixService
     public bool IsHostRunning() => FindHostProcessIds().Count > 0;
 
     /// <summary>
-    /// 停止宿主会话联机游戏：先从宿主命令行里取出游戏 exe 结束游戏，再结束宿主。
+    /// 停止宿主会话联机游戏：先结束游戏，再结束宿主。
+    ///
+    /// 游戏进程怎么找（三路并集，任一条命中就够）：
+    ///   ① 宿主的子孙进程 —— 宿主是游戏或启动器的父进程，这条路与启动方式无关；
+    ///   ② 环境变量里 SteamAppId=480 的进程；
+    ///   ③ 宿主命令行里的游戏 exe（老路径，宿主带参数启动时才有）。
+    /// 2026-11-17 之前只做了 ③，改成经 Steam 启动后宿主不再带参数（参数走请求文件），
+    /// 于是取不到游戏 exe、只结束了宿主，游戏留在原地——就是那次"点停止没反应"。
     /// </summary>
     public (bool success, string message) StopViaHost()
     {
@@ -337,21 +395,35 @@ public class OnlineFixService
         if (hosts.Count == 0)
             return (false, "当前没有宿主会话在运行");
 
-        var games = 0;
-        var stopped = 0;
+        var gamePids = new HashSet<int>(FindDescendantProcessIds(hosts));
+        foreach (var pid in FindOnlineFixProcessIds()) gamePids.Add(pid);
         foreach (var pid in hosts)
         {
             var gameExe = GameExeFromHost(pid);
-            if (gameExe is not null)
+            if (gameExe is null) continue;
+            foreach (var proc in Process.GetProcessesByName(Path.GetFileNameWithoutExtension(gameExe)))
             {
-                var name = Path.GetFileNameWithoutExtension(gameExe);
-                foreach (var game in Process.GetProcessesByName(name))
-                {
-                    try { game.Kill(); games++; } catch { }
-                    finally { game.Dispose(); }
-                }
+                gamePids.Add(proc.Id);
+                proc.Dispose();
             }
+        }
+        foreach (var pid in hosts) gamePids.Remove(pid);
 
+        var games = 0;
+        foreach (var pid in gamePids)
+        {
+            try
+            {
+                using var game = Process.GetProcessById(pid);
+                game.Kill();
+                games++;
+            }
+            catch { }
+        }
+
+        var stopped = 0;
+        foreach (var pid in hosts)
+        {
             try
             {
                 // 先给宿主 3 秒自己收尾（文件法要还原文件、宿主路线要 SteamAPI_Shutdown），赖着不走才强杀
@@ -362,10 +434,70 @@ public class OnlineFixService
             catch { }
         }
 
+        LogService.Diag($"停止宿主会话：游戏 {games} 个、启动器 {stopped} 个（游戏 pid: {string.Join(",", gamePids)}）");
         return stopped > 0
             ? (true, $"已停止游戏 {games} 个、启动器 {stopped} 个")
             : (false, "停止失败，请手动结束进程");
     }
+
+    /// <summary>取一组进程的全部子孙 pid（Toolhelp 快照里的父 pid 关系，按层展开）。</summary>
+    private static HashSet<int> FindDescendantProcessIds(IEnumerable<int> roots)
+    {
+        var parentOf = new Dictionary<int, int>();
+        var snapshot = CreateToolhelp32Snapshot(Th32csSnapProcess, 0);
+        if (snapshot != IntPtr.Zero && snapshot != new IntPtr(-1))
+        {
+            try
+            {
+                var entry = new ProcessEntry32 { dwSize = (uint)Marshal.SizeOf<ProcessEntry32>() };
+                if (Process32First(snapshot, ref entry))
+                {
+                    do { parentOf[(int)entry.th32ProcessID] = (int)entry.th32ParentProcessID; }
+                    while (Process32Next(snapshot, ref entry));
+                }
+            }
+            finally { CloseHandle(snapshot); }
+        }
+
+        var result = new HashSet<int>();
+        var queue = new Queue<int>(roots);
+        while (queue.Count > 0)
+        {
+            var current = queue.Dequeue();
+            foreach (var pair in parentOf)
+            {
+                if (pair.Value != current || !result.Add(pair.Key)) continue;
+                queue.Enqueue(pair.Key);
+            }
+        }
+        return result;
+    }
+
+    private const uint Th32csSnapProcess = 0x00000002;
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct ProcessEntry32
+    {
+        public uint dwSize;
+        public uint cntUsage;
+        public uint th32ProcessID;
+        public IntPtr th32DefaultHeapID;
+        public uint th32ModuleID;
+        public uint cntThreads;
+        public uint th32ParentProcessID;
+        public int pcPriClassBase;
+        public uint dwFlags;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 260)] public string szExeFile;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern IntPtr CreateToolhelp32Snapshot(uint flags, uint pid);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool Process32First(IntPtr snapshot, ref ProcessEntry32 entry);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool Process32Next(IntPtr snapshot, ref ProcessEntry32 entry);
 
     private static List<int> FindHostProcessIds()
     {
