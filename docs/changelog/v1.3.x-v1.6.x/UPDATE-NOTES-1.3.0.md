@@ -88,7 +88,7 @@
 
 - **构建脚本整合**：全部构建入口收敛为根目录 `build.bat`——安静输出、完整日志落盘 `%TEMP%\ostgui_build.log`、失败自动打印错误摘要、支持 `build.bat /r` 构建后直接启动；删除了 5 个过时/失效的脚本；
 - **NoSteamLauncher 折叠入主仓库**：此前它是一个嵌套的独立 git 仓库（克隆主仓库时源码会丢失），现作为普通源码目录纳入统一版本控制，其运行时二进制资源（脱壳插件、GSE 模板等约 22MB）一并纳入；
-- **第三方组件声明**：新增 `docs/THIRD-PARTY-NOTICES.md`，列明随仓库分发的 GSE（LGPL-3.0）、Steamless（CC BY-NC-ND 4.0）、SteamAPICheckBypass（MIT）组件的来源与许可证。
+- **第三方组件声明**：新增 `docs/dev/THIRD-PARTY-NOTICES.md`，列明随仓库分发的 GSE（LGPL-3.0）、Steamless（CC BY-NC-ND 4.0）、SteamAPICheckBypass（MIT）组件的来源与许可证。
 
 ---
 
